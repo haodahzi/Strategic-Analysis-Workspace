@@ -1,0 +1,23 @@
+/* 工作台 chrome（外壳）样式。交付物内容用 report.css，二者隔离。 */
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#e9e5dc}
+.app-root{min-height:100vh}
+
+.app-chrome{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;background:#1a1712;color:#fff;
+  border-bottom:2px solid #9a6c00;
+  font-family:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+}
+.app-brand{display:flex;align-items:center;gap:12px}
+.app-logo{color:#9a6c00;font-size:18px}
+.app-title{font-size:15px;font-weight:600;letter-spacing:.5px}
+.app-sub{font-size:10px;color:rgba(255,255,255,.5);font-family:'IBM Plex Mono',monospace;letter-spacing:.5px}
+.app-actions{display:flex;gap:8px}
+.app-btn{
+  font-size:12px;padding:6px 14px;cursor:pointer;
+  background:#9a6c00;color:#fff;border:1px solid #9a6c00;border-radius:2px;
+}
+.app-btn.ghost{background:transparent;color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.25)}
+.app-btn:hover{filter:brightness(1.1)}
