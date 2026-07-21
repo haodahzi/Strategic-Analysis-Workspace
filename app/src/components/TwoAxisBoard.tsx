@@ -4,7 +4,10 @@ const CELL_CLASS: Record<CellState, string> = {
   空: "c-empty", 假设: "c-hyp", 验证: "c-ver", 结论: "c-con",
 };
 
-export default function TwoAxisBoard({ project, onOpenReport }: { project: Project; onOpenReport: () => void }) {
+export default function TwoAxisBoard(
+  { project, onOpenReport, onOpenTx }:
+  { project: Project; onOpenReport: () => void; onOpenTx: () => void },
+) {
   return (
     <div className="board">
       <div className="board-head">
@@ -16,9 +19,12 @@ export default function TwoAxisBoard({ project, onOpenReport }: { project: Proje
             <span className="st-chip st-cur">当前阶段：{project.stage}</span>
           </div>
         </div>
-        {project.hasIndustryReport && (
-          <button type="button" className="app-btn" onClick={onOpenReport}>查看行业深度分析 →</button>
-        )}
+        <div className="board-actions">
+          {project.hasIndustryReport && (
+            <button type="button" className="app-btn" onClick={onOpenReport}>查看行业深度分析 →</button>
+          )}
+          <button type="button" className="app-btn ghost dark" onClick={onOpenTx}>交易结构 · 合规探测 →</button>
+        </div>
       </div>
 
       <div className="board-note">

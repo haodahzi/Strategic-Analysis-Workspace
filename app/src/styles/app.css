@@ -111,6 +111,9 @@ body{font-family:var(--sans);background:#e9e5dc;color:var(--ink)}
 .board-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
 .board-head h2{font-family:var(--serif);font-size:22px;font-weight:700}
 .board-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.board-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.board-actions .app-btn{color:#fff}
+.app-btn.ghost.dark{background:transparent;color:var(--ink2);border-color:var(--border)}
 .board-note{font-size:12px;color:var(--ink2);background:var(--surface2);border-left:3px solid var(--gold);padding:11px 14px;margin:18px 0;line-height:1.7}
 table.matrix{width:100%;border-collapse:collapse;margin:8px 0;background:#fff}
 table.matrix th{background:var(--ink);color:rgba(255,255,255,.85);font-family:var(--mono);font-size:11px;font-weight:400;padding:9px 12px;text-align:center}
