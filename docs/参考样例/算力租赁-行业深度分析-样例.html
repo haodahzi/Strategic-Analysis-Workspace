@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>算力租赁行业 · 深度研究与项目评估</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f1eb;--surface:#fff;--surface2:#faf8f3;
+  --ink:#1a1712;--ink2:#484440;--ink3:#8a847c;
+  --border:#ddd8ce;--border2:#ece8e0;
+  --red:#b03020;--gold:#9a6c00;--teal:#1a6050;--blue:#1a3f72;--purple:#4a2878;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{font-family:'Noto Sans SC','Noto Sans CJK SC',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.75}
+.nav{position:sticky;top:0;z-index:100;background:var(--ink);display:flex;gap:0;overflow-x:auto;border-bottom:2px solid var(--gold)}
+.nav a{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.5px;color:rgba(255,255,255,.45);padding:10px 15px;text-decoration:none;white-space:nowrap;border-right:1px solid rgba(255,255,255,.07);transition:all .2s}
+.nav a:hover{color:#fff;background:rgba(255,255,255,.06)}
+.nav .navdiv{color:var(--gold);font-weight:600;background:rgba(154,108,0,.14)}
+.wrap{max-width:980px;margin:0 auto;padding:0 24px 100px}
+
+/* HERO */
+.hero{padding:58px 0 42px;border-bottom:3px double var(--border)}
+.eyebrow{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--ink3);margin-bottom:18px}
+.hero-h{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:40px;font-weight:900;line-height:1.15;margin-bottom:14px}
+.hero-h em{font-style:normal;color:var(--gold)}
+.hero-sub{font-size:15px;color:var(--ink2);line-height:1.8;border-left:3px solid var(--gold);padding-left:18px;max-width:700px;margin-top:22px}
+.hero-badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.badge{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:1px;padding:4px 10px;border:1px solid var(--border);color:var(--ink3)}
+
+/* PART DIVIDER */
+.part{margin-top:64px;padding:22px 26px;background:var(--ink);color:#fff;display:flex;gap:20px;align-items:center}
+.part .p-n{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--gold)}
+.part .p-t{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:22px;font-weight:700}
+.part .p-d{font-size:12px;color:rgba(255,255,255,.6);margin-left:auto;text-align:right;max-width:360px;line-height:1.55}
+
+/* CHAPTER */
+.chapter{margin-top:56px;scroll-margin-top:56px}
+.ch-hd{display:flex;gap:18px;align-items:baseline;margin-bottom:26px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.ch-n{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:32px;font-weight:600;color:var(--border);line-height:1}
+.ch-meta .ch-label{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--ink3);margin-bottom:3px}
+.ch-meta .ch-title{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:21px;font-weight:700}
+
+/* SECTION */
+.sec{margin-bottom:34px}
+.sec-t{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:15px;font-weight:600;color:var(--ink);margin:22px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border2)}
+p{color:var(--ink2);margin-bottom:11px;font-size:14px}
+strong{color:var(--ink);font-weight:500}
+
+/* WHAT GRID */
+.what-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+.what-item{padding:14px 16px;background:var(--surface2);border-left:3px solid var(--border)}
+.what-item.key{border-left-color:var(--gold)}
+.what-label{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--ink3);margin-bottom:5px}
+.what-text{font-size:13px;color:var(--ink2);line-height:1.6}
+.what-text strong{color:var(--ink)}
+
+/* INSIGHT */
+.insight{margin:16px 0;padding:18px 22px}
+.insight-tag{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:2px;margin-bottom:8px}
+.insight p{font-size:13px;margin-bottom:0;line-height:1.7}
+.insight.dark{background:var(--ink);color:rgba(255,255,255,.8)}.insight.dark .insight-tag{color:rgba(255,255,255,.4)}.insight.dark p{color:rgba(255,255,255,.72)}.insight.dark strong{color:#fff}
+.insight.gold{background:#faf3e0;border:1px solid #d4a017}.insight.gold .insight-tag{color:var(--gold)}.insight.gold p{color:var(--ink2)}
+.insight.teal{background:#e8f5f1;border:1px solid var(--teal)}.insight.teal .insight-tag{color:var(--teal)}.insight.teal p{color:var(--ink2)}
+.insight.red{background:#fdf0ee;border:1px solid var(--red)}.insight.red .insight-tag{color:var(--red)}.insight.red p{color:var(--ink2)}
+
+/* ANNO */
+.anno{border-left:3px solid var(--gold);padding:11px 16px;background:var(--surface2);margin:14px 0}
+.anno-tag{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;color:var(--ink3);letter-spacing:1.5px;margin-bottom:5px}
+.anno p{font-size:13px;margin:0;line-height:1.65}
+.anno.blue{border-left-color:var(--blue)}
+.anno.teal{border-left-color:var(--teal)}
+.anno.red{border-left-color:var(--red)}
+.anno.purple{border-left-color:var(--purple)}
+.anno.gold{border-left-color:var(--gold)}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:14px 0}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border2);padding:18px}
+.card-tag{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;color:var(--ink3);letter-spacing:1.5px;margin-bottom:7px}
+.card-val{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:24px;font-weight:700;color:var(--ink);line-height:1.1;margin-bottom:3px}
+.card-val.teal{color:var(--teal)}.card-val.gold{color:var(--gold)}.card-val.red{color:var(--red)}.card-val.blue{color:var(--blue)}
+.card-sub{font-size:11px;color:var(--ink3);line-height:1.45}
+.card-body{font-size:13px;color:var(--ink2);line-height:1.65}
+.card-body strong{color:var(--ink)}
+.card-name{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px}
+
+/* TIMELINE */
+.tl{position:relative;padding-left:28px;margin:18px 0}
+.tl::before{content:'';position:absolute;left:6px;top:8px;bottom:8px;width:1px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:20px}
+.tl-item::before{content:'';position:absolute;left:-24px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--ink3)}
+.tl-item.key::before{background:var(--gold);width:9px;height:9px;left:-25px;top:5px}
+.tl-item.pivot::before{background:var(--red);width:11px;height:11px;left:-26px;top:4px}
+.tl-yr{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:10px;color:var(--gold);font-weight:600;margin-bottom:2px;letter-spacing:1px}
+.tl-t{font-size:13px;font-weight:500;color:var(--ink);margin-bottom:3px}
+.tl-d{font-size:12px;color:var(--ink2);line-height:1.6}
+
+/* METRIC ROW */
+.mrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border2)}
+.mrow-name{font-size:12px;color:var(--ink);min-width:190px;flex-shrink:0}
+.mrow-bar{flex:1;height:6px;background:var(--border2);overflow:hidden}
+.mrow-fill{height:100%}
+.mrow-val{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:11px;color:var(--ink2);min-width:60px;text-align:right}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+th{text-align:left;padding:7px 12px;background:var(--ink);color:rgba(255,255,255,.82);font-weight:400;font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.4px}
+td{padding:8px 12px;border-bottom:1px solid var(--border2);color:var(--ink2);vertical-align:top}
+td:first-child{color:var(--ink);font-weight:500}
+tr:hover td{background:var(--surface2)}
+.tr-hi td{color:var(--teal)!important;font-weight:500}
+.tr-lo td{color:var(--ink3)!important}
+.tr-warn td{color:var(--red)!important}
+.tw{overflow-x:auto}
+
+/* QUOTE */
+.quote{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:18px;color:var(--ink);line-height:1.7;padding:20px 0;margin:22px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center}
+.quote span{display:block;font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:10px;color:var(--ink3);letter-spacing:1px;margin-top:10px;font-style:normal}
+
+/* CHAIN (产业链三列) */
+.chain{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;margin:16px 0}
+.chain-col{border:1px solid var(--border);background:var(--surface)}
+.chain-hd{background:var(--ink);color:#fff;padding:9px 12px;font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline}
+.chain-hd .cx{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:8px;letter-spacing:1px;color:rgba(255,255,255,.5)}
+.chain-col.mid .chain-hd{background:var(--red)}
+.chain-body{padding:10px 11px}
+.cgrp{margin-bottom:9px}
+.cgrp:last-child{margin-bottom:0}
+.cgrp-t{font-size:10px;color:var(--ink3);letter-spacing:.5px;margin-bottom:4px;font-weight:500}
+.cgrp.hot .cgrp-t{color:var(--red);font-weight:600}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:10px;padding:2px 6px;background:var(--surface2);border:1px solid var(--border2);color:var(--ink2);border-radius:2px;line-height:1.3}
+.cgrp.hot .tag{background:#fdf0ee;border-color:#e8c4bd;color:var(--red)}
+.chain-flow{text-align:center;font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--ink3);margin:2px 0 12px}
+
+/* DIAGRAM WRAP */
+.diagram{background:var(--surface);border:1px solid var(--border2);padding:16px;margin:16px 0}
+.diagram svg{width:100%;height:auto;display:block}
+.dia-cap{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;color:var(--ink3);letter-spacing:1px;margin-top:8px;text-align:center}
+
+/* CHECKLIST */
+.chk{border:1px solid var(--border2);margin:14px 0}
+.chk-row{display:grid;grid-template-columns:26px 1fr;border-bottom:1px solid var(--border2)}
+.chk-row:last-child{border-bottom:none}
+.chk-box{background:var(--surface2);border-right:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:11px;color:var(--gold);font-weight:600}
+.chk-c{padding:10px 14px}
+.chk-q{font-size:13px;color:var(--ink);font-weight:500;margin-bottom:3px}
+.chk-r{font-size:12px;color:var(--red);line-height:1.55}
+.chk-r::before{content:'⚑ 危险信号  ';font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:.5px;color:var(--red)}
+
+/* VERDICT */
+.verdict{background:var(--ink);padding:32px;margin-top:40px}
+.verdict-t{font-family:'Noto Serif SC','Noto Serif CJK SC',serif;font-size:18px;font-weight:700;color:#fff;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.12)}
+.v-item{display:flex;gap:14px;margin-bottom:13px}
+.v-tag{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:1px;padding:3px 8px;height:fit-content;margin-top:1px;flex-shrink:0}
+.v-tag.bull{background:rgba(26,96,80,.55);color:#a8e0d4}
+.v-tag.bear{background:rgba(176,48,32,.45);color:#f4b8b0}
+.v-tag.note{background:rgba(154,108,0,.4);color:#f0d080}
+.v-text{font-size:13px;color:rgba(255,255,255,.7);line-height:1.65}
+.v-text strong{color:#fff}
+
+hr{border:none;border-top:1px solid var(--border2);margin:28px 0}
+.sub-tag{font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--ink3);margin:22px 0 10px;text-transform:uppercase}
+.foot{padding:24px 0;font-family:'IBM Plex Mono','DejaVu Sans Mono',monospace;font-size:10px;color:var(--ink3);line-height:1.7;border-top:1px solid var(--border2)}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+@media(max-width:720px){
+  .hero-h{font-size:30px}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .what-grid{grid-template-columns:1fr}
+  .chain{grid-template-columns:1fr}
+  .mrow-name{min-width:130px}
+  .part{flex-wrap:wrap;gap:10px}.part .p-d{margin-left:0;text-align:left}
+}
+
+/* ============ A4 PRINT ============ */
+@page{size:A4;margin:15mm 14mm 16mm}
+@media print{
+  html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body{font-size:10.3pt;line-height:1.6}
+  .nav{display:none!important}
+  .wrap{max-width:none;margin:0;padding:0}
+  .hero{padding:2mm 0 6mm;border-bottom-width:2px}
+  .hero-h{font-size:25pt;line-height:1.12}
+  .hero-sub{font-size:11pt;margin-top:14px}
+  .badge{font-size:8pt}
+  .eyebrow{font-size:8.5pt}
+  .part{break-before:page;margin-top:0;padding:14px 18px}
+  .part .p-t{font-size:16pt}.part .p-d{font-size:9pt}
+  .chapter{margin-top:8mm}
+  .chapter:first-of-type{margin-top:6mm}
+  .ch-hd{break-inside:avoid;break-after:avoid;margin-bottom:14px;padding-bottom:9px}
+  .ch-n{font-size:22pt}
+  .ch-meta .ch-title{font-size:15pt}
+  .ch-meta .ch-label{font-size:8pt}
+  .sec-t{break-after:avoid;font-size:12pt;margin-top:12px}
+  .sub-tag{break-after:avoid;font-size:8pt;margin:12px 0 7px}
+  p{font-size:10.3pt;margin-bottom:7px;orphans:2;widows:2}
+  .card,.what-item,.anno,.insight,.tl-item,.quote,.mrow,.v-item,.foot,.chain-col,.diagram,.chk-row{break-inside:avoid}
+  .verdict{break-inside:avoid}
+  .what-grid,.g2,.g3,.g4{gap:9px;margin:9px 0}
+  .card{padding:11px 13px}
+  .card-val{font-size:20pt}
+  .card-body,.what-text{font-size:9.3pt;line-height:1.5}
+  .card-name{font-size:11pt}
+  .anno p,.insight p,.tl-d{font-size:9.3pt;line-height:1.5}
+  .v-text{font-size:9.3pt}
+  .chain{gap:9px}
+  .tag{font-size:8.4pt}
+  .cgrp-t{font-size:8.6pt}
+  .chk-q{font-size:9.6pt}.chk-r{font-size:8.8pt}
+  table{font-size:9pt;break-inside:auto}
+  thead{display:table-header-group}
+  tr{break-inside:avoid}
+  th,td{padding:5px 9px}
+  .tw{overflow:visible}
+  .quote{font-size:14pt;padding:14px 0;margin:16px 0}
+  .verdict{padding:22px 24px;margin-top:18px}
+  a{color:var(--ink);text-decoration:none}
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="#s1">核心结论</a>
+  <a class="navdiv" href="#pa">上篇·行业逻辑</a>
+  <a href="#s2">是什么</a>
+  <a href="#s3">需求侧</a>
+  <a href="#s4">产业链</a>
+  <a href="#s5">竞争格局</a>
+  <a href="#s6">模式经济</a>
+  <a class="navdiv" href="#pb">下篇·项目逻辑</a>
+  <a href="#s7">项目怎么跑</a>
+  <a href="#s8">风险陷阱</a>
+  <a href="#s9">评估与尽调</a>
+</nav>
+
+<div class="wrap">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="eyebrow">算力租赁行业深度研究 · GPU LEASING · 聚焦国内市场 · 2026</div>
+  <h1 class="hero-h">算力租赁：<br>一门什么生意，<em>一个项目怎么判断</em></h1>
+  <div class="hero-sub">这份报告分两篇：<strong>上篇讲行业逻辑</strong>——算力租赁分几层、每层谁在赚钱、靠什么赚、钱好不好赚；<strong>下篇讲项目逻辑</strong>——当一个算力租赁项目摆到你面前，它的交易结构、资金流、经济账和合同长什么样，以及用哪几把尺子判断它是真生意还是蹭概念。</div>
+  <div class="hero-badges">
+    <span class="badge">数据截至 2026 年年中</span>
+    <span class="badge">综合公开信息与研究机构估算</span>
+    <span class="badge">口径差异大 · 仅供项目评估参考</span>
+    <span class="badge">非投资 / 法律 / 财务建议</span>
+  </div>
+</div>
+
+<!-- CH1 -->
+<div class="chapter" id="s1">
+  <div class="ch-hd"><div class="ch-n">01</div><div class="ch-meta"><div class="ch-label">EXECUTIVE SUMMARY</div><div class="ch-title">核心结论：一页看懂算力租赁</div></div></div>
+
+  <p>先把骨架讲清楚。算力租赁的本质，是<strong>用重资产（GPU 服务器）换现金流的"数字包租"生意</strong>——把"买服务器 + 建机房 + 招运维"的一次性重投入，转化为客户按需支付的运营成本。但 2024 年之后，它已经从"囤卡收租"演变为<strong>拿卡资源、资金实力、客户锁定、运维调度四种能力的多维较量</strong>；同时，这个赛道里真生意与纯炒作、甚至骗局高度混杂。</p>
+
+  <div class="sub-tag">关键数字快览（量级参考，口径不一）</div>
+  <div class="g4">
+    <div class="card"><div class="card-tag">2025 智算租赁市场</div><div class="card-val">≈2000<span style="font-size:14px">亿</span></div><div class="card-sub">元，2024 约 1480 亿，同比近翻倍</div></div>
+    <div class="card"><div class="card-tag">2026 潜在收入</div><div class="card-val teal">≈2600<span style="font-size:14px">亿</span></div><div class="card-sub">元，3 年 CAGR 约 40–50%</div></div>
+    <div class="card"><div class="card-tag">下游需求集中度</div><div class="card-val gold">≈60%</div><div class="card-sub">互联网 + 大模型，主导行业景气</div></div>
+    <div class="card"><div class="card-tag">行业平均上架率</div><div class="card-val red">&lt;60%</div><div class="card-sub">部分智算中心出租率仅 20–30%</div></div>
+  </div>
+
+  <div class="sub-tag">十条要点</div>
+  <div class="g2">
+    <div class="card"><div class="card-tag">本质</div><div class="card-body">重资产吃现金流。上游拿卡、中游运营、下游消纳，算力租赁位于<strong>中游</strong>，是把上游算力"整合成按需租用服务"的一层。</div></div>
+    <div class="card"><div class="card-tag">需求切换</div><div class="card-body">重心正从<strong>训练转向推理</strong>：推理算力需求已是训练的 10–15 倍，行业逻辑从"卖 GPU 卡时"转向"卖 Token / 卖服务"。</div></div>
+    <div class="card"><div class="card-tag">强周期</div><div class="card-body">2023 卖方市场 → 2025 买方市场（价格腰斩、押付比降到押一付一）→ 2026 重回供不应求、价格上行。<strong>签约时点几乎决定盈亏。</strong></div></div>
+    <div class="card"><div class="card-tag">段位分化</div><div class="card-body">纯裸机"二房东"毛利约 20%、按 PB 估值；懂调度、有生态的"云厂商"毛利 60%+、按 PS 估值，<strong>天差地别</strong>。</div></div>
+    <div class="card"><div class="card-tag">拿卡为王</div><div class="card-body">出口管制下高端英伟达卡一卡难求；<strong>能否稳定拿到货、能否真租出去</strong>，是两条决定项目生死的确定性。</div></div>
+    <div class="card"><div class="card-tag">国产变量</div><div class="card-body">英伟达机柜出租率超 90%，国产卡出租率偏低——瓶颈在 CUDA 生态。2026 下半年昇腾 950 系列或成放量拐点。</div></div>
+    <div class="card"><div class="card-tag">头部集中</div><div class="card-body">利通、润泽、协创等一线厂商同时握有资质、重资产与大客户长约；<strong>资源与订单向少数头部集中，"赢家通吃"轮廓浮现</strong>。</div></div>
+    <div class="card"><div class="card-tag">阶段性暴利</div><div class="card-body">2026 Q1 头部预告归母净利 6–8 亿元、同比增 280–400%；但与"价格高位 + 折旧未充分体现"有关，需看穿。</div></div>
+    <div class="card"><div class="card-tag">最大的坑</div><div class="card-body">空转套利、壳公司毁约、概念炒作与融资性贸易——已有上市公司数十亿"算力大单"零交付被证监会立案。</div></div>
+    <div class="card"><div class="card-tag">判断准绳</div><div class="card-body">评估一个项目：<strong>先定位环节 → 再验货源与客户两端是否真实 → 穿透经济性 → 识别真做还是蹭概念</strong>。</div></div>
+  </div>
+</div>
+
+
+<!-- ===== PART A ===== -->
+<div class="part" id="pa">
+  <div class="p-n">上篇</div>
+  <div class="p-t">行业逻辑</div>
+  <div class="p-d">读懂算力租赁作为一个行业——它分几层、由什么驱动、格局如何、钱怎么赚。</div>
+</div>
+
+<!-- CH2 -->
+<div class="chapter" id="s2">
+  <div class="ch-hd"><div class="ch-n">02</div><div class="ch-meta"><div class="ch-label">DEFINITION</div><div class="ch-title">算力租赁是什么：定义、分类与本质</div></div></div>
+
+  <p>算力租赁（也叫 GPU 云、算力云）指：按 AI 应用的需求，把 GPU 等计算资源做成一种"服务"，按规格/时长租给企业和个人，而不是让用户自己买服务器、建机房、运维硬件。要理解它，先分清三组概念。</p>
+
+  <div class="sec-t">2.1　算力的三种分类</div>
+  <div class="tw"><table>
+    <thead><tr><th>类型</th><th>核心</th><th>典型场景</th></tr></thead>
+    <tbody>
+      <tr><td>通用算力</td><td>CPU 为核心</td><td>网站、数据库、企业 IT、日常云服务</td></tr>
+      <tr class="tr-hi"><td>智能算力</td><td>GPU / AI 芯片为核心</td><td>AI 大模型训练与推理 —— 算力租赁的主战场</td></tr>
+      <tr><td>超算算力</td><td>高性能计算（HPC）</td><td>气象、基因、材料、流体仿真等科研工程</td></tr>
+    </tbody>
+  </table></div>
+  <p>市场上说的"算力租赁"，几乎专指其中的<strong>智能算力（GPU）</strong>这一块。</p>
+
+  <div class="sec-t">2.2　训练 vs 推理：先分清的分岔</div>
+  <div class="anno blue"><div class="anno-tag">2026 年最大的认知差</div><p><strong>训练</strong>追求极致的单集群规模与稳定性，依赖高端卡与高速互联；<strong>推理</strong>看重部署成本、时延、并发与单位 Token 成本，可用中端甚至国产卡。随着大模型转入应用规模化，推理已成增量主力——它深刻改变了芯片选型、机房设计与商业模式，也让国产卡有了用武之地。</p></div>
+
+  <div class="sec-t">2.3　卡型分层：直接决定经济性</div>
+  <div class="what-grid">
+    <div class="what-item key"><div class="what-label">高端训练卡</div><div class="what-text">H100 / H200 / B200 / B300。受美国出口管制，国内只能买特定或"阉割版"型号，一卡难求、价格坚挺——是稀缺资源与议价权的来源。</div></div>
+    <div class="what-item"><div class="what-label">中端卡</div><div class="what-text">A100 / A800 / H800。上一代主力，2025 年价格已腰斩；二手 A100 仍高达 70–80 万元/张。</div></div>
+    <div class="what-item"><div class="what-label">消费级</div><div class="what-text">RTX 4090 / 5090。跑推理、AI 绘图，性价比高，是"小卡"市场主力。</div></div>
+    <div class="what-item"><div class="what-label">国产卡</div><div class="what-text">华为昇腾 910B / 950 系列等。政策友好、推理优选，但生态是短板——"能用"到"好用"仍有距离。</div></div>
+  </div>
+
+  <div class="sec-t">2.4　本质：同样卖算力，分两个段位</div>
+  <div class="g2">
+    <div class="card"><div class="card-name">"二房东"（裸金属出租）</div><div class="card-body">买卡、上架、收租。门槛只有资金，谁都能干。毛利薄（约 20%）、强周期，估值按 PB（资产）给。<strong>单纯囤卡收租的模式在买方市场里已经很难持续。</strong></div></div>
+    <div class="card"><div class="card-name">"云厂商"（算力+调度+服务）</div><div class="card-body">靠软件调度把碎片化推理需求拼在一起，把利用率干到 80–90%，再叠加 MaaS、Token 分成、运维调优等增值服务。毛利 60%+，估值按 PS（收入）给。<strong>转租赚辛苦钱，服务赚利润钱。</strong></div></div>
+  </div>
+</div>
+
+<!-- CH3 -->
+<div class="chapter" id="s3">
+  <div class="ch-hd"><div class="ch-n">03</div><div class="ch-meta"><div class="ch-label">DEMAND</div><div class="ch-title">需求侧：谁在租、为什么租</div></div></div>
+
+  <p>这一轮景气的根本驱动力，是生成式 AI 对算力近乎指数级的需求，以及"买卡又难又贵、不如直接租一整套集群"的天然经济性。</p>
+
+  <div class="what-grid">
+    <div class="what-item key"><div class="what-label">规模</div><div class="what-text">2024 年国内智算租赁市场约 1480 亿元（同比近 +90%），2025 年破 2000 亿，2026 潜在收入约 <strong>2600 亿元</strong>，后续以 20%+ 增速增长。全国已建成 42 个万卡级智算集群。</div></div>
+    <div class="what-item"><div class="what-label">下游结构</div><div class="what-text">高度集中：互联网 + 大模型约 60%+，政府约 10%+，金融/医疗/教育/制造各约 4–6%。<strong>少数互联网大厂的资本开支节奏，几乎主导整个行业景气。</strong></div></div>
+    <div class="what-item key"><div class="what-label">Token 经济</div><div class="what-text">推理需求已是训练的 <strong>10–15 倍</strong>。带"深度思考"的模型单次回答消耗 Token 数是过去的 5–10 倍；某头部 App 日均 Token 消耗较两年前增长约千倍。付费用户越多、任务越复杂，算力消耗越快。</div></div>
+    <div class="what-item"><div class="what-label">成本曲线</div><div class="what-text">单位算力/推理成本快速下降。这既扩大应用空间，也意味着<strong>高价买入的算力资产可能快速贬值</strong>——是评估任何重资产项目的必要变量。</div></div>
+  </div>
+
+  <div class="insight teal"><div class="insight-tag">对项目方的含义</div><p>需求的真实性最终锚定在少数大客户身上。一个项目的下游若不是"互联网大厂/头部大模型公司/有真实预算的政企"，而是来路不明的中小主体或过桥转租，其需求确定性要打上大大的问号。</p></div>
+</div>
+
+<!-- CH4 -->
+<div class="chapter" id="s4">
+  <div class="ch-hd"><div class="ch-n">04</div><div class="ch-meta"><div class="ch-label">VALUE CHAIN</div><div class="ch-title">产业链全景：算力租赁在链条中的位置</div></div></div>
+
+  <p>产业链分上游（软硬件供应）、中游（算力中心服务，算力租赁在此）、下游（应用与需求方）。下图整合了主流券商产业链框架与本报告梳理，<strong>红色为算力租赁/运营所在环节</strong>。</p>
+
+  <div class="quote">"短期缺芯片，长期缺能源，永远缺存储。"<span>—— 一句精准概括上游稀缺次序的业内话</span></div>
+
+  <div class="chain">
+    <div class="chain-col">
+      <div class="chain-hd">上游 · 软硬件供应<span class="cx">UPSTREAM</span></div>
+      <div class="chain-body">
+        <div class="cgrp"><div class="cgrp-t">AI 芯片（壁垒/利润最高）</div><div class="tags"><span class="tag">英伟达</span><span class="tag">AMD</span><span class="tag">华为昇腾</span><span class="tag">海光</span><span class="tag">寒武纪</span><span class="tag">沐曦</span><span class="tag">摩尔线程</span><span class="tag">壁仞</span><span class="tag">昆仑芯</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">AI 服务器 / 整机</div><div class="tags"><span class="tag">浪潮信息</span><span class="tag">新华三</span><span class="tag">工业富联</span><span class="tag">超聚变</span><span class="tag">华鲲振宇</span><span class="tag">中科曙光</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">光模块 / 网络</div><div class="tags"><span class="tag">中际旭创</span><span class="tag">新易盛</span><span class="tag">天孚通信</span><span class="tag">中兴</span><span class="tag">锐捷</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">供配电（电力成瓶颈）</div><div class="tags"><span class="tag">UPS：华为/施耐德</span><span class="tag">柴发：卡特/潍柴</span><span class="tag">变压器</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">冷却 / 温控</div><div class="tags"><span class="tag">英维克</span><span class="tag">申菱环境</span><span class="tag">高澜</span><span class="tag">美的/格力</span></div></div>
+      </div>
+    </div>
+    <div class="chain-col mid">
+      <div class="chain-hd">中游 · 算力中心服务<span class="cx">MIDSTREAM</span></div>
+      <div class="chain-body">
+        <div class="cgrp"><div class="cgrp-t">基础电信运营商</div><div class="tags"><span class="tag">中国移动</span><span class="tag">中国电信</span><span class="tag">中国联通</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">云服务商</div><div class="tags"><span class="tag">阿里云</span><span class="tag">华为云</span><span class="tag">腾讯云</span><span class="tag">百度智能云</span><span class="tag">火山引擎</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">第三方 IDC / AIDC</div><div class="tags"><span class="tag">润泽科技</span><span class="tag">万国数据</span><span class="tag">世纪互联</span><span class="tag">秦淮数据</span><span class="tag">光环新网</span><span class="tag">数据港</span><span class="tag">奥飞数据</span><span class="tag">科华数据</span><span class="tag">宝信软件</span></div></div>
+        <div class="cgrp hot"><div class="cgrp-t">算力租赁 / 运营 ★ 本报告核心</div><div class="tags"><span class="tag">利通电子</span><span class="tag">协创数据</span><span class="tag">中贝通信</span><span class="tag">弘信电子</span><span class="tag">拓维信息</span><span class="tag">鸿博股份</span><span class="tag">首都在线</span><span class="tag">优刻得</span><span class="tag">东方国信</span><span class="tag">AutoDL/晨涧云</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">算力调度 / 交易</div><div class="tags"><span class="tag">电信"息壤"</span><span class="tag">移动"算网大脑"</span><span class="tag">云赛智联</span></div></div>
+      </div>
+    </div>
+    <div class="chain-col">
+      <div class="chain-hd">下游 · 应用与需求方<span class="cx">DOWNSTREAM</span></div>
+      <div class="chain-body">
+        <div class="cgrp"><div class="cgrp-t">互联网</div><div class="tags"><span class="tag">阿里</span><span class="tag">腾讯</span><span class="tag">字节</span><span class="tag">百度</span><span class="tag">美团</span><span class="tag">京东</span><span class="tag">B站</span><span class="tag">滴滴</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">AI / 大模型</div><div class="tags"><span class="tag">DeepSeek</span><span class="tag">月之暗面</span><span class="tag">智谱</span><span class="tag">MiniMax</span><span class="tag">科大讯飞</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">金融</div><div class="tags"><span class="tag">中国银行</span><span class="tag">招商银行</span><span class="tag">中国平安</span><span class="tag">中金</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">泛政务</div><div class="tags"><span class="tag">各地政府</span><span class="tag">国家电网</span></div></div>
+        <div class="cgrp"><div class="cgrp-t">制造 / 汽车</div><div class="tags"><span class="tag">上汽</span><span class="tag">OPPO</span><span class="tag">美的</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="chain-flow">算力自上而下流动　▸　资金自下而上回流</div>
+
+  <div class="anno gold"><div class="anno-tag">读这张图的关键</div><p>算力租赁夹在"上游拿卡"与"下游消纳"之间，本身<strong>不掌握芯片、也不最终使用算力</strong>——它的价值在于整合。因此，判断一个租赁项目，本质上就是判断它在<strong>上游货源</strong>和<strong>下游客户</strong>两端各自的确定性，以及中间的运营与调度能力。这条主线贯穿下篇。</p></div>
+</div>
+
+<!-- CH5 -->
+<div class="chapter" id="s5">
+  <div class="ch-hd"><div class="ch-n">05</div><div class="ch-meta"><div class="ch-label">COMPETITIVE LANDSCAPE</div><div class="ch-title">竞争格局：五类玩家、强周期、国产替代</div></div></div>
+
+  <div class="sec-t">5.1　五类玩家</div>
+  <div class="tw"><table>
+    <thead><tr><th>类型</th><th>打法与优势</th><th>代表</th></tr></thead>
+    <tbody>
+      <tr><td>云巨头</td><td>自建 + 纳管 + 全球调度；2026 年 AI 算力产品已多轮提价</td><td>阿里云、腾讯云、百度、字节火山引擎</td></tr>
+      <tr><td>运营商</td><td>算力"中军"，网络+资金+客户三重优势，承担全国算力网骨干</td><td>移动、电信、联通</td></tr>
+      <tr class="tr-hi"><td>IDC / AIDC 厂商</td><td>靠土地、能耗指标、长协与上架率卡位；业绩确定性相对高</td><td>润泽科技、光环新网、数据港、奥飞</td></tr>
+      <tr class="tr-hi"><td>专业算力租赁 / 概念股</td><td>资金换规模、拿卡换议价；分化剧烈，头部有护城河</td><td>利通、协创、中贝、弘信、拓维、鸿博</td></tr>
+      <tr class="tr-lo"><td>算力掮客 / 中介</td><td>撮合供需、帮找消纳；鱼龙混杂，骗局高发区</td><td>各类中介与平台</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sec-t">5.2　强周期：卖方市场 ↔ 买方市场来回切</div>
+  <div class="tl">
+    <div class="tl-item key"><div class="tl-yr">2023 – 24 初</div><div class="tl-t">卖方市场</div><div class="tl-d">供不应求，H100 租金一度冲到 8 美元/小时；押三付一、押二付一，回本可短至 1.5–2 年。</div></div>
+    <div class="tl-item pivot"><div class="tl-yr">2025</div><div class="tl-t">买方市场（冷静期）</div><div class="tl-d">供给过剩、价格腰斩；预付费消失，服务商须先垫资建池、客户落地后按实际使用付租；押付比降到押一付一，回本拉长至 3–4 年，部分项目回不了本。</div></div>
+    <div class="tl-item key"><div class="tl-yr">2026</div><div class="tl-t">重回卖方市场</div><div class="tl-d">B 卡需求突出、供应偏紧，月租赁价格普遍上涨；掌握稳定货源者定价主动权更大。高景气预计延续至 2027。</div></div>
+  </div>
+  <div class="insight gold"><div class="insight-tag">对项目方最重要的一句</div><p>同一家公司、同一批卡，<strong>不同时点签的订单，盈利可能天差地别</strong>。评估任何项目，都要问清"这单是在什么周期、什么价位锁的"，并纳入价格回落的情景做压力测试。</p></div>
+
+  <div class="sec-t">5.3　国产替代：旧王牌贬值、新能力待补位</div>
+  <div class="anno purple"><div class="anno-tag">一个黑色幽默的现实</div><p>装了英伟达 GPU 的机柜出租率超 <strong>90%</strong>，国产 GPU 服务器出租率却偏低——核心瓶颈不是硬件，而是 CUDA 十几年沉淀的软件生态。大量自建智算中心厂房已建好，却因"无卡可上"或"上了国产卡租不出去"而空置。</p></div>
+  <div class="anno teal"><div class="anno-tag">拐点信号</div><p>Token 经济爆发后算力可按"每百万 Token"计价，利好国产卡生态；华为昇腾 910B/950 也已一卡难求。业界预期 <strong>2026 下半年昇腾 950 系列或成放量拐点</strong>，焦点在实际适配——能否从"能用"跨越到"好用"。谁能率先做好国产卡集群的调优运营，谁就能建立新护城河。</p></div>
+
+  <div class="sec-t">5.4　头部集中：赢家通吃轮廓浮现</div>
+  <p>在全球四大科技公司 2026 年合计约 7000 亿美元 AI 资本开支的背景下，中小参与者在供应链博弈中天然处于劣势。资源与订单进一步向<strong>同时握有英伟达资质、重资产基础设施、稳定大客户长约</strong>的一线厂商集中（如利通电子、润泽科技、协创数据）。从业者普遍判断：2026–2027 加速洗牌，<strong>低端纯二房东必死，有服务、有技术、有本地化能力的中端服务商才能活下来</strong>。海外新型云厂商（CoreWeave、Oracle 等）以巨额资本开支与在手长约扩张，是这套模式已被验证的对照。</p>
+</div>
+
+<!-- CH6 -->
+<div class="chapter" id="s6">
+  <div class="ch-hd"><div class="ch-n">06</div><div class="ch-meta"><div class="ch-label">MODEL &amp; ECONOMICS</div><div class="ch-title">商业模式与经济性：钱好不好赚</div></div></div>
+
+  <div class="sec-t">6.1　三种计费方式</div>
+  <div class="tw"><table>
+    <thead><tr><th>模式</th><th>计价单位</th><th>适用客户</th></tr></thead>
+    <tbody>
+      <tr><td>单实例整租</td><td>每台 / 每月（单台标配 8 张 GPU）</td><td>长期稳定使用大规模 GPU 的客户</td></tr>
+      <tr class="tr-hi"><td>按算力规模租赁</td><td>每 P / 每年（国内大单最常用）</td><td>按需选规模、弹性配置的客户</td></tr>
+      <tr><td>按 GPU 卡时租赁</td><td>每卡 / 每小时</td><td>短期、临时、突发需求；推理/绘图</td></tr>
+    </tbody>
+  </table></div>
+  <p>更上层还有 <strong>MaaS（模型即服务，按 Token/调用量）</strong> 与 <strong>Token 分成（房东变合伙人）</strong>——这是毛利最高、也是行业演进的方向。</p>
+
+  <div class="sec-t">6.2　利润公式已经变了</div>
+  <div class="quote">利润 =（单价 × <em style="color:var(--red);font-style:normal">利用率</em>）－（运维 + 获客）－ 折旧<span>—— 利用率是最致命的变量</span></div>
+  <p>成本结构上，主要成本是买服务器，其中 <strong>70–80% 是算力卡</strong>，折旧周期一般 3–4 年，加机房租金、电费与运维。若利用率上不去（行业普遍 40% 以下连电费和折旧都覆盖不了），四年后卡就是废铁。<strong>裸机租赁毛利约 20%；通过调度把单卡利用率从约 58% 提到 95%+、并叠加推理与 MaaS，头部综合毛利率可到 60%+。</strong></p>
+
+  <div class="sub-tag">毛利率与利用率对比（示意）</div>
+  <div class="mrow"><span class="mrow-name">裸机 / 整机租赁毛利</span><div class="mrow-bar"><div class="mrow-fill" style="width:20%;background:var(--red)"></div></div><span class="mrow-val">≈20%</span></div>
+  <div class="mrow"><span class="mrow-name">IDC 类算力租赁毛利</span><div class="mrow-bar"><div class="mrow-fill" style="width:42%;background:var(--gold)"></div></div><span class="mrow-val">≈40%</span></div>
+  <div class="mrow"><span class="mrow-name">服务化后综合毛利</span><div class="mrow-bar"><div class="mrow-fill" style="width:60%;background:var(--teal)"></div></div><span class="mrow-val">60%+</span></div>
+  <div class="mrow"><span class="mrow-name">单卡利用率（优化前）</span><div class="mrow-bar"><div class="mrow-fill" style="width:58%;background:var(--gold)"></div></div><span class="mrow-val">≈58%</span></div>
+  <div class="mrow"><span class="mrow-name">单卡利用率（调度后）</span><div class="mrow-bar"><div class="mrow-fill" style="width:96%;background:var(--teal)"></div></div><span class="mrow-val">95%+</span></div>
+
+  <div class="sec-t">6.3　回本与收益率（对价格极度敏感）</div>
+  <p>乐观口径下，GPU 资产约 <strong>2.5 年</strong> 收回成本；买方市场下部分项目 3–4 年，谈判中常把"三年后 30% 残值"纳入收益测算。收益率对租金极其敏感——以一个偏旧的示意模型为例：租金约 4.5 美元/小时时 IRR 超 20%，跌到约 2.85 美元时仅约 10%，低于约 1.65 美元投资者将面临严重亏损。<strong>结论不是"能赚多少"，而是"盈亏高度依赖签约价位与利用率"。</strong></p>
+
+  <div class="insight gold"><div class="insight-tag">阶段性高景气，但要看穿</div><p>2026 年一季度一批核心算力企业净利润同比普遍翻倍以上（头部预告归母 6–8 亿、同比 +280–400%）。但这与"价格高位 + 折旧尚未充分体现"有关，可持续性取决于后续供需与价格走向。<strong>看利润必须穿透折旧假设与签约周期。</strong></p></div>
+</div>
+
+
+<!-- ===== PART B ===== -->
+<div class="part" id="pb">
+  <div class="p-n">下篇</div>
+  <div class="p-t">项目逻辑</div>
+  <div class="p-d">把行业地图叠回一个具体项目：它怎么跑通、怎么赚钱、有哪些坑，以及用什么尺子判断。</div>
+</div>
+
+<!-- CH7 -->
+<div class="chapter" id="s7">
+  <div class="ch-hd"><div class="ch-n">07</div><div class="ch-meta"><div class="ch-label">PROJECT ANATOMY</div><div class="ch-title">一个算力租赁项目怎么跑通、怎么赚钱</div></div></div>
+
+  <div class="sec-t">7.1　交易结构：五个角色</div>
+  <p>一个典型的算力租赁项目，本质是把五类角色的资源拼在一起——很多项目里这些角色部分重叠，或由一个掮客/中介牵线。看懂谁提供什么、谁承担什么风险，是判断项目的起点。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg" font-family="'Noto Sans SC',sans-serif">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#484440"/></marker>
+        <marker id="arg" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#9a6c00"/></marker>
+        <marker id="art" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1a6050"/></marker>
+      </defs>
+      <!-- center: operator -->
+      <rect x="270" y="128" width="180" height="84" fill="#b03020"/>
+      <text x="360" y="158" text-anchor="middle" fill="#fff" font-size="15" font-weight="700" font-family="'Noto Serif SC',serif">算力租赁运营方</text>
+      <text x="360" y="180" text-anchor="middle" fill="#f4d4cd" font-size="10.5">上架 · 调度 · 运维</text>
+      <text x="360" y="196" text-anchor="middle" fill="#f4d4cd" font-size="10.5">签约 · 增值服务</text>
+      <!-- capital -->
+      <rect x="40" y="18" width="150" height="60" fill="#1a1712"/>
+      <text x="115" y="42" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600">① 资金方 / 投资人</text>
+      <text x="115" y="60" text-anchor="middle" fill="#bdb8ae" font-size="9.5">自有资金 / 融资租赁</text>
+      <!-- chip source -->
+      <rect x="40" y="150" width="150" height="60" fill="#1a3f72"/>
+      <text x="115" y="174" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600">② 卡源 / 集成商</text>
+      <text x="115" y="192" text-anchor="middle" fill="#c3d0e2" font-size="9.5">英伟达渠道·超聚变·浪潮</text>
+      <!-- site -->
+      <rect x="285" y="270" width="150" height="56" fill="#1a6050"/>
+      <text x="360" y="293" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600">③ 场地方 / IDC</text>
+      <text x="360" y="311" text-anchor="middle" fill="#bfe4da" font-size="9.5">土地·电力·能耗·机柜·液冷</text>
+      <!-- customer -->
+      <rect x="530" y="128" width="150" height="84" fill="#1a1712"/>
+      <text x="605" y="158" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600">④ 客户 / 消纳方</text>
+      <text x="605" y="178" text-anchor="middle" fill="#bdb8ae" font-size="9.5">大模型公司</text>
+      <text x="605" y="194" text-anchor="middle" fill="#bdb8ae" font-size="9.5">互联网大厂 · 政企</text>
+
+      <!-- flows -->
+      <!-- capital -> chip (采购款) -->
+      <path d="M115,78 L115,150" stroke="#9a6c00" stroke-width="1.6" fill="none" marker-end="url(#arg)"/>
+      <text x="122" y="118" fill="#9a6c00" font-size="9.5">采购款</text>
+      <!-- chip -> operator (GPU) -->
+      <path d="M190,180 L266,175" stroke="#1a3f72" stroke-width="1.8" fill="none" marker-end="url(#ar)"/>
+      <text x="200" y="168" fill="#1a3f72" font-size="9.5">GPU 服务器</text>
+      <!-- capital -> operator (出资/持有资产) -->
+      <path d="M190,48 L300,124" stroke="#9a6c00" stroke-width="1.4" fill="none" stroke-dasharray="4 3" marker-end="url(#arg)"/>
+      <text x="238" y="80" fill="#9a6c00" font-size="9.5">出资 / 持有资产</text>
+      <!-- operator -> site (机柜电力费) -->
+      <path d="M360,212 L360,266" stroke="#1a6050" stroke-width="1.6" fill="none" marker-end="url(#art)"/>
+      <text x="368" y="242" fill="#1a6050" font-size="9.5">机柜 · 电力 · 运维费</text>
+      <!-- customer -> operator (租金) -->
+      <path d="M530,170 L454,170" stroke="#1a6050" stroke-width="2" fill="none" marker-end="url(#art)"/>
+      <text x="466" y="162" fill="#1a6050" font-size="10" font-weight="600">租金 →</text>
+      <!-- operator -> customer (算力/Token) -->
+      <path d="M454,192 L526,192" stroke="#484440" stroke-width="1.4" fill="none" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+      <text x="462" y="205" fill="#484440" font-size="9.5">算力 / Token 服务</text>
+    </svg>
+    <div class="dia-cap">图 · 算力租赁项目典型交易结构与资金流（实线=资金/实物，虚线=服务/持有关系）</div>
+  </div>
+
+  <div class="sec-t">7.2　资金流：钱怎么进、怎么出、怎么留下利润</div>
+  <p>顺着上图看现金流：<strong>客户按合同付租金 → 运营方收入</strong>；这笔收入要覆盖<strong>折旧（等同于摊还买卡的采购款或融资租赁月供）+ 机房电力费 + 运维与获客</strong>，剩下的才是利润，再在资金方与运营方之间分配。<strong>押付比例决定现金流的时间结构</strong>——卖方市场"押三付一/押二付一"让运营方先拿到钱，买方市场"押一付一"甚至先垫资，运营方现金压力陡增。合同负债（客户预付款累积）的规模，是景气度最直接的财务信号。</p>
+
+  <div class="sec-t">7.3　拆一台服务器的账（情景对比，量级示意）</div>
+  <p>以一台 8 卡高端 GPU 服务器为例，同一套资产在不同周期、不同利用率下的经济性差异极大。下表数字口径来自公开信息、波动剧烈，仅用于说明<strong>敏感度</strong>，不作为具体测算依据。</p>
+  <div class="tw"><table>
+    <thead><tr><th>维度</th><th>卖方市场 / 高利用率</th><th>买方市场 / 低利用率</th></tr></thead>
+    <tbody>
+      <tr><td>单台采购成本</td><td colspan="2" style="text-align:center">约 200–380 万元（随卡型与行情剧烈波动）</td></tr>
+      <tr><td>折旧（3 年）</td><td colspan="2" style="text-align:center">约占采购额 1/3 / 年，持续压低当期利润</td></tr>
+      <tr><td>机房 + 电 + 运维</td><td colspan="2" style="text-align:center">AI 机柜年租约 10 万元，加电费运维更高</td></tr>
+      <tr class="tr-hi"><td>租金水平</td><td>单台月租曾达约 5 万元，卡时满租更高</td><td>曾探底约 4.8 万元，逼近成本平衡点</td></tr>
+      <tr class="tr-hi"><td>上架率 / 利用率</td><td>95–100%</td><td>常低于 60%，部分仅 20–30%</td></tr>
+      <tr class="tr-hi"><td>毛利率</td><td>高端卡 + 服务化可达 60%+</td><td>裸机约 20%，甚至亏损</td></tr>
+      <tr class="tr-hi"><td>回本周期</td><td>约 1.5–2.5 年</td><td>3–4 年，部分回不了本</td></tr>
+    </tbody>
+  </table></div>
+  <div class="insight red"><div class="insight-tag">最容易被"神话"骗到的地方</div><p>有人用"当下高租金 + 100% 满租"倒推出"几个月回本"的神话。真实的账要同时纳入<strong>利用率打折、价格回落、折旧摊满、电力与运维、以及客户违约概率</strong>。对中小/边缘玩家，这套神话往往暗藏陷阱。</p></div>
+
+  <div class="sec-t">7.4　合同结构：期限、押付、保底、违约</div>
+  <div class="what-grid">
+    <div class="what-item key"><div class="what-label">期限</div><div class="what-text">大卡主流"3+2"：前 3 年闭口锁价，后 2 年按市价重议；5 年锁价已罕见。小卡随供需波动，2026 已要求 12 个月起签、部分 3 年闭口。</div></div>
+    <div class="what-item"><div class="what-label">押付</div><div class="what-text">卖方市场押三付一/押二付一；买方市场押一付一甚至先垫资。押付比例直接决定运营方的现金安全。</div></div>
+    <div class="what-item key"><div class="what-label">保底 / 违约</div><div class="what-text">优质合同应含最低用量保底、违约金（如实际使用低于承诺 80% 按总价 80% 赔付）、芯片厂商连带担保等条款。</div></div>
+    <div class="what-item"><div class="what-label">成本上涨风险</div><div class="what-text">"先签闭口长约、再倒推采购成本上限拿货"的模式下，若拿货时设备价超上限，服务商要么毁约赔违约金、要么自担亏损——行业已有实际案例。</div></div>
+  </div>
+
+  <div class="sec-t">7.5　你在这单里是什么角色，就盯什么</div>
+  <div class="tw"><table>
+    <thead><tr><th>你的角色</th><th>核心该盯的东西</th></tr></thead>
+    <tbody>
+      <tr><td>资金方 / 投资人</td><td>资产是否真实持有与登记、折旧与残值假设是否激进、退出与回购条款、是否"名为买卖实为借贷"的融资性贸易</td></tr>
+      <tr><td>场地方 / 有地有电</td><td>能耗审批与 PUE 合规、电力容量、上架率承诺是否有约束、别只当"机房房东"被套牢空置</td></tr>
+      <tr><td>卡源 / 集成方</td><td>货源渠道真实性与交付确定性、认证的实际含金量、成本上涨时的履约条款</td></tr>
+      <tr><td>运营方</td><td>下游客户与订单真实性、利用率与调度能力、押付与现金流、闭口长约下的成本敞口</td></tr>
+      <tr><td>下游客户 / 用算方</td><td>算力的稳定性与可用吞吐、服务与运维、供应商的资金与拿卡能力（"卖的是确定性"）</td></tr>
+    </tbody>
+  </table></div>
+</div>
+
+<!-- CH8 -->
+<div class="chapter" id="s8">
+  <div class="ch-hd"><div class="ch-n">08</div><div class="ch-meta"><div class="ch-label">RISKS &amp; TRAPS</div><div class="ch-title">风险与陷阱：这个赛道的坑</div></div></div>
+
+  <p>算力租赁是骗局与资本炒作的重灾区。有从业者直言，2023 年底还有真诚建议做算力的人，到 2024 年中，"再来提议合作做算力的已经全是骗子"。以下是必须警惕的典型风险。</p>
+
+  <div class="anno red"><div class="anno-tag">上市公司层面的"杀猪盘"</div><p>已有公司宣布数十亿"算力大单"，股价连板、股东户数暴增数倍，半年后合同以"零交付、零成本、零收入"终止，证监会立案调查，散户接盘。跨界玩家（做调味品的、染料的）蜂拥而入，真转型与割韭菜混杂。</p></div>
+  <div class="anno red"><div class="anno-tag">空转与挖矿套利</div><p>租不出去的算力被拿去挖矿或空转套补贴。正规招商方对"纯套利、空转的，一分补贴都不给"，并分三年考核兑现、中途跑路则场地收回、补贴追回。</p></div>
+  <div class="anno red"><div class="anno-tag">壳公司毁约</div><p>大客户常通过壳公司对外签约，一旦毁约则弃车保帅，壳公司不具备赔付能力，租赁方即使起诉也难获赔——"见到集团 CEO 拿到的口头承诺，东窗事发时没有任何实质作用"。违约在本行业是常态，头部厂商已发生过上亿元违约金案例。</p></div>
+  <div class="anno red"><div class="anno-tag">资金链断裂</div><p>最常见的死法：盲目扩张，砸重金锁资源、租机房、招人，结果客户跟不上、闲置严重，现金流断裂直接倒闭。重资产 + 高折旧还会推高负债率。</p></div>
+  <div class="anno red"><div class="anno-tag">能耗与合规红线</div><p>国家枢纽节点及能耗紧张地区要求 PUE≤1.25、绿电占比≥80%，未拿到能耗审批就开工的项目会被责令关停。</p></div>
+  <div class="anno red"><div class="anno-tag">技术迭代与资产贬值</div><p>英伟达代际更替极快，旧卡账面价值快速缩水；国产卡二手市场不成熟、残值不确定。闭口长约期未满、下一代产品已上线，大客户有毁约动机。</p></div>
+  <div class="anno red"><div class="anno-tag">融资性贸易（强监管）</div><p>转租链条中"名为买卖、实为借贷"的融资性贸易是强监管红线，涉国企/上市公司尤甚；监管密集问询订单真实性与披露充分性。</p></div>
+</div>
+
+<!-- CH9 -->
+<div class="chapter" id="s9">
+  <div class="ch-hd"><div class="ch-n">09</div><div class="ch-meta"><div class="ch-label">HOW TO EVALUATE</div><div class="ch-title">结语：项目评估框架与尽调清单</div></div></div>
+
+  <p>把上篇的行业地图叠回到你手上的这一单，形成四条快速判断准绳，再落到一张可执行的尽调清单。</p>
+
+  <div class="what-grid">
+    <div class="what-item key"><div class="what-label">准绳 01 · 先定位环节</div><div class="what-text">看项目落在链条哪一环——是上游拿卡/贸易，还是中游 IDC/租赁/运营。上游利润厚但拼供应链与配额；中游利润薄、强周期，拼客户与调度。</div></div>
+    <div class="what-item key"><div class="what-label">准绳 02 · 再验两端</div><div class="what-text">上游看货源是否真实（"空口锁货 + 先付预付款"是高危信号）；下游看客户与订单是否真实（正式合同还是框架、真实终端还是过桥转租、规模与信用是否匹配）。</div></div>
+    <div class="what-item key"><div class="what-label">准绳 03 · 穿透经济性</div><div class="what-text">用采购成本、租金/差价、折旧（3 年）、电费运维搭全周期模型，并纳入价格回落与利用率打折情景；警惕靠激进残值和折旧年限调节撑起的利润。</div></div>
+    <div class="what-item key"><div class="what-label">准绳 04 · 识别真做还是蹭概念</div><div class="what-text">看项目方是否具备组网、调度、运维等真实能力，还是仅充当"机房房东"或资金过桥方。这一条，往往决定项目值不值得深入。</div></div>
+  </div>
+
+  <div class="sub-tag">尽调清单 · 逐项核实</div>
+  <div class="chk">
+    <div class="chk-row"><div class="chk-box">01</div><div class="chk-c"><div class="chk-q">卡从哪来？渠道、型号、交付时间是否可验证？</div><div class="chk-r">只有"关系"和口头承诺、要求先付大额预付款锁货、拿不出采购/交付凭证。</div></div></div>
+    <div class="chk-row"><div class="chk-box">02</div><div class="chk-c"><div class="chk-q">客户是谁？签的是正式合同还是框架/意向？</div><div class="chk-r">终端是壳公司或来路不明主体、只有框架协议、金额远超对方合理算力需求。</div></div></div>
+    <div class="chk-row"><div class="chk-box">03</div><div class="chk-c"><div class="chk-q">上架率/利用率实测多少？（要看日志与监控）</div><div class="chk-r">只给"预计满租"、拿不出真实使用日志、机房照片与远程监控。</div></div></div>
+    <div class="chk-row"><div class="chk-box">04</div><div class="chk-c"><div class="chk-q">合同结构：期限、押付、保底、违约金、连带担保？</div><div class="chk-r">无保底用量、无违约金、押付比例对己方不利、无芯片厂商担保。</div></div></div>
+    <div class="chk-row"><div class="chk-box">05</div><div class="chk-c"><div class="chk-q">谁承担折旧与换代风险？残值怎么算？</div><div class="chk-r">用激进残值（远高于 30%）撑利润、无二手回收测算、无回购条款。</div></div></div>
+    <div class="chk-row"><div class="chk-box">06</div><div class="chk-c"><div class="chk-q">能耗、环评、PUE、绿电、电力容量批了没？</div><div class="chk-r">未拿能耗审批就开工、PUE 达不到当地要求、电力容量不足。</div></div></div>
+    <div class="chk-row"><div class="chk-box">07</div><div class="chk-c"><div class="chk-q">交易实质：是真租赁，还是融资性贸易/资金过桥？</div><div class="chk-r">资金空转闭环、"名为买卖实为借贷"、涉国企上市公司的披露不充分。</div></div></div>
+  </div>
+
+  <div class="verdict">
+    <div class="verdict-t">综合研判：算力租赁这门生意的多与空</div>
+    <div class="v-item"><span class="v-tag bull">利好</span><p class="v-text">需求端指数级增长（推理主导、Token 经济）+ 国产替代进入兑现期 + 政策强力顺风（东数西算、算力券、全国算力网），行业长期贝塔清晰。</p></div>
+    <div class="v-item"><span class="v-tag bull">利好</span><p class="v-text">盈利正在服务化：从"卖卡时"到"卖 Token/卖服务"，具备调度、软件栈与电力资源的一体化玩家能获得毛利溢价。</p></div>
+    <div class="v-item"><span class="v-tag bear">需冷静</span><p class="v-text">强周期 + 高杠杆 + 3 年快速折旧，高位接盘风险真实；单纯堆卡、裸机租赁是低毛利的苦生意，买方市场下大量玩家出局。</p></div>
+    <div class="v-item"><span class="v-tag bear">需冷静</span><p class="v-text">空转套利、壳公司毁约、概念炒作与融资性贸易是这个赛道最集中的风险；已有数十亿"算力大单"零交付、被监管立案的先例。</p></div>
+    <div class="v-item"><span class="v-tag note">核心结论</span><p class="v-text">评估任何算力租赁项目：先<strong>定位环节</strong>、再<strong>验两端（货源与客户是否真实）</strong>、然后<strong>穿透经济性</strong>、最后<strong>识别真做还是蹭概念</strong>。这套判断，比"算力这门生意好不好"更能决定一单的成败。</p></div>
+  </div>
+</div>
+
+<div class="foot">
+  数据来源：公开信息与研究机构估算（券商研报、行业媒体报道及公开访谈），以及中邮证券/灼识咨询《中国算力中心行业白皮书》产业链框架。不同来源口径存在差异，价格、租金、订单等为特定时点数据、波动剧烈，本报告数字仅用于说明行业逻辑与敏感度，不作为具体测算依据。本报告仅供内部学习与项目评估参考，不构成投资、法律或财务建议。关键数据请以最新披露与尽调核实为准。
+</div>
+
+</div>
+</body>
+</html>
