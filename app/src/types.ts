@@ -13,7 +13,7 @@ export interface Deliverable {
   status: "初稿" | "进行中" | "完成";
 }
 
-export interface Project {
+export interface Analysis {
   id: string;
   name: string;
   ourRole: string;

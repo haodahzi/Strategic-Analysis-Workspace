@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Project } from "../types";
+import { Analysis } from "../types";
 import { FlowType, Party, RiskFinding, runComplianceRules, TxStructure } from "../domain/tx";
 import { exportReport } from "../export/exporter";
 
@@ -12,7 +12,7 @@ function partyName(tx: TxStructure, id: string) {
   return tx.parties.find((p) => p.id === id)?.name ?? id;
 }
 
-export default function TxComplianceView({ tx, project, onBack }: { tx: TxStructure; project: Project; onBack: () => void }) {
+export default function TxComplianceView({ tx, project, onBack }: { tx: TxStructure; project: Analysis; onBack: () => void }) {
   const reportRef = useRef<HTMLDivElement>(null);
   const title = `交易结构合规·${project.industry}`;
   const findings: RiskFinding[] = runComplianceRules(tx);

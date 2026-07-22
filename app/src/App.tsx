@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { projects } from "./data/seed";
+import { analyses } from "./data/seed";
 import { sampleTx } from "./data/tx-sample";
 import { Stage } from "./types";
 import Dashboard from "./components/Dashboard";
@@ -19,13 +19,13 @@ const STAGE_CLASS: Record<Stage, string> = {
 export default function App() {
   const params = new URLSearchParams(window.location.search);
   const [view, setView] = useState<View>((params.get("view") as View) || "dashboard");
-  const [pid, setPid] = useState(params.get("pid") || projects[0].id);
+  const [pid, setPid] = useState(params.get("pid") || analyses[0].id);
   const [sub, setSub] = useState<SubView>(
     (params.get("sub") as SubView) || (params.get("report") === "1" ? "report" : "board"),
   );
 
-  const project = projects.find((p) => p.id === pid) ?? projects[0];
-  const suanli = projects.find((p) => p.hasIndustryReport) ?? projects[0];
+  const project = analyses.find((p) => p.id === pid) ?? analyses[0];
+  const suanli = analyses.find((p) => p.hasIndustryReport) ?? analyses[0];
 
   const openProject = (id: string, rep = false) => {
     setPid(id);
@@ -49,12 +49,12 @@ export default function App() {
         <div className="app-brand">
           <span className="app-logo">◆</span>
           <div>
-            <div className="app-title">业务项目对接工作台</div>
+            <div className="app-title">战略发展分析工作台</div>
             <div className="app-sub">决策副驾 · 洽谈+评估 · M1 Web 内核</div>
           </div>
         </div>
         <nav className="app-actions">
-          <button type="button" className="app-btn">+ 新建对接</button>
+          <button type="button" className="app-btn">+ 新建分析</button>
           <button type="button" className="app-btn ghost" onClick={() => setView("settings")}>设置</button>
         </nav>
       </header>
@@ -62,12 +62,12 @@ export default function App() {
       <div className="app-body">
         <aside className="app-sidebar">
           <div className="nav-group">导航</div>
-          {navItem("dashboard", "▤ 对接总览")}
+          {navItem("dashboard", "▤ 研究分析总览")}
           {navItem("kb", "▧ 交付物库")}
           {navItem("settings", "⚙ 设置（多模型）")}
 
-          <div className="nav-group">在办对接 · {projects.length}</div>
-          {projects.map((p) => (
+          <div className="nav-group">在办分析 · {analyses.length}</div>
+          {analyses.map((p) => (
             <button
               key={p.id}
               type="button"

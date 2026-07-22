@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import sampleHtml from "../assets/suanli-sample.html?raw";
-import { Project } from "../types";
+import { Analysis } from "../types";
 import { exportReport } from "../export/exporter";
 
 // 把参考样例的正文（.wrap 内容）抽出来，注入统一的 .report 渲染容器。
@@ -19,7 +19,7 @@ function extractWrap(html: string): string {
 }
 const REPORT_INNER = extractWrap(sampleHtml);
 
-export default function IndustryReport({ project, onBack }: { project: Project; onBack: () => void }) {
+export default function IndustryReport({ project, onBack }: { project: Analysis; onBack: () => void }) {
   const reportRef = useRef<HTMLDivElement>(null);
   const title = `行业深度分析·${project.industry}`;
   return (

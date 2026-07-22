@@ -1,4 +1,4 @@
-import { projects, kbIndustry, kbEnterprise } from "../data/seed";
+import { analyses, kbIndustry, kbEnterprise } from "../data/seed";
 import { STAGES, Stage } from "../types";
 
 const STAGE_CLASS: Record<Stage, string> = {
@@ -20,23 +20,23 @@ function StageProgress({ stage }: { stage: Stage }) {
 }
 
 export default function Dashboard({ onOpen }: { onOpen: (id: string, report?: boolean) => void }) {
-  const byStage = (s: Stage) => projects.filter((p) => p.stage === s).length;
-  const inProgress = projects.filter((p) => p.deliverables.some((d) => d.status !== "完成")).length;
+  const byStage = (s: Stage) => analyses.filter((p) => p.stage === s).length;
+  const inProgress = analyses.filter((p) => p.deliverables.some((d) => d.status !== "完成")).length;
   const kbCount = kbIndustry.length + kbEnterprise.length;
-  const dealBreakers = projects.reduce((n, p) => n + p.dealBreakers, 0);
+  const dealBreakers = analyses.reduce((n, p) => n + p.dealBreakers, 0);
 
   return (
     <div className="dash">
       <div className="dash-head">
-        <h2>对接总览</h2>
-        <div className="dash-sub">总部职能部门 · 接洽前后可行性初评 · 决策建议权（「项目」＝待评估的业务合作/投资项目；「对接」＝工作台对一个项目的一次评估）</div>
+        <h2>研究分析总览</h2>
+        <div className="dash-sub">总部职能部门 · 接洽前后可行性初评 · 决策建议权</div>
       </div>
 
       {/* KPI */}
       <div className="kpi-row">
         <div className="kpi">
-          <div className="kpi-n">{projects.length}</div>
-          <div className="kpi-l">在办对接</div>
+          <div className="kpi-n">{analyses.length}</div>
+          <div className="kpi-l">在办分析</div>
           <div className="kpi-x">{inProgress} 个尚有在办交付物</div>
         </div>
         <div className="kpi">
@@ -62,10 +62,10 @@ export default function Dashboard({ onOpen }: { onOpen: (id: string, report?: bo
         </div>
       </div>
 
-      {/* 在办对接（每个对接＝对一个业务项目的评估） */}
-      <div className="sec-head">在办对接 · 各处什么阶段（每个对接＝对一个业务项目的评估）</div>
+      {/* 在办分析（每次分析＝对一个业务项目的评估） */}
+      <div className="sec-head">在办分析 · 各处什么阶段</div>
       <div className="proj-list">
-        {projects.map((p) => (
+        {analyses.map((p) => (
           <div key={p.id} className="proj-card">
             <div className="proj-top">
               <div>

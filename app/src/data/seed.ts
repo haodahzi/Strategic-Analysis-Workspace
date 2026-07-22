@@ -1,6 +1,6 @@
 // 演示种子数据（第一段用；第二段接 SQLite 后由真实项目替代）。
 import {
-  CellState, DimensionKey, DIMENSIONS, KbEnterprise, KbIndustry, Matrix, Project,
+  CellState, DimensionKey, DIMENSIONS, KbEnterprise, KbIndustry, Matrix, Analysis,
 } from "../types";
 
 type Row = [CellState, CellState, CellState];
@@ -13,7 +13,7 @@ function mat(rows: Partial<Record<DimensionKey, Row>>): Matrix {
   return out;
 }
 
-export const projects: Project[] = [
+export const analyses: Analysis[] = [
   {
     id: "p-suanli",
     name: "某智算中心 · 算力租赁合作",

@@ -1,4 +1,4 @@
-import { DIMENSIONS, PHASE_COLS, Project, CellState } from "../types";
+import { DIMENSIONS, PHASE_COLS, Analysis, CellState } from "../types";
 
 const CELL_CLASS: Record<CellState, string> = {
   空: "c-empty", 假设: "c-hyp", 验证: "c-ver", 结论: "c-con",
@@ -6,7 +6,7 @@ const CELL_CLASS: Record<CellState, string> = {
 
 export default function TwoAxisBoard(
   { project, onOpenReport, onOpenTx }:
-  { project: Project; onOpenReport: () => void; onOpenTx: () => void },
+  { project: Analysis; onOpenReport: () => void; onOpenTx: () => void },
 ) {
   return (
     <div className="board">
