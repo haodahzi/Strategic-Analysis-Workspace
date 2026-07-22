@@ -8,9 +8,10 @@ import KnowledgeBase from "./components/KnowledgeBase";
 import IndustryReport from "./components/IndustryReport";
 import TxComplianceView from "./components/TxComplianceView";
 import Settings from "./components/Settings";
+import Step0 from "./components/Step0";
 
 type View = "dashboard" | "project" | "kb" | "settings";
-type SubView = "board" | "report" | "tx";
+type SubView = "board" | "report" | "tx" | "step0";
 
 const STAGE_CLASS: Record<Stage, string> = {
   定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -87,6 +88,7 @@ export default function App() {
               project={project}
               onOpenReport={() => setSub("report")}
               onOpenTx={() => setSub("tx")}
+              onOpenStep0={() => setSub("step0")}
             />
           )}
           {view === "project" && sub === "report" && (
@@ -94,6 +96,9 @@ export default function App() {
           )}
           {view === "project" && sub === "tx" && (
             <TxComplianceView tx={sampleTx} project={project} onBack={() => setSub("board")} />
+          )}
+          {view === "project" && sub === "step0" && (
+            <Step0 analysis={project} onBack={() => setSub("board")} />
           )}
           {view === "kb" && <KnowledgeBase onOpenSample={() => openProject(suanli.id, true)} />}
           {view === "settings" && <Settings />}

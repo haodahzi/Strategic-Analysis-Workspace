@@ -5,8 +5,8 @@ const CELL_CLASS: Record<CellState, string> = {
 };
 
 export default function TwoAxisBoard(
-  { project, onOpenReport, onOpenTx }:
-  { project: Analysis; onOpenReport: () => void; onOpenTx: () => void },
+  { project, onOpenReport, onOpenTx, onOpenStep0 }:
+  { project: Analysis; onOpenReport: () => void; onOpenTx: () => void; onOpenStep0: () => void },
 ) {
   return (
     <div className="board">
@@ -20,8 +20,9 @@ export default function TwoAxisBoard(
           </div>
         </div>
         <div className="board-actions">
+          <button type="button" className="app-btn" onClick={onOpenStep0}>Step 0 定框 · 生成 →</button>
           {project.hasIndustryReport && (
-            <button type="button" className="app-btn" onClick={onOpenReport}>查看行业深度分析 →</button>
+            <button type="button" className="app-btn ghost dark" onClick={onOpenReport}>查看行业深度分析 →</button>
           )}
           <button type="button" className="app-btn ghost dark" onClick={onOpenTx}>交易结构 · 合规探测 →</button>
         </div>
