@@ -25,8 +25,10 @@ export interface HttpSpec { url: string; headers: Record<string, string>; body: 
 export interface LLMResult { text: string; raw?: unknown; }
 export interface LLMClient { send(req: ChatRequest): Promise<LLMResult>; }
 
-// 需要按阶段路由的 LLM 阶段
-export const LLM_STAGES = ["定框", "行业分析", "企业画像", "洽谈问题", "洽谈后"] as const;
+// 需要按阶段路由的 LLM 阶段（"前提假设映射""四流抽取"为硬结构化，仍可路由到其他模型）
+export const LLM_STAGES = [
+  "定框", "行业深度分析", "企业画像", "洽谈问题清单", "前提假设映射", "四流抽取", "可行性判断初稿",
+] as const;
 export type LlmStage = (typeof LLM_STAGES)[number];
 
 export interface AppConfig {
