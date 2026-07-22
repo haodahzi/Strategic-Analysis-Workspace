@@ -7,6 +7,7 @@ import TwoAxisBoard from "./components/TwoAxisBoard";
 import KnowledgeBase from "./components/KnowledgeBase";
 import IndustryReport from "./components/IndustryReport";
 import TxComplianceView from "./components/TxComplianceView";
+import Settings from "./components/Settings";
 
 type View = "dashboard" | "project" | "kb" | "settings";
 type SubView = "board" | "report" | "tx";
@@ -95,44 +96,8 @@ export default function App() {
             <TxComplianceView tx={sampleTx} project={project} onBack={() => setSub("board")} />
           )}
           {view === "kb" && <KnowledgeBase onOpenSample={() => openProject(suanli.id, true)} />}
-          {view === "settings" && <SettingsStub />}
+          {view === "settings" && <Settings />}
         </main>
-      </div>
-    </div>
-  );
-}
-
-function SettingsStub() {
-  const providers = [
-    { name: "Claude (Anthropic)", note: "默认 · claude-opus-4-8 / claude-fable-5", on: true },
-    { name: "GPT (OpenAI)", note: "OpenAI Chat Completions", on: false },
-    { name: "DeepSeek", note: "OpenAI 兼容 · deepseek-chat / reasoner", on: false },
-    { name: "智谱 GLM", note: "OpenAI 兼容 · glm-*", on: false },
-    { name: "KIMI (Moonshot)", note: "OpenAI 兼容 · moonshot-*", on: false },
-  ];
-  return (
-    <div className="dash">
-      <div className="dash-head">
-        <h2>设置 · 多模型（填 Key 即用）</h2>
-        <div className="dash-sub">保留多提供商 API Key，可按阶段选模型；Key 存 OS 密钥库、不入库。（连通性自检为下一块）</div>
-      </div>
-      <div className="kb-list">
-        {providers.map((p) => (
-          <div key={p.name} className="kb-row">
-            <div className="kb-row-main">
-              <span className="kb-row-title">{p.name}</span>
-              {p.on && <span className="kb-tag">默认</span>}
-            </div>
-            <div className="kb-row-r">
-              <span className="kb-up">{p.note}</span>
-              <input className="key-input" placeholder="填入 API Key…" disabled />
-              <button type="button" className="app-btn ghost" disabled>连通性自检</button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="board-note" style={{ marginTop: 18 }}>
-        硬结构化步骤（四流抽取、前提假设映射）默认走 Claude 更稳；散文类阶段可自由选提供商。
       </div>
     </div>
   );
