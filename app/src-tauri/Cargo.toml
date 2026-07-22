@@ -1,0 +1,27 @@
+[package]
+name = "strategic-analysis-workbench"
+version = "0.1.0"
+description = "战略发展分析工作台 — 决策副驾"
+edition = "2021"
+rust-version = "1.77.2"
+
+# 库入口：桌面与（未来）移动端共用 run()
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 发布体积优化（Windows 安装包更小）
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

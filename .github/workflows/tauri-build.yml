@@ -1,0 +1,68 @@
+name: build-desktop
+
+# 用 GitHub Actions 的 windows runner 出安装包（.msi + .exe），
+# 绕过本地/云沙箱缺 webkit 的限制。产物在每次运行的 Artifacts 里下载。
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - "claude/business-project-docking-workbench-ccies1"
+    tags:
+      - "v*"
+    # 仅当桌面壳/前端/工作流本身变化时才触发，纯文档提交不跑 15 分钟构建
+    paths:
+      - "app/src/**"
+      - "app/src-tauri/**"
+      - "app/package.json"
+      - "app/package-lock.json"
+      - "app/vite.config.ts"
+      - "app/tsconfig.json"
+      - "app/index.html"
+      - ".github/workflows/tauri-build.yml"
+
+env:
+  RUST_BACKTRACE: "1"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # 当前 Windows 优先；日后加 macos-latest / ubuntu-22.04 只需在此追加
+        include:
+          - platform: windows-latest
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend deps
+        working-directory: app
+        run: npm ci
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "app/src-tauri -> target"
+
+      # 运行 beforeBuildCommand(npm run build) 产出 dist，再 cargo tauri build 出安装包
+      - name: Build Tauri (Windows installers)
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: app
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          if-no-files-found: error
+          path: |
+            app/src-tauri/target/release/bundle/msi/*.msi
+            app/src-tauri/target/release/bundle/nsis/*.exe
