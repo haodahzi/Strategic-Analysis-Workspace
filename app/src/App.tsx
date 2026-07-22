@@ -54,7 +54,7 @@ export default function App() {
           </div>
         </div>
         <nav className="app-actions">
-          <button type="button" className="app-btn">+ 新建项目</button>
+          <button type="button" className="app-btn">+ 新建对接</button>
           <button type="button" className="app-btn ghost" onClick={() => setView("settings")}>设置</button>
         </nav>
       </header>
@@ -62,11 +62,11 @@ export default function App() {
       <div className="app-body">
         <aside className="app-sidebar">
           <div className="nav-group">导航</div>
-          {navItem("dashboard", "▤ 项目总览")}
+          {navItem("dashboard", "▤ 对接总览")}
           {navItem("kb", "▧ 交付物库")}
           {navItem("settings", "⚙ 设置（多模型）")}
 
-          <div className="nav-group">运行项目 · {projects.length}</div>
+          <div className="nav-group">在办对接 · {projects.length}</div>
           {projects.map((p) => (
             <button
               key={p.id}

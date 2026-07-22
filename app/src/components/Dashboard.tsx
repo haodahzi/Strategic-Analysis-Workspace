@@ -28,15 +28,15 @@ export default function Dashboard({ onOpen }: { onOpen: (id: string, report?: bo
   return (
     <div className="dash">
       <div className="dash-head">
-        <h2>项目总览</h2>
-        <div className="dash-sub">总部职能部门 · 接洽前后可行性初评 · 决策建议权</div>
+        <h2>对接总览</h2>
+        <div className="dash-sub">总部职能部门 · 接洽前后可行性初评 · 决策建议权（「项目」＝待评估的业务合作/投资项目；「对接」＝工作台对一个项目的一次评估）</div>
       </div>
 
       {/* KPI */}
       <div className="kpi-row">
         <div className="kpi">
           <div className="kpi-n">{projects.length}</div>
-          <div className="kpi-l">运行项目</div>
+          <div className="kpi-l">在办对接</div>
           <div className="kpi-x">{inProgress} 个尚有在办交付物</div>
         </div>
         <div className="kpi">
@@ -62,8 +62,8 @@ export default function Dashboard({ onOpen }: { onOpen: (id: string, report?: bo
         </div>
       </div>
 
-      {/* 运行项目 */}
-      <div className="sec-head">运行项目 · 各处什么阶段</div>
+      {/* 在办对接（每个对接＝对一个业务项目的评估） */}
+      <div className="sec-head">在办对接 · 各处什么阶段（每个对接＝对一个业务项目的评估）</div>
       <div className="proj-list">
         {projects.map((p) => (
           <div key={p.id} className="proj-card">
