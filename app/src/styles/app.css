@@ -141,6 +141,12 @@ table.matrix td.mx-dim{text-align:left;font-weight:500;color:var(--ink);backgrou
 .report-bar-actions{display:flex;gap:7px}
 .report-bar .app-btn.ghost{color:rgba(255,255,255,.8)}
 
+/* 导出 PDF（WebView 打印）时只留交付物，隐藏工作台 chrome */
+@media print{
+  .app-chrome,.app-sidebar,.report-bar{display:none!important}
+  .app-body{display:block!important}
+  .app-main{overflow:visible!important}
+}
 @media(max-width:900px){
   .app-body{grid-template-columns:1fr}
   .app-sidebar{display:none}

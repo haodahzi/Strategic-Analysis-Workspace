@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import sampleHtml from "../assets/suanli-sample.html?raw";
 import { Project } from "../types";
+import { exportReport } from "../export/exporter";
 
 // 把参考样例的正文（.wrap 内容）抽出来，注入统一的 .report 渲染容器。
 // 该样例即框架 §3 点名的《算力租赁·深度研究与项目评估》深度基准，
@@ -18,6 +20,8 @@ function extractWrap(html: string): string {
 const REPORT_INNER = extractWrap(sampleHtml);
 
 export default function IndustryReport({ project, onBack }: { project: Project; onBack: () => void }) {
+  const reportRef = useRef<HTMLDivElement>(null);
+  const title = `行业深度分析·${project.industry}`;
   return (
     <div className="report-view">
       <div className="report-bar">
@@ -27,12 +31,12 @@ export default function IndustryReport({ project, onBack }: { project: Project; 
           <span className="report-bar-tag">半耐用 · 待审初稿</span>
         </div>
         <div className="report-bar-actions">
-          <button type="button" className="app-btn">导出 Word</button>
-          <button type="button" className="app-btn ghost">导出 PDF</button>
-          <button type="button" className="app-btn ghost">导出 HTML</button>
+          <button type="button" className="app-btn" onClick={() => exportReport(reportRef.current, title, "word")}>导出 Word</button>
+          <button type="button" className="app-btn ghost" onClick={() => exportReport(reportRef.current, title, "pdf")}>导出 PDF</button>
+          <button type="button" className="app-btn ghost" onClick={() => exportReport(reportRef.current, title, "html")}>导出 HTML</button>
         </div>
       </div>
-      <div className="report">
+      <div className="report" ref={reportRef}>
         <div className="wrap" dangerouslySetInnerHTML={{ __html: REPORT_INNER }} />
       </div>
     </div>

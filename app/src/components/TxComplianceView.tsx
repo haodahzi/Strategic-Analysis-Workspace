@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import { Project } from "../types";
 import { FlowType, Party, RiskFinding, runComplianceRules, TxStructure } from "../domain/tx";
+import { exportReport } from "../export/exporter";
 
 const FLOW_ORDER: FlowType[] = ["合同流", "资金流", "货物服务流", "票流"];
 const FLOW_COLOR: Record<FlowType, string> = {
@@ -11,6 +13,8 @@ function partyName(tx: TxStructure, id: string) {
 }
 
 export default function TxComplianceView({ tx, project, onBack }: { tx: TxStructure; project: Project; onBack: () => void }) {
+  const reportRef = useRef<HTMLDivElement>(null);
+  const title = `交易结构合规·${project.industry}`;
   const findings: RiskFinding[] = runComplianceRules(tx);
   const red = findings.filter((f) => f.level === "红").length;
   const yellow = findings.filter((f) => f.level === "黄").length;
@@ -24,12 +28,12 @@ export default function TxComplianceView({ tx, project, onBack }: { tx: TxStruct
           <span className="report-bar-tag">合作备忘收口件</span>
         </div>
         <div className="report-bar-actions">
-          <button type="button" className="app-btn">导出 Word</button>
-          <button type="button" className="app-btn ghost">导出 PDF</button>
+          <button type="button" className="app-btn" onClick={() => exportReport(reportRef.current, title, "word")}>导出 Word</button>
+          <button type="button" className="app-btn ghost" onClick={() => exportReport(reportRef.current, title, "pdf")}>导出 PDF</button>
         </div>
       </div>
 
-      <div className="report">
+      <div className="report" ref={reportRef}>
         <div className="wrap">
           <div className="hero" style={{ padding: "34px 0 24px" }}>
             <div className="eyebrow">交易结构 · 四流探测 · 确定性规则 R1–R7</div>
