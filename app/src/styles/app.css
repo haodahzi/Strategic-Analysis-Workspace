@@ -134,6 +134,20 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 .fld input{width:100%}
 .stg-tag{font-family:var(--mono);font-size:8px;color:var(--gold);border:1px solid var(--gold);padding:1px 5px;margin-left:8px;letter-spacing:.5px}
 
+/* 新建分析 */
+.na-form{display:flex;flex-direction:column;gap:18px;max-width:760px;margin-top:8px}
+.na-form .fld>span{font-size:12px;color:var(--ink2);margin-bottom:2px}
+.na-hint{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--ink3);margin-left:8px;border:1px solid var(--border);padding:1px 5px;border-radius:2px}
+.na-roles{display:flex;flex-wrap:wrap;gap:7px}
+.na-chip{font-size:12px;padding:6px 13px;border:1px solid var(--border);background:#fff;color:var(--ink2);cursor:pointer;border-radius:2px}
+.na-chip.on{background:var(--gold);color:#fff;border-color:var(--gold)}
+.na-focus{display:flex;flex-direction:column;gap:8px}
+.na-focus-card{text-align:left;border:1px solid var(--border2);background:#fff;padding:11px 14px;cursor:pointer;border-radius:2px}
+.na-focus-card.on{border-color:var(--gold);background:#fdf7e8;box-shadow:inset 3px 0 0 var(--gold)}
+.na-focus-t{font-family:var(--serif);font-size:14px;font-weight:600;color:var(--ink)}
+.na-focus-d{font-size:11px;color:var(--ink3);margin-top:3px;line-height:1.6}
+.na-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px}
+
 /* ===== 两轴看板 ===== */
 .board{padding:26px 30px;max-width:1100px}
 .board-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
@@ -156,10 +170,18 @@ table.matrix td.mx-dim{text-align:left;font-weight:500;color:var(--ink);backgrou
 .legend{display:flex;gap:22px;font-size:11px;color:var(--ink2);margin:14px 0;align-items:center}
 .legend i{font-style:normal;margin-right:6px}
 .board-mainline{margin-top:22px;background:#1a1712;color:rgba(255,255,255,.82);padding:16px 20px}
-.board-mainline .ml-t{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--gold);margin-bottom:7px}
+.board-mainline .ml-t{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--gold);margin-bottom:10px}
 .board-mainline p{font-size:13px;line-height:1.7}
 .board-mainline strong{color:#fff}
 .board-mainline .warn{color:#f4b8b0}
+.premise-list{list-style:none;display:flex;flex-direction:column;gap:7px;margin:0 0 12px}
+.premise{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;font-size:13px;line-height:1.6;padding:8px 11px;background:rgba(255,255,255,.05);border-left:2px solid rgba(255,255,255,.18)}
+.premise.db{border-left-color:#f4b8b0;background:rgba(244,184,176,.09)}
+.premise-dim{flex-shrink:0;font-family:var(--mono);font-size:9px;letter-spacing:.5px;color:var(--gold);border:1px solid rgba(212,160,23,.45);padding:1px 6px;border-radius:2px}
+.premise-text{flex:1;min-width:200px;color:rgba(255,255,255,.9)}
+.premise-badge{flex-shrink:0;font-size:10px;color:#1a1712;background:#f4b8b0;padding:1px 7px;border-radius:2px;font-weight:600}
+.premise-st{flex-shrink:0;font-family:var(--mono);font-size:9px;color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.22);padding:1px 6px;border-radius:2px}
+.board-mainline .ml-foot{font-size:12px;color:rgba(255,255,255,.7);border-top:1px solid rgba(255,255,255,.12);padding-top:10px}
 
 /* ===== 行业分析报告视图 ===== */
 .report-view{display:flex;flex-direction:column;min-height:100%}

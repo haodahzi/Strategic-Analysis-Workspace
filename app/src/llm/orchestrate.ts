@@ -10,7 +10,7 @@ export interface OverlayItem { item: string; reason: string; }
 export interface Step0Framework { coreDimensions: CoreDim[]; industryOverlay: OverlayItem[]; reflexive: string[]; }
 export interface Step0Run { framework: Step0Framework; providerLabel: string; model: string; }
 
-const CORE_KEYS = ["行业理解", "对方画像", "项目评估", "风险维度", "战略布局匹配", "我方角色"];
+const CORE_KEYS = ["行业理解", "对方画像", "我方角色", "项目评估", "风险维度", "战略布局匹配"];
 
 export const SYSTEM_CONTRACT =
   `你是"决策副驾"。定位：对业务合作/投资项目做接洽前后的可行性初评，只给决策建议、不替用户拍板。\n` +
@@ -108,10 +108,10 @@ function roleWeights(role: string): Record<string, [number, string]> {
   const base: Record<string, [number, string]> = {
     行业理解: [70, "跨项目复用的弹药库，基础项"],
     对方画像: [75, "真实诉求/资质/决策链决定可行性"],
+    我方角色: [85, `我方为「${role}」，据此为其余维度排权重`],
     项目评估: [80, "能不能做 + 值不值得做的核心"],
     风险维度: [70, "合规/财务/履约/退出等"],
     战略布局匹配: [60, "与既有业务布局的协同"],
-    我方角色: [85, `我方为「${role}」，据此为其余维度排权重`],
   };
   if (role.includes("资金")) { base["风险维度"] = [88, "资金方最盯财务/退出/名实分离"]; base["项目评估"] = [86, "ROI 与价值分配是资金方命门"]; }
   else if (role.includes("场地")) { base["风险维度"] = [78, "能耗/合规/空置风险"]; base["对方画像"] = [82, "运营方履约与上架率承诺"]; }

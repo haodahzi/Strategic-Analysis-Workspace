@@ -23,6 +23,11 @@ export const analyses: Analysis[] = [
     updatedAt: "2026-07-18",
     assumptions: 3,
     dealBreakers: 1,
+    premises: [
+      { text: "标的算力集群真实上架率与租约锁定期达到融资测算下限（≥80% 上架、租期 ≥3 年）", dimension: "项目评估", status: "待验证" },
+      { text: "终端租户（算力需求方）信用与付款能力真实、可长期履约", dimension: "对方画像", status: "假设" },
+      { text: "本单非「名实分离/回租套利」，资金-货物-票-合同四流一致、可穿透合规", dimension: "风险维度", dealBreaker: true, status: "待验证" },
+    ],
     hasIndustryReport: true,
     matrix: mat({
       行业理解: ["结论", "空", "空"],
@@ -46,6 +51,12 @@ export const analyses: Analysis[] = [
     updatedAt: "2026-07-19",
     assumptions: 4,
     dealBreakers: 2,
+    premises: [
+      { text: "冷库能耗/电价与制冷负荷测算成立，空置期我方不兜底", dimension: "风险维度", dealBreaker: true, status: "待验证" },
+      { text: "运营方对上架率/周转的承诺有真实货源支撑", dimension: "对方画像", dealBreaker: true, status: "待验证" },
+      { text: "温控合规资质齐全（HACCP，涉药则 GSP）", dimension: "风险维度", status: "已确认" },
+      { text: "场地租金与运营分成的价值分配对我方公允", dimension: "项目评估", status: "假设" },
+    ],
     matrix: mat({
       行业理解: ["结论", "结论", "空"],
       我方角色: ["结论", "结论", "空"],
@@ -69,6 +80,13 @@ export const analyses: Analysis[] = [
     updatedAt: "2026-07-20",
     assumptions: 5,
     dealBreakers: 1,
+    premises: [
+      { text: "联合体各方资质与并网路条真实齐备", dimension: "对方画像", status: "已确认" },
+      { text: "组件/逆变器供货价与工期锁定，不被涨价击穿", dimension: "项目评估", dealBreaker: true, status: "待验证" },
+      { text: "业主付款节点与回款风险可控", dimension: "风险维度", status: "已确认" },
+      { text: "联合体内部权责分成清晰、无连带塌方风险", dimension: "我方角色", status: "已确认" },
+      { text: "补贴/电价政策在测算周期内稳定", dimension: "战略布局匹配", status: "已确认" },
+    ],
     matrix: mat({
       行业理解: ["结论", "结论", "结论"],
       我方角色: ["结论", "结论", "结论"],

@@ -3,73 +3,70 @@ import { AppConfig, LLM_STAGES, ProviderId } from "../llm/types";
 import { loadConfig, providerById, saveConfig } from "../config/store";
 import { makeClient } from "../llm/adapters";
 
-// 硬结构化步骤：推荐 Claude（原生结构化输出），但也支持其他模型（JSON mode + 本地校验重试）。
-const STRUCTURED = new Set<string>(["前提假设映射", "四流抽取"]);
-
 export default function Settings() {
   const [cfg, setCfg] = useState<AppConfig>(() => loadConfig());
-  const [editing, setEditing] = useState<ProviderId>("claude");
-  const [checks, setChecks] = useState<Record<string, string>>({});
+  const [check, setCheck] = useState<string>("");
   const commit = (next: AppConfig) => { setCfg(next); saveConfig(next); };
-  const patch = (id: ProviderId, p: Partial<{ apiKey: string; baseUrl: string; models: string[] }>) =>
-    commit({ ...cfg, providers: cfg.providers.map((x) => (x.id === id ? { ...x, ...p } : x)) });
-  const editP = providerById(cfg, editing);
 
-  const selfCheck = async (id: ProviderId) => {
-    const p = providerById(cfg, id);
-    setChecks((c) => ({ ...c, [id]: "检测中…" }));
-    try {
-      await makeClient(p).send({ model: p.models[0] ?? "", messages: [{ role: "user", content: "回复 OK" }], maxTokens: 5 });
-      setChecks((c) => ({ ...c, [id]: "✓ 连通" }));
-    } catch (e) {
-      setChecks((c) => ({ ...c, [id]: "✗ " + (e as Error).message.slice(0, 70) }));
-    }
+  const active = cfg.defaultProvider;          // 主用提供商 = 正在配置的对象
+  const activeP = providerById(cfg, active);
+
+  const patch = (p: Partial<{ apiKey: string; baseUrl: string; models: string[] }>) =>
+    commit({ ...cfg, providers: cfg.providers.map((x) => (x.id === active ? { ...x, ...p } : x)) });
+
+  // 选主用提供商：设为默认，并把所有阶段一键填成它（个别阶段需要时在下方单独改）
+  const selectProvider = (id: ProviderId) => {
+    const model = providerById(cfg, id).models[0] ?? "";
+    const routing = {} as AppConfig["routing"];
+    for (const s of LLM_STAGES) routing[s] = { provider: id, model };
+    commit({ ...cfg, defaultProvider: id, routing });
+    setCheck("");
   };
-  const chkClass = (v?: string) => "chk-res " + (v?.startsWith("✓") ? "ok" : v?.startsWith("✗") ? "bad" : "");
+
+  const selfCheck = async () => {
+    setCheck("检测中…");
+    try {
+      await makeClient(activeP).send({ model: activeP.models[0] ?? "", messages: [{ role: "user", content: "回复 OK" }], maxTokens: 5 });
+      setCheck("✓ 连通");
+    } catch (e) { setCheck("✗ " + (e as Error).message.slice(0, 70)); }
+  };
+  const chkClass = "chk-res " + (check.startsWith("✓") ? "ok" : check.startsWith("✗") ? "bad" : "");
 
   return (
     <div className="dash">
       <div className="dash-head">
-        <h2>设置 · 多模型（填 Key 即用）</h2>
-        <div className="dash-sub">先选提供商再填其配置；可按阶段选模型。Key 本地保存（第二段改存 OS 密钥库、不入库）。</div>
+        <h2>设置</h2>
+        <div className="dash-sub">选主用提供商、填 Key 即用；选定后所有分析阶段默认走它，个别阶段想换在下方单独改。Key 仅本地保存（第二段改存 OS 密钥库、不入库）。</div>
       </div>
 
-      <div className="sec-head">默认提供商</div>
+      <div className="sec-head">主用提供商（填 Key 即用）</div>
       <div className="set-row">
-        <select className="set-select" value={cfg.defaultProvider} onChange={(e) => commit({ ...cfg, defaultProvider: e.target.value as ProviderId })}>
+        <select className="set-select" value={active} onChange={(e) => selectProvider(e.target.value as ProviderId)}>
           {cfg.providers.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
         </select>
-        <span className="set-hint">未配置 Key 的提供商，请先在下方填好再选用。</span>
-      </div>
-
-      <div className="sec-head">配置提供商</div>
-      <div className="set-row">
-        <select className="set-select" value={editing} onChange={(e) => setEditing(e.target.value as ProviderId)}>
-          {cfg.providers.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
-        </select>
-        <span className="prov-style">{editP.style === "anthropic" ? "Anthropic" : "OpenAI 兼容"}</span>
-        <span className={"key-status " + (editP.id === "mock" ? "na" : editP.apiKey ? "ok" : "none")}>
-          {editP.id === "mock" ? "无需 Key" : editP.apiKey ? "● 已配置 Key" : "○ 未配置 Key"}
+        <span className="prov-style">{activeP.style === "anthropic" ? "Anthropic" : "OpenAI 兼容"}</span>
+        <span className={"key-status " + (activeP.id === "mock" ? "na" : activeP.apiKey ? "ok" : "none")}>
+          {activeP.id === "mock" ? "无需 Key（演示）" : activeP.apiKey ? "● 已配置 Key" : "○ 未配置 Key"}
         </span>
         <div className="spacer" />
-        <span className={chkClass(checks[editing])}>{checks[editing] ?? ""}</span>
-        <button type="button" className="app-btn ghost dark" onClick={() => selfCheck(editing)} disabled={editing !== "mock" && !editP.apiKey}>连通性自检</button>
+        <span className={chkClass}>{check}</span>
+        <button type="button" className="app-btn ghost dark" onClick={selfCheck} disabled={active !== "mock" && !activeP.apiKey}>连通性自检</button>
       </div>
-      {editing !== "mock" && (
+      {active !== "mock" && (
         <div className="prov-fields-col">
           <label className="fld"><span>API Key</span>
-            <input className="key-input wide" type="password" placeholder="填入 API Key…" value={editP.apiKey ?? ""} onChange={(e) => patch(editing, { apiKey: e.target.value })} />
+            <input className="key-input wide" type="password" placeholder="填入 API Key…" value={activeP.apiKey ?? ""} onChange={(e) => patch({ apiKey: e.target.value })} />
           </label>
           <label className="fld"><span>Base URL</span>
-            <input className="key-input wide" value={editP.baseUrl} onChange={(e) => patch(editing, { baseUrl: e.target.value })} />
+            <input className="key-input wide" value={activeP.baseUrl} onChange={(e) => patch({ baseUrl: e.target.value })} />
           </label>
           <label className="fld"><span>模型列表（逗号分隔）</span>
-            <input className="key-input wide" value={editP.models.join(", ")} onChange={(e) => patch(editing, { models: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+            <input className="key-input wide" value={activeP.models.join(", ")} onChange={(e) => patch({ models: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
           </label>
         </div>
       )}
 
-      <div className="sec-head">按阶段选模型</div>
+      <div className="sec-head">按阶段选模型（默认跟随主用提供商，个别要换才动）</div>
       <div className="tw">
         <table className="matrix">
           <thead><tr><th className="mx-dim">阶段</th><th>提供商</th><th>模型</th></tr></thead>
@@ -79,7 +76,7 @@ export default function Settings() {
               const prov = providerById(cfg, r.provider);
               return (
                 <tr key={s}>
-                  <td className="mx-dim">{s}{STRUCTURED.has(s) && <span className="stg-tag">结构化</span>}</td>
+                  <td className="mx-dim">{s}</td>
                   <td>
                     <select value={r.provider} onChange={(e) => {
                       const provider = e.target.value as ProviderId;
@@ -99,9 +96,6 @@ export default function Settings() {
             })}
           </tbody>
         </table>
-      </div>
-      <div className="board-note" style={{ marginTop: 16 }}>
-        <strong>四流抽取、前提假设映射</strong> 标「结构化」：推荐 Claude（原生结构化输出），但<strong>同样支持其他大模型</strong>——非严格结构化的模型自动走 JSON mode + 本地 schema 校验与重试。配置自动本地保存。
       </div>
     </div>
   );

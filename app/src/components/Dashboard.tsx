@@ -1,5 +1,5 @@
-import { analyses, kbIndustry, kbEnterprise } from "../data/seed";
-import { STAGES, Stage } from "../types";
+import { kbIndustry, kbEnterprise } from "../data/seed";
+import { Analysis, STAGES, Stage } from "../types";
 
 const STAGE_CLASS: Record<Stage, string> = {
   定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -19,11 +19,11 @@ function StageProgress({ stage }: { stage: Stage }) {
   );
 }
 
-export default function Dashboard({ onOpen }: { onOpen: (id: string, report?: boolean) => void }) {
-  const byStage = (s: Stage) => analyses.filter((p) => p.stage === s).length;
-  const inProgress = analyses.filter((p) => p.deliverables.some((d) => d.status !== "完成")).length;
+export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen: (id: string, report?: boolean) => void }) {
+  const byStage = (s: Stage) => items.filter((p) => p.stage === s).length;
+  const inProgress = items.filter((p) => p.deliverables.some((d) => d.status !== "完成")).length;
   const kbCount = kbIndustry.length + kbEnterprise.length;
-  const dealBreakers = analyses.reduce((n, p) => n + p.dealBreakers, 0);
+  const dealBreakers = items.reduce((n, p) => n + p.dealBreakers, 0);
 
   return (
     <div className="dash">
@@ -35,7 +35,7 @@ export default function Dashboard({ onOpen }: { onOpen: (id: string, report?: bo
       {/* KPI */}
       <div className="kpi-row">
         <div className="kpi">
-          <div className="kpi-n">{analyses.length}</div>
+          <div className="kpi-n">{items.length}</div>
           <div className="kpi-l">在办分析</div>
           <div className="kpi-x">{inProgress} 个尚有在办交付物</div>
         </div>
@@ -65,7 +65,7 @@ export default function Dashboard({ onOpen }: { onOpen: (id: string, report?: bo
       {/* 在办分析（每次分析＝对一个业务项目的评估） */}
       <div className="sec-head">在办分析 · 各处什么阶段</div>
       <div className="proj-list">
-        {analyses.map((p) => (
+        {items.map((p) => (
           <div key={p.id} className="proj-card">
             <div className="proj-top">
               <div>

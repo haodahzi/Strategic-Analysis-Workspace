@@ -13,15 +13,26 @@ export interface Deliverable {
   status: "初稿" | "进行中" | "完成";
 }
 
+// 「这单成立」所依赖的前提假设——贯穿主线的锚。dealBreaker=错了就能推翻整单。
+export type PremiseStatus = "假设" | "待验证" | "已确认" | "已推翻";
+export interface Premise {
+  text: string;                 // 具体假设内容（不是数量！）
+  dimension: DimensionKey;      // 挂在哪个评估维度
+  dealBreaker?: boolean;        // 是否「错了就能推翻这单」
+  status?: PremiseStatus;       // 假设→待验证→已确认/已推翻
+}
+
 export interface Analysis {
   id: string;
   name: string;
   ourRole: string;
   industry: string;
+  focus?: string;               // 本次分析重点：项目可行性 / 行业深度分析 / 企业画像
   stage: Stage;
   updatedAt: string;
   assumptions: number;
   dealBreakers: number;
+  premises?: Premise[];         // 前提假设的具体内容（有则据此渲染主线，数量由它推导）
   matrix: Matrix;
   deliverables: Deliverable[];
   hasIndustryReport?: boolean;
@@ -35,7 +46,7 @@ export interface KbEnterprise {
 }
 
 export const DIMENSIONS: DimensionKey[] = [
-  "行业理解", "对方画像", "项目评估", "风险维度", "战略布局匹配", "我方角色",
+  "行业理解", "对方画像", "我方角色", "项目评估", "风险维度", "战略布局匹配",
 ];
 export const STAGES: Stage[] = ["定框", "调研前", "洽谈中", "洽谈后"];
 export const PHASE_COLS: PhaseCol[] = ["调研前", "洽谈中", "洽谈后"];

@@ -66,12 +66,28 @@ export default function TwoAxisBoard(
       </div>
 
       <div className="board-mainline">
-        <div className="ml-t">贯穿主线</div>
-        <p>
-          前提假设 <strong>{project.assumptions}</strong> 条，其中
-          <span className="warn"> 能推翻这单 {project.dealBreakers} 条</span>
-          → 转成洽谈问题清单里优先级最高的几条 → 洽谈后在合作备忘里逐条确认或推翻。
-        </p>
+        <div className="ml-t">贯穿主线 · 这单成立所依赖的前提假设</div>
+        {project.premises && project.premises.length > 0 ? (
+          <>
+            <ul className="premise-list">
+              {project.premises.map((pr, i) => (
+                <li key={i} className={"premise" + (pr.dealBreaker ? " db" : "")}>
+                  <span className="premise-dim">{pr.dimension}</span>
+                  <span className="premise-text">{pr.text}</span>
+                  {pr.dealBreaker && <span className="premise-badge">能推翻这单</span>}
+                  {pr.status && <span className="premise-st">{pr.status}</span>}
+                </li>
+              ))}
+            </ul>
+            <p className="ml-foot">
+              共 <strong>{project.premises.length}</strong> 条前提，其中
+              <span className="warn"> {project.premises.filter((p) => p.dealBreaker).length} 条能推翻这单</span>。
+              读法：<strong>调研前</strong>立起这些假设（矩阵该维度＝「假设」）→ <strong>洽谈中</strong>带着它们逐条去问 / 去核（＝「验证」）→ <strong>洽谈后</strong>确认或推翻（＝「结论」）。deal-breaker 自动排进洽谈问题清单最前。
+            </p>
+          </>
+        ) : (
+          <p>本单尚在定框，前提假设待「调研前」阶段立起（行业深度分析 / 企业画像产出）。</p>
+        )}
       </div>
     </div>
   );

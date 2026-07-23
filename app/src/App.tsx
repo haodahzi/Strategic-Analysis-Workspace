@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { analyses } from "./data/seed";
 import { sampleTx } from "./data/tx-sample";
-import { Stage } from "./types";
+import { Analysis, Stage } from "./types";
 import Dashboard from "./components/Dashboard";
 import TwoAxisBoard from "./components/TwoAxisBoard";
 import KnowledgeBase from "./components/KnowledgeBase";
@@ -9,8 +9,9 @@ import IndustryReport from "./components/IndustryReport";
 import TxComplianceView from "./components/TxComplianceView";
 import Settings from "./components/Settings";
 import Step0 from "./components/Step0";
+import NewAnalysis from "./components/NewAnalysis";
 
-type View = "dashboard" | "project" | "kb" | "settings";
+type View = "dashboard" | "project" | "kb" | "settings" | "new";
 type SubView = "board" | "report" | "tx" | "step0";
 
 const STAGE_CLASS: Record<Stage, string> = {
@@ -24,13 +25,21 @@ export default function App() {
   const [sub, setSub] = useState<SubView>(
     (params.get("sub") as SubView) || (params.get("report") === "1" ? "report" : "board"),
   );
+  const [items, setItems] = useState<Analysis[]>(analyses);
 
-  const project = analyses.find((p) => p.id === pid) ?? analyses[0];
-  const suanli = analyses.find((p) => p.hasIndustryReport) ?? analyses[0];
+  const project = items.find((p) => p.id === pid) ?? items[0];
+  const suanli = items.find((p) => p.hasIndustryReport) ?? items[0];
 
   const openProject = (id: string, rep = false) => {
     setPid(id);
     setSub(rep ? "report" : "board");
+    setView("project");
+  };
+
+  const createAnalysis = (a: Analysis) => {
+    setItems((xs) => [a, ...xs]);
+    setPid(a.id);
+    setSub("step0");
     setView("project");
   };
 
@@ -55,8 +64,7 @@ export default function App() {
           </div>
         </div>
         <nav className="app-actions">
-          <button type="button" className="app-btn">+ 新建分析</button>
-          <button type="button" className="app-btn ghost" onClick={() => setView("settings")}>设置</button>
+          <button type="button" className="app-btn" onClick={() => setView("new")}>+ 新建分析</button>
         </nav>
       </header>
 
@@ -64,11 +72,12 @@ export default function App() {
         <aside className="app-sidebar">
           <div className="nav-group">导航</div>
           {navItem("dashboard", "▤ 研究分析总览")}
+          {navItem("new", "✚ 新建分析")}
           {navItem("kb", "▧ 交付物库")}
-          {navItem("settings", "⚙ 设置（多模型）")}
+          {navItem("settings", "⚙ 设置")}
 
-          <div className="nav-group">在办分析 · {analyses.length}</div>
-          {analyses.map((p) => (
+          <div className="nav-group">在办分析 · {items.length}</div>
+          {items.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -82,7 +91,8 @@ export default function App() {
         </aside>
 
         <main className="app-main">
-          {view === "dashboard" && <Dashboard onOpen={openProject} />}
+          {view === "dashboard" && <Dashboard items={items} onOpen={openProject} />}
+          {view === "new" && <NewAnalysis onCreate={createAnalysis} onCancel={() => setView("dashboard")} />}
           {view === "project" && sub === "board" && (
             <TwoAxisBoard
               project={project}
