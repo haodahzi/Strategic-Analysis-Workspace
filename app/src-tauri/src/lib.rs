@@ -4,6 +4,8 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 经 Rust 发 HTTP，绕过 WebView 的 CORS（真实模型调用的关键）
+        .plugin(tauri_plugin_http::init())
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

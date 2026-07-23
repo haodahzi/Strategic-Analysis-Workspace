@@ -1,7 +1,19 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "主窗口默认权限集（核心）。接入插件时在此追加对应 permission。",
+  "description": "主窗口默认权限集（核心 + 受限 HTTP）。HTTP 仅放行已知模型提供商域名。",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.anthropic.com/*" },
+        { "url": "https://api.openai.com/*" },
+        { "url": "https://api.deepseek.com/*" },
+        { "url": "https://open.bigmodel.cn/*" },
+        { "url": "https://api.moonshot.cn/*" }
+      ]
+    }
+  ]
 }

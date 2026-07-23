@@ -3,6 +3,7 @@
 import { ChatRequest, LLMClient } from "./types";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
+import { getLlmFetch } from "./runtime";
 
 export interface Step0Input { industry: string; ourRole: string; lightScan: string; }
 export interface CoreDim { key: string; weight: number; weightReason: string; }
@@ -134,6 +135,7 @@ export async function generateStep0(input: Step0Input): Promise<Step0Run> {
   if (p.id === "mock") {
     return { framework: parseStep0(mockStep0Json(input)), providerLabel: p.label, model: r.model };
   }
-  const framework = await runStep0(input, makeClient(p), r.model);
+  // 桌面下 getLlmFetch() 返回 tauri-http fetch（经 Rust 发请求、绕过 CORS）；浏览器下为全局 fetch。
+  const framework = await runStep0(input, makeClient(p, await getLlmFetch()), r.model);
   return { framework, providerLabel: p.label, model: r.model };
 }

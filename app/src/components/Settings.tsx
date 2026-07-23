@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AppConfig, LLM_STAGES, ProviderId } from "../llm/types";
 import { loadConfig, providerById, saveConfig } from "../config/store";
 import { makeClient } from "../llm/adapters";
+import { getLlmFetch } from "../llm/runtime";
 
 export default function Settings() {
   const [cfg, setCfg] = useState<AppConfig>(() => loadConfig());
@@ -26,7 +27,7 @@ export default function Settings() {
   const selfCheck = async () => {
     setCheck("检测中…");
     try {
-      await makeClient(activeP).send({ model: activeP.models[0] ?? "", messages: [{ role: "user", content: "回复 OK" }], maxTokens: 5 });
+      await makeClient(activeP, await getLlmFetch()).send({ model: activeP.models[0] ?? "", messages: [{ role: "user", content: "回复 OK" }], maxTokens: 5 });
       setCheck("✓ 连通");
     } catch (e) { setCheck("✗ " + (e as Error).message.slice(0, 70)); }
   };
