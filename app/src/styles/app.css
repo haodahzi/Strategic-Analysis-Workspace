@@ -236,6 +236,11 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 .mn-parsed-t{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--gold);margin-bottom:6px}
 .mn-parsed p{font-size:12px;line-height:1.7}
 @media(max-width:820px){.mn{grid-template-columns:1fr}}
+/* 洽谈中·单屏 */
+.nd .sec-head:first-child{margin-top:6px}
+.nd-extra{width:100%;min-height:90px;font-family:var(--sans);font-size:13px;line-height:1.7;padding:12px;border:1px solid var(--border2);background:#fff;resize:vertical}
+.nd-paste{width:100%;min-height:150px;font-family:var(--sans);font-size:13px;line-height:1.7;padding:12px;border:1px solid var(--border2);background:#fff;resize:vertical}
+.nd-actions{margin-top:10px;display:flex;align-items:center;flex-wrap:wrap}
 
 /* 项目报告 · 定调（可编辑 #6 + 四流并入 #5） */
 .pr-report{max-width:900px}

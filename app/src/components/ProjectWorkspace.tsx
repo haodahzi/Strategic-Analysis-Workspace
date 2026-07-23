@@ -5,7 +5,7 @@ import Step0 from "./Step0";
 import TwoAxisBoard from "./TwoAxisBoard";
 import ReportProgress from "./ReportProgress";
 import QuestionList from "./QuestionList";
-import MeetingNotes from "./MeetingNotes";
+import NegotiationDesk from "./NegotiationDesk";
 import ProjectReport from "./ProjectReport";
 
 const STAGE_CLASS: Record<Stage, string> = { 定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
@@ -18,8 +18,7 @@ const PHASE_TABS: Record<Stage, { key: string; label: string }[]> = {
     { key: "questions", label: "洽谈重点清单" },
   ],
   洽谈中: [
-    { key: "notes", label: "洽谈记录" },
-    { key: "check", label: "问题核对清单" },
+    { key: "desk", label: "对照问题 · 记录 · 导入" },
   ],
   洽谈后: [{ key: "report", label: "项目报告 · 定调" }],
 };
@@ -78,11 +77,10 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
         {phase === "调研前" && tab === "questions" && (
           <div className="dash"><QuestionList items={questions} onChange={setQuestions} mode="编辑" /></div>
         )}
-        {phase === "洽谈中" && tab === "notes" && (
-          <div className="dash"><MeetingNotes analysis={analysis} notes={notes} onNotes={setNotes} /></div>
-        )}
-        {phase === "洽谈中" && tab === "check" && (
-          <div className="dash"><QuestionList items={questions} onChange={setQuestions} mode="核对" /></div>
+        {phase === "洽谈中" && tab === "desk" && (
+          <div className="dash">
+            <NegotiationDesk analysis={analysis} questions={questions} onQuestions={setQuestions} notes={notes} onNotes={setNotes} />
+          </div>
         )}
         {phase === "洽谈后" && tab === "report" && (
           <div className="dash"><ProjectReport analysis={analysis} /></div>
