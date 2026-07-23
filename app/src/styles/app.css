@@ -132,6 +132,9 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 .prov-fields-col{display:flex;flex-direction:column;gap:12px;background:#fff;border:1px solid var(--border2);border-top:none;padding:14px 16px}
 .fld{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ink3)}
 .fld input{width:100%}
+.key-persist{font-size:11px;color:var(--teal);display:flex;align-items:center;gap:8px;margin-top:2px}
+.key-clear{font-size:10px;font-family:var(--mono);color:var(--ink3);background:none;border:1px solid var(--border);padding:1px 8px;border-radius:2px;cursor:pointer}
+.key-clear:hover{color:var(--red);border-color:var(--red)}
 .stg-tag{font-family:var(--mono);font-size:8px;color:var(--gold);border:1px solid var(--gold);padding:1px 5px;margin-left:8px;letter-spacing:.5px}
 
 /* 新建分析 */

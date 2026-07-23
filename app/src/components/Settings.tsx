@@ -46,7 +46,7 @@ export default function Settings() {
         </select>
         <span className="prov-style">{activeP.style === "anthropic" ? "Anthropic" : "OpenAI 兼容"}</span>
         <span className={"key-status " + (activeP.id === "mock" ? "na" : activeP.apiKey ? "ok" : "none")}>
-          {activeP.id === "mock" ? "无需 Key（演示）" : activeP.apiKey ? "● 已配置 Key" : "○ 未配置 Key"}
+          {activeP.id === "mock" ? "无需 Key（演示）" : activeP.apiKey ? "● Key 已存本机" : "○ 未配置 Key"}
         </span>
         <div className="spacer" />
         <span className={chkClass}>{check}</span>
@@ -56,6 +56,13 @@ export default function Settings() {
         <div className="prov-fields-col">
           <label className="fld"><span>API Key</span>
             <input className="key-input wide" type="password" placeholder="填入 API Key…" value={activeP.apiKey ?? ""} onChange={(e) => patch({ apiKey: e.target.value })} />
+            <div className="key-persist">
+              {activeP.apiKey ? (
+                <>🔒 已存本机、下次打开自动带出（仅本地，不上传、不入库）
+                  <button type="button" className="key-clear" onClick={() => patch({ apiKey: "" })}>清除</button>
+                </>
+              ) : "填入后即自动保存到本机浏览器；桌面版将改存系统钥匙库（加密）。"}
+            </div>
           </label>
           <label className="fld"><span>Base URL</span>
             <input className="key-input wide" value={activeP.baseUrl} onChange={(e) => patch({ baseUrl: e.target.value })} />
