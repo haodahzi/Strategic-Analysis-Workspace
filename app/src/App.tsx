@@ -10,9 +10,10 @@ import TxComplianceView from "./components/TxComplianceView";
 import Settings from "./components/Settings";
 import Step0 from "./components/Step0";
 import NewAnalysis from "./components/NewAnalysis";
+import ReportProgress from "./components/ReportProgress";
 
 type View = "dashboard" | "project" | "kb" | "settings" | "new";
-type SubView = "board" | "report" | "tx" | "step0";
+type SubView = "board" | "report" | "tx" | "step0" | "pipeline";
 
 const STAGE_CLASS: Record<Stage, string> = {
   定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -99,7 +100,11 @@ export default function App() {
               onOpenReport={() => setSub("report")}
               onOpenTx={() => setSub("tx")}
               onOpenStep0={() => setSub("step0")}
+              onOpenPipeline={() => setSub("pipeline")}
             />
+          )}
+          {view === "project" && sub === "pipeline" && (
+            <ReportProgress analysis={project} onBack={() => setSub("board")} />
           )}
           {view === "project" && sub === "report" && (
             <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSub("board")} />
