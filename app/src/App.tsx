@@ -1,19 +1,14 @@
 import { useState } from "react";
 import { analyses } from "./data/seed";
-import { sampleTx } from "./data/tx-sample";
 import { Analysis, Stage } from "./types";
 import Dashboard from "./components/Dashboard";
-import TwoAxisBoard from "./components/TwoAxisBoard";
 import KnowledgeBase from "./components/KnowledgeBase";
 import IndustryReport from "./components/IndustryReport";
-import TxComplianceView from "./components/TxComplianceView";
 import Settings from "./components/Settings";
-import Step0 from "./components/Step0";
 import NewAnalysis from "./components/NewAnalysis";
-import ReportProgress from "./components/ReportProgress";
+import ProjectWorkspace from "./components/ProjectWorkspace";
 
 type View = "dashboard" | "project" | "kb" | "settings" | "new";
-type SubView = "board" | "report" | "tx" | "step0" | "pipeline";
 
 const STAGE_CLASS: Record<Stage, string> = {
   定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -23,9 +18,7 @@ export default function App() {
   const params = new URLSearchParams(window.location.search);
   const [view, setView] = useState<View>((params.get("view") as View) || "dashboard");
   const [pid, setPid] = useState(params.get("pid") || analyses[0].id);
-  const [sub, setSub] = useState<SubView>(
-    (params.get("sub") as SubView) || (params.get("report") === "1" ? "report" : "board"),
-  );
+  const [sampleOn, setSampleOn] = useState(params.get("report") === "1");
   const [items, setItems] = useState<Analysis[]>(analyses);
 
   const project = items.find((p) => p.id === pid) ?? items[0];
@@ -33,14 +26,14 @@ export default function App() {
 
   const openProject = (id: string, rep = false) => {
     setPid(id);
-    setSub(rep ? "report" : "board");
+    setSampleOn(rep);
     setView("project");
   };
 
   const createAnalysis = (a: Analysis) => {
     setItems((xs) => [a, ...xs]);
     setPid(a.id);
-    setSub("step0");
+    setSampleOn(false);
     setView("project");
   };
 
@@ -48,7 +41,7 @@ export default function App() {
     <button
       type="button"
       className={"nav-item" + (view === v ? " active" : "")}
-      onClick={() => { setView(v); setSub("board"); }}
+      onClick={() => setView(v)}
     >
       {label}
     </button>
@@ -94,27 +87,9 @@ export default function App() {
         <main className="app-main">
           {view === "dashboard" && <Dashboard items={items} onOpen={openProject} />}
           {view === "new" && <NewAnalysis onCreate={createAnalysis} onCancel={() => setView("dashboard")} />}
-          {view === "project" && sub === "board" && (
-            <TwoAxisBoard
-              project={project}
-              onOpenReport={() => setSub("report")}
-              onOpenTx={() => setSub("tx")}
-              onOpenStep0={() => setSub("step0")}
-              onOpenPipeline={() => setSub("pipeline")}
-            />
-          )}
-          {view === "project" && sub === "pipeline" && (
-            <ReportProgress analysis={project} onBack={() => setSub("board")} />
-          )}
-          {view === "project" && sub === "report" && (
-            <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSub("board")} />
-          )}
-          {view === "project" && sub === "tx" && (
-            <TxComplianceView tx={sampleTx} project={project} onBack={() => setSub("board")} />
-          )}
-          {view === "project" && sub === "step0" && (
-            <Step0 analysis={project} onBack={() => setSub("board")} />
-          )}
+          {view === "project" && (sampleOn
+            ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
+            : <ProjectWorkspace analysis={project} />)}
           {view === "kb" && <KnowledgeBase onOpenSample={() => openProject(suanli.id, true)} />}
           {view === "settings" && <Settings />}
         </main>

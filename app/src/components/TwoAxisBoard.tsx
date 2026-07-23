@@ -4,31 +4,9 @@ const CELL_CLASS: Record<CellState, string> = {
   空: "c-empty", 假设: "c-hyp", 验证: "c-ver", 结论: "c-con",
 };
 
-export default function TwoAxisBoard(
-  { project, onOpenReport, onOpenTx, onOpenStep0, onOpenPipeline }:
-  { project: Analysis; onOpenReport: () => void; onOpenTx: () => void; onOpenStep0: () => void; onOpenPipeline: () => void },
-) {
+export default function TwoAxisBoard({ project }: { project: Analysis }) {
   return (
     <div className="board">
-      <div className="board-head">
-        <div>
-          <h2>{project.name}</h2>
-          <div className="board-meta">
-            <span className="role-badge">我方：{project.ourRole}</span>
-            <span className="ind-badge">{project.industry}</span>
-            <span className="st-chip st-cur">当前阶段：{project.stage}</span>
-          </div>
-        </div>
-        <div className="board-actions">
-          <button type="button" className="app-btn" onClick={onOpenStep0}>Step 0 定框 · 生成 →</button>
-          <button type="button" className="app-btn" onClick={onOpenPipeline}>推进 · 多智能体生成分析 →</button>
-          {project.hasIndustryReport && (
-            <button type="button" className="app-btn ghost dark" onClick={onOpenReport}>查看行业深度分析 →</button>
-          )}
-          <button type="button" className="app-btn ghost dark" onClick={onOpenTx}>交易结构 · 合规探测 →</button>
-        </div>
-      </div>
-
       <div className="board-note">
         <strong>定框</strong>已确认我方角色为「{project.ourRole}」，并据此为各维度排权重。
         下表：<strong>纵轴 = 评估维度，横轴 = 时间阶段</strong>；同一维度随阶段推进：假设 → 验证 → 结论。

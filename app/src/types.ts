@@ -38,6 +38,16 @@ export interface Analysis {
   hasIndustryReport?: boolean;
 }
 
+// 洽谈重点清单条目（可编辑：#6）。由前提假设转化，deal-breaker 置顶。
+export interface QItem {
+  id: string;
+  text: string;
+  intent: "要查" | "要问对方" | "待搞清";
+  dealBreaker?: boolean;
+  answered?: boolean;
+  note?: string;                 // 洽谈中回填的答案/记录
+}
+
 export interface KbIndustry {
   id: string; industry: string; version: number; updatedAt: string; hasSample?: boolean;
 }
