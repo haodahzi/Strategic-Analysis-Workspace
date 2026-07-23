@@ -1,23 +1,13 @@
 name: build-desktop
 
 # 用 GitHub Actions 的 windows runner 出安装包（.msi + .exe），绕过本地/沙箱缺 webkit。
-# 交付走 Release 资产（不占 Actions 制品存储配额）：
-#   - 推分支：仅编译校验（不上传，不受配额影响）
-#   - 推 tag v*：编译 + 发布 Release，安装包作为可下载资产挂上去
+# 交付走 Release 资产。**只在发版时构建**：提交信息含 [build] 才真正打包，
+# 平时推送触发后立即跳过（不占 Windows runner、不计费）。
 on:
   workflow_dispatch: {}
   push:
     branches:
       - "claude/business-project-docking-workbench-ccies1"
-    paths:
-      - "app/src/**"
-      - "app/src-tauri/**"
-      - "app/package.json"
-      - "app/package-lock.json"
-      - "app/vite.config.ts"
-      - "app/tsconfig.json"
-      - "app/index.html"
-      - ".github/workflows/tauri-build.yml"
 
 # 让内置 GITHUB_TOKEN 能创建 Release
 permissions:
@@ -28,6 +18,8 @@ env:
 
 jobs:
   build:
+    # 发版闸门：手动触发，或提交信息含 [build] 时才构建；否则跳过、零成本。
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[build]')
     strategy:
       fail-fast: false
       matrix:
