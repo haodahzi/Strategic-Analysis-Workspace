@@ -18,8 +18,9 @@ env:
 
 jobs:
   build:
-    # 发版闸门：手动触发，或提交信息含 [build] 时才构建；否则跳过、零成本。
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[build]')
+    # 发版闸门：手动触发，或提交信息含专用标记时才构建；否则跳过、零成本。
+    # 标记用较长专用串，避免正文顺口提到而误触发。
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[pack-desktop-release]')
     strategy:
       fail-fast: false
       matrix:
