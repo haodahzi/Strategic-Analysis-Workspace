@@ -1,9 +1,7 @@
-// 多智能体报告流水线：规划→起草→红队反驳→定稿→验收。
-// 每个 stage 都是用户可见的「子任务」，实时勾选显示进度与思考（掌控感）。
-// 纯逻辑 + Mock 内容在此；动画/时序在 ReportProgress 组件里驱动。
-// 真实模型路径：每个 stage 一次 LLM 调用，前一步产物喂给下一步（此处给出结构，Key 就绪即接）。
-
-export type AgentRole = "规划" | "起草" | "红队" | "定稿" | "验收";
+// 多智能体报告流水线：规划→资料研判→起草→红队反驳→定稿→验收。
+// 每个 stage 都是用户可见的「子任务」，各自可路由不同模型；红队宜换一家/一款互查。
+// 纯逻辑（stage 定义、Mock 内容、各 agent 的请求组装）在此；异步链在 ReportProgress 里驱动。
+import { AgentRole, ChatRequest } from "./types";
 
 export interface PipelineStage {
   id: string;
@@ -17,11 +15,56 @@ export interface StageResult { stageId: string; summary: string; }
 
 export const REPORT_PIPELINE: PipelineStage[] = [
   { id: "plan", role: "规划", title: "拆解框架", detail: "依据 Step 0 定框，列出报告骨架：决策主心骨 / 分层轴 / 命门变量" },
-  { id: "draft", role: "起草", title: "起草初稿", detail: "按骨架产出判断卡、行业分层、量化区间（每条标口径）" },
-  { id: "red", role: "红队", title: "红队反驳", detail: "挑漏洞：证据够不够、口径清不清、风险有没有名有姓、falsifiers 够不够狠" },
+  { id: "research", role: "资料", title: "资料研判", detail: "读入本单材料（尽调稿 / 对方资料 / 交付物库），抽取关键事实与数据作为起草依据；缺料处标「需补」" },
+  { id: "draft", role: "起草", title: "起草初稿", detail: "按骨架 + 资料产出判断卡、行业分层、量化区间（每条标口径）" },
+  { id: "red", role: "红队", title: "红队反驳", detail: "换一模型挑漏洞：证据够不够、口径清不清、风险有没有名有姓、falsifiers 够不够狠" },
   { id: "final", role: "定稿", title: "吸收反驳 · 定稿", detail: "逐条回应红队意见，产出终稿（仍为待审初稿）" },
   { id: "check", role: "验收", title: "自检验收 6 线", detail: "对照 6 条验收线逐条打钩，缺项打回" },
 ];
+
+// ——真实模型路径：每个 stage 的提示词组装（纯函数、可单测）。前一步产物喂给下一步。——
+export interface PipelineCtx {
+  input: PipelineInput;
+  materials: string;                 // 用户提供的本单资料（尽调稿/对方资料等）
+  outputs: Record<string, string>;   // 已完成 stage 的文本产出，按 stageId
+}
+
+const AGENT_SYS: Record<AgentRole, string> = {
+  规划: "你是资深行研规划师，先搭骨架再落笔。",
+  资料: "你是尽调分析师：只依据给定材料抽取事实，材料没有的标「需补」，绝不杜撰。",
+  起草: "你是行业深度分析师。每个判断给「立场/依据/把握度/falsifiers」四段，每个量化区间必带口径。",
+  红队: "你是红队评审，专挑漏洞、不留情面，只针对证据、口径、风险命名与 falsifiers 的硬伤。",
+  定稿: "你是主笔，吸收红队意见定稿；结论仍是「待审初稿」，可被推翻。",
+  验收: "你是质检，对照验收线逐条打钩，缺一条就点名。",
+};
+
+export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model: string): ChatRequest {
+  const { industry, ourRole, focus } = ctx.input;
+  const o = ctx.outputs;
+  const head = `行业「${industry}」· 我方「${ourRole}」· 本次重点「${focus}」。`;
+  let user = "";
+  switch (stage.id) {
+    case "plan":
+      user = `${head}\n为这份深度分析规划骨架：决策主心骨（一句话拎全篇）、分层轴（3 层，切开而非罗列）、命门变量（3–5 个）、需要哪些资料。简洁分点。`;
+      break;
+    case "research":
+      user = `${head}\n骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」。不要编造。`;
+      break;
+    case "draft":
+      user = `${head}\n骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草深度分析初稿：主心骨、分层论述、量化区间（每条带口径）、命门风险（有名有姓 + 识别信号）、可行性判断卡（立场/依据/把握度/falsifiers）。`;
+      break;
+    case "red":
+      user = `审下面这份初稿，逐条挑硬伤（证据不足 / 口径含糊 / 风险没点名 / falsifiers 不够狠），并列出必须补的清单：\n\n${o.draft ?? ""}`;
+      break;
+    case "final":
+      user = `初稿：\n${o.draft ?? ""}\n\n红队意见：\n${o.red ?? ""}\n\n逐条回应并修改，产出定稿（markdown，结构清晰）。仍标注为待审初稿。`;
+      break;
+    case "check":
+      user = `对照 6 条验收线逐条打 ✓/✗ 并一句话说明：决策主心骨 / 分层轴 / 量化+口径 / 命门变量 / 有名有姓的风险 / ${ourRole}角色视角。\n\n定稿：\n${o.final ?? ""}`;
+      break;
+  }
+  return { model, system: AGENT_SYS[stage.role], messages: [{ role: "user", content: user }], maxTokens: 4000 };
+}
 
 // ——报告成品（结构化，供 .report 样式渲染；也是"深度"的载体）——
 export interface JudgmentCardData {
@@ -42,6 +85,8 @@ export function mockStageOutput(stage: PipelineStage, input: PipelineInput): Sta
   switch (stage.role) {
     case "规划":
       return { stageId: stage.id, summary: `锁定「${ind}」报告骨架：以「时点×筹码」为决策主心骨；按[资产层/运营层/资本层]分层；命门变量＝真实上架率、租约锁定期、电价与能耗、终端信用。` };
+    case "资料":
+      return { stageId: stage.id, summary: `读入本单材料，抽取关键事实与数据；缺料处标「需补」。示例：${ind}区域电价、租户名单与履约记录、机房 PUE 实测——未提供则标注需补。` };
     case "起草":
       return { stageId: stage.id, summary: "产出 4 张判断卡 + 3 条量化区间（均标口径），例：整柜租赁毛利 18–28%（口径：不含电费转售、按 3 年租期摊）。" };
     case "红队":

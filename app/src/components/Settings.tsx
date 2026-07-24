@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { AppConfig, LLM_STAGES, ProviderId } from "../llm/types";
-import { loadConfig, providerById, saveConfig } from "../config/store";
+import { AGENT_ROLES, AppConfig, ModelPick, ProviderId } from "../llm/types";
+import { applyMainProvider, loadConfig, providerById, saveConfig } from "../config/store";
 import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
 
@@ -9,20 +9,13 @@ export default function Settings() {
   const [check, setCheck] = useState<string>("");
   const commit = (next: AppConfig) => { setCfg(next); saveConfig(next); };
 
-  const active = cfg.defaultProvider;          // 主用提供商 = 正在配置的对象
+  const active = cfg.defaultProvider;
   const activeP = providerById(cfg, active);
 
   const patch = (p: Partial<{ apiKey: string; baseUrl: string; models: string[] }>) =>
     commit({ ...cfg, providers: cfg.providers.map((x) => (x.id === active ? { ...x, ...p } : x)) });
 
-  // 选主用提供商：设为默认，并把所有阶段一键填成它（个别阶段需要时在下方单独改）
-  const selectProvider = (id: ProviderId) => {
-    const model = providerById(cfg, id).models[0] ?? "";
-    const routing = {} as AppConfig["routing"];
-    for (const s of LLM_STAGES) routing[s] = { provider: id, model };
-    commit({ ...cfg, defaultProvider: id, routing });
-    setCheck("");
-  };
+  const selectProvider = (id: ProviderId) => { commit(applyMainProvider(cfg, id)); setCheck(""); };
 
   const selfCheck = async () => {
     setCheck("检测中…");
@@ -32,6 +25,26 @@ export default function Settings() {
     } catch (e) { setCheck("✗ " + (e as Error).message.slice(0, 70)); }
   };
   const chkClass = "chk-res " + (check.startsWith("✓") ? "ok" : check.startsWith("✗") ? "bad" : "");
+
+  // provider + model 双下拉行
+  const modelRow = (label: string, pick: ModelPick, onChange: (v: ModelPick) => void) => {
+    const prov = providerById(cfg, pick.provider);
+    return (
+      <tr key={label}>
+        <td className="mx-dim">{label}</td>
+        <td>
+          <select value={pick.provider} onChange={(e) => { const provider = e.target.value as ProviderId; onChange({ provider, model: providerById(cfg, provider).models[0] ?? "" }); }}>
+            {cfg.providers.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
+          </select>
+        </td>
+        <td>
+          <select value={pick.model} onChange={(e) => onChange({ ...pick, model: e.target.value })}>
+            {prov.models.map((m) => (<option key={m} value={m}>{m}</option>))}
+          </select>
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div className="dash">
@@ -73,34 +86,20 @@ export default function Settings() {
         </div>
       )}
 
-      <div className="sec-head">按阶段选模型（默认跟随主用提供商，个别要换才动）</div>
+      <div className="sec-head">定框 · 模型</div>
       <div className="tw">
         <table className="matrix">
-          <thead><tr><th className="mx-dim">阶段</th><th>提供商</th><th>模型</th></tr></thead>
+          <thead><tr><th className="mx-dim">环节</th><th>提供商</th><th>模型</th></tr></thead>
+          <tbody>{modelRow("定框（Step 0）", cfg.step0, (v) => commit({ ...cfg, step0: v }))}</tbody>
+        </table>
+      </div>
+
+      <div className="sec-head">多智能体子任务 · 模型（红队宜换一款，互查更狠）</div>
+      <div className="tw">
+        <table className="matrix">
+          <thead><tr><th className="mx-dim">子任务</th><th>提供商</th><th>模型</th></tr></thead>
           <tbody>
-            {LLM_STAGES.map((s) => {
-              const r = cfg.routing[s];
-              const prov = providerById(cfg, r.provider);
-              return (
-                <tr key={s}>
-                  <td className="mx-dim">{s}</td>
-                  <td>
-                    <select value={r.provider} onChange={(e) => {
-                      const provider = e.target.value as ProviderId;
-                      const model = providerById(cfg, provider).models[0] ?? "";
-                      commit({ ...cfg, routing: { ...cfg.routing, [s]: { provider, model } } });
-                    }}>
-                      {cfg.providers.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
-                    </select>
-                  </td>
-                  <td>
-                    <select value={r.model} onChange={(e) => commit({ ...cfg, routing: { ...cfg.routing, [s]: { ...r, model: e.target.value } } })}>
-                      {prov.models.map((m) => (<option key={m} value={m}>{m}</option>))}
-                    </select>
-                  </td>
-                </tr>
-              );
-            })}
+            {AGENT_ROLES.map((a) => modelRow(a, cfg.agents[a], (v) => commit({ ...cfg, agents: { ...cfg.agents, [a]: v } })))}
           </tbody>
         </table>
       </div>

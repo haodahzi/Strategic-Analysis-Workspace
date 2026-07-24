@@ -123,14 +123,14 @@ function roleWeights(role: string): Record<string, [number, string]> {
 // 按配置路由生成：Mock 走本地演示，其余走真实模型。
 export function step0Route(): { isMock: boolean; label: string; model: string } {
   const cfg = loadConfig();
-  const r = cfg.routing["定框"];
+  const r = cfg.step0;
   const p = providerById(cfg, r.provider);
   return { isMock: p.id === "mock", label: p.label, model: r.model };
 }
 
 export async function generateStep0(input: Step0Input): Promise<Step0Run> {
   const cfg = loadConfig();
-  const r = cfg.routing["定框"];
+  const r = cfg.step0;
   const p = providerById(cfg, r.provider);
   if (p.id === "mock") {
     return { framework: parseStep0(mockStep0Json(input)), providerLabel: p.label, model: r.model };

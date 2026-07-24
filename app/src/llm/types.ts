@@ -25,14 +25,14 @@ export interface HttpSpec { url: string; headers: Record<string, string>; body: 
 export interface LLMResult { text: string; raw?: unknown; }
 export interface LLMClient { send(req: ChatRequest): Promise<LLMResult>; }
 
-// 需要按阶段路由的 LLM 阶段（"前提假设映射""四流抽取"为硬结构化，仍可路由到其他模型）
-export const LLM_STAGES = [
-  "定框", "行业深度分析", "企业画像", "洽谈问题清单", "前提假设映射", "四流抽取", "可行性判断初稿",
-] as const;
-export type LlmStage = (typeof LLM_STAGES)[number];
+// 多智能体子任务：报告流水线按这些子任务推进，各自可选模型（红队宜换一家/一款互查）。
+export const AGENT_ROLES = ["规划", "资料", "起草", "红队", "定稿", "验收"] as const;
+export type AgentRole = (typeof AGENT_ROLES)[number];
+export interface ModelPick { provider: ProviderId; model: string; }
 
 export interface AppConfig {
   providers: ProviderConfig[];
   defaultProvider: ProviderId;
-  routing: Record<LlmStage, { provider: ProviderId; model: string }>;
+  step0: ModelPick;                         // 定框（Step 0）
+  agents: Record<AgentRole, ModelPick>;     // 多智能体子任务
 }
