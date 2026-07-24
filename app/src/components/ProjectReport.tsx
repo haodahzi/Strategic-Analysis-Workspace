@@ -1,13 +1,8 @@
 import { useState } from "react";
 import { Analysis } from "../types";
 import { mockReport } from "../llm/pipeline";
-import { FlowType, runComplianceRules } from "../domain/tx";
 import { sampleTx } from "../data/tx-sample";
 
-const FLOW_ORDER: FlowType[] = ["合同流", "资金流", "货物服务流", "票流"];
-const FLOW_COLOR: Record<FlowType, string> = {
-  合同流: "var(--purple)", 资金流: "var(--gold)", 货物服务流: "var(--blue)", 票流: "var(--teal)",
-};
 type Verdict = "做" | "缓" | "弃";
 const VERDICTS: Verdict[] = ["做", "缓", "弃"];
 
@@ -18,13 +13,11 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
   const seed = mockReport({ industry: analysis.industry, ourRole: analysis.ourRole, focus: analysis.focus ?? "项目可行性" }).judgment;
   const [j, setJ] = useState<Judgment>({ stance: seed.stance, grounds: [...seed.grounds], confidence: seed.confidence, falsifiers: [...seed.falsifiers] });
   const [verdict, setVerdict] = useState<Verdict>("缓");
-  const [verdictReason, setVerdictReason] = useState("四流未穿透前，deal-breaker 未解除，建议先补尽调再定。");
+  const [verdictReason, setVerdictReason] = useState("关键前提未确认、尽调未补齐前，建议缓一缓再定。");
   const [revInput, setRevInput] = useState("");
   const [revs, setRevs] = useState<{ at: string; note: string }[]>([]);
 
   const partyName = (id: string) => sampleTx.parties.find((p) => p.id === id)?.name ?? id;
-  const findings = runComplianceRules(sampleTx);
-  const red = findings.filter((f) => f.level === "红").length;
 
   const editList = (key: "grounds" | "falsifiers", i: number, v: string) =>
     setJ((s) => ({ ...s, [key]: s[key].map((x, k) => (k === i ? v : x)) }));
@@ -45,7 +38,6 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
       <div className="pr-top">
         <div>
           <h2>项目报告 · 定调</h2>
-          <div className="dash-sub">{analysis.name} · 我方{analysis.ourRole} · 洽谈后收口件（判断为初稿，可改可推翻）</div>
         </div>
         <div className="pr-verdict-pick">
           {VERDICTS.map((v) => (
@@ -106,34 +98,21 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
         )}
       </div>
 
-      {/* 交易结构 · 四流（并入项目报告 #5） */}
-      <div className="sec-head">交易结构 · 四流合规探测（本报告的一节）</div>
+      {/* 交易框架（并入项目报告 #5；此阶段只到框架，四流合规探测留到需要时再上） */}
+      <div className="sec-head">交易框架</div>
       <div className="pr-tx">
-        <div className="pr-tx-badges">
-          <span className="badge" style={{ color: "var(--red)", borderColor: "var(--red)" }}>红灯 {red}</span>
-          <span className="badge" style={{ color: "var(--gold)", borderColor: "var(--gold)" }}>黄灯 {findings.filter((f) => f.level === "黄").length}</span>
-          <span className="badge">主体 {sampleTx.parties.length}</span>
-          <span className="badge">流 {sampleTx.flows.length}</span>
-        </div>
         <table className="rp-table">
-          <thead><tr><th>流</th><th>从</th><th>工具 / 内容</th><th>到</th></tr></thead>
+          <thead><tr><th>从</th><th>给出 / 内容</th><th>到</th></tr></thead>
           <tbody>
-            {FLOW_ORDER.flatMap((ft) => sampleTx.flows.filter((f) => f.type === ft).map((f) => (
+            {sampleTx.flows.map((f) => (
               <tr key={f.id}>
-                <td><span style={{ color: FLOW_COLOR[ft], fontWeight: 600 }}>{ft}</span></td>
                 <td>{partyName(f.from)}</td>
-                <td>{f.instrument ?? "—"}{f.amount ? `（${f.amount} 万元）` : ""}</td>
+                <td><span className="pr-flowtype">{f.type}</span> {f.instrument ?? "—"}{f.amount ? `（${f.amount} 万元）` : ""}</td>
                 <td>{partyName(f.to)}</td>
               </tr>
-            )))}
+            ))}
           </tbody>
         </table>
-        {findings.map((f, i) => (
-          <div key={i} className={"pr-finding " + (f.level === "红" ? "red" : "gold")}>
-            <div className="pr-finding-tag">{f.level === "红" ? "⚑ 红灯" : "▲ 黄灯"} · {f.rule} {f.title}{f.parties.length > 0 && ` · 涉及：${f.parties.join("、")}`}</div>
-            <p>{f.reason}</p>
-          </div>
-        ))}
       </div>
     </div>
   );

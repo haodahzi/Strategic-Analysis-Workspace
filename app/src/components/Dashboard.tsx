@@ -23,13 +23,11 @@ export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen
   const byStage = (s: Stage) => items.filter((p) => p.stage === s).length;
   const inProgress = items.filter((p) => p.deliverables.some((d) => d.status !== "完成")).length;
   const kbCount = kbIndustry.length + kbEnterprise.length;
-  const dealBreakers = items.reduce((n, p) => n + p.dealBreakers, 0);
 
   return (
     <div className="dash">
       <div className="dash-head">
         <h2>研究分析总览</h2>
-        <div className="dash-sub">总部职能部门 · 接洽前后可行性初评 · 决策建议权</div>
       </div>
 
       {/* KPI */}
@@ -52,13 +50,8 @@ export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen
         </div>
         <div className="kpi">
           <div className="kpi-n">{kbCount}</div>
-          <div className="kpi-l">交付物库 · 半耐用</div>
-          <div className="kpi-x">行业分析 {kbIndustry.length} · 企业画像 {kbEnterprise.length}（可复用复利资产）</div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-n" style={{ color: "var(--red)" }}>{dealBreakers}</div>
-          <div className="kpi-l">能推翻这单的前提</div>
-          <div className="kpi-x">跨项目 deal-breaker 假设，洽谈优先验证</div>
+          <div className="kpi-l">交付物库</div>
+          <div className="kpi-x">行业分析 {kbIndustry.length} · 企业画像 {kbEnterprise.length}</div>
         </div>
       </div>
 
@@ -83,7 +76,6 @@ export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen
 
             <div className="proj-facts">
               <span>前提假设 <strong>{p.assumptions}</strong></span>
-              <span className="warn">能推翻这单 <strong>{p.dealBreakers}</strong></span>
               <span>交付物 <strong>{p.deliverables.length}</strong></span>
             </div>
 

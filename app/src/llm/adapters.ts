@@ -2,6 +2,8 @@ import { ChatRequest, HttpSpec, LLMClient, LLMResult, ProviderConfig, ProviderSt
 
 // 纯整形：统一 ChatRequest → 各家 HTTP 规格（可单测，不发请求）。
 export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
+  // 容错：模型名若误含逗号/顿号（历史配置把多个模型粘一起），只取第一个。
+  const model = (req.model || "").split(/[,，、]+/)[0].trim();
   if (cfg.style === "anthropic") {
     return {
       url: `${cfg.baseUrl}/v1/messages`,
@@ -13,7 +15,7 @@ export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
         "anthropic-dangerous-direct-browser-access": "true",
       },
       body: {
-        model: req.model,
+        model,
         max_tokens: req.maxTokens ?? 8000,
         ...(req.system ? { system: req.system } : {}),
         messages: req.messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
@@ -27,7 +29,7 @@ export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
     url: `${cfg.baseUrl}/chat/completions`,
     headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey ?? ""}` },
     body: {
-      model: req.model,
+      model,
       max_tokens: req.maxTokens ?? 8000,
       messages,
       // 非严格结构化输出的通用退化：JSON mode（+ 本地 schema 校验重试，见 orchestrate）

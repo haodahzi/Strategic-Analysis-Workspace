@@ -6,9 +6,9 @@ const ROLES = ["资金方", "场地资源方", "货源方", "运营方", "牵头
 
 // 本次分析重点 = 决定先产哪份交付物、走哪套提示词（三者提示词不同）。
 const FOCUS: { key: string; desc: string }[] = [
-  { key: "项目可行性", desc: "全流程评估这单该不该做 → 产出行业/项目深度分析 + 洽谈重点清单，洽谈后成项目报告（默认）" },
-  { key: "行业深度分析", desc: "先把行业摸透 → 半耐用资产，可跨项目复用（对标投研行业深度报告）" },
-  { key: "企业画像", desc: "先把对方摸透 → 半耐用资产，诉求/资质/决策链/替代选项" },
+  { key: "项目可行性", desc: "全流程评估这单该不该做（默认）" },
+  { key: "行业深度分析", desc: "先把行业摸透，可跨项目复用" },
+  { key: "企业画像", desc: "先把对方摸透：诉求 / 资质 / 决策链" },
 ];
 
 function emptyMatrix(): Matrix {
@@ -54,7 +54,6 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
     <div className="dash">
       <div className="dash-head">
         <h2>新建分析</h2>
-        <div className="dash-sub">一次「分析」＝对一个业务合作/投资项目的评估。先填这单的基本信息与<strong>我方角色</strong>，建好即进入 Step 0 定框。</div>
       </div>
 
       <div className="na-form">
@@ -66,7 +65,7 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
           <input className="key-input wide" value={industry} placeholder="如：算力租赁 / 冷链物流 / 光伏 EPC" onChange={(e) => setIndustry(e.target.value)} />
         </label>
 
-        <div className="fld"><span>我方角色 <em className="na-hint">决定 Step 0 各维度权重</em></span>
+        <div className="fld"><span>我方角色</span>
           <div className="na-roles">
             {ROLES.map((r) => (
               <button key={r} type="button" className={"na-chip" + (ourRole === r ? " on" : "")} onClick={() => setOurRole(r)}>{r}</button>
@@ -77,7 +76,7 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
           )}
         </div>
 
-        <div className="fld"><span>本次分析重点 <em className="na-hint">决定先产哪份交付物、走哪套提示词</em></span>
+        <div className="fld"><span>本次分析重点</span>
           <div className="na-focus">
             {FOCUS.map((f) => (
               <button key={f.key} type="button" className={"na-focus-card" + (focus === f.key ? " on" : "")} onClick={() => setFocus(f.key)}>

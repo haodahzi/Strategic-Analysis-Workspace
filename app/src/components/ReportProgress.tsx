@@ -19,6 +19,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   const [done, setDone] = useState(false);
   const [runKey, setRunKey] = useState(0);
   const [report, setReport] = useState<MockReport | null>(null);
+  const [started, setStarted] = useState(false);
 
   const cfg = loadConfig();
   const route = cfg.routing["行业深度分析"];
@@ -26,6 +27,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   const isMock = prov.id === "mock";
 
   useEffect(() => {
+    if (!started) return;              // 不自动生成：新建的单默认空白，点「生成」才跑
     let cancelled = false;
     setStatus({}); setOutputs([]); setDone(false); setReport(null);
     (async () => {
@@ -43,7 +45,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runKey]);
+  }, [runKey, started]);
 
   const outMap = new Map(outputs.map((o) => [o.stageId, o.summary]));
   const doneCount = REPORT_PIPELINE.filter((s) => status[s.id] === "完成").length;
@@ -53,8 +55,8 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
       <div className="report-bar">
         <button type="button" className="app-btn ghost" onClick={onBack}>← 返回工作区</button>
         <div className="report-bar-title">
-          多智能体生成 · {analysis.industry} · {input.focus}
-          <span className="report-bar-tag">{done ? "待审初稿" : `进行中 ${doneCount}/${REPORT_PIPELINE.length}`}</span>
+          深度分析 · {analysis.industry} · {input.focus}
+          <span className="report-bar-tag">{!started ? "未生成" : done ? "待审初稿" : `进行中 ${doneCount}/${REPORT_PIPELINE.length}`}</span>
         </div>
         <div className="report-bar-actions">
           <span className="rb-meta">{isMock ? "流水线演示 · Mock（无 Key）" : `${prov.label} · ${route.model}`}</span>
@@ -63,9 +65,16 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
       </div>
 
       <div className="dash">
-        {/* 子任务进度面板 */}
-        <div className="sec-head">生成进度 · 子任务（每一步都看得见，可掌控）</div>
-        <ol className="pipe">
+        {!started && (
+          <div className="pipe-empty">
+            <div className="pipe-empty-h">深度分析尚未生成</div>
+            <p>多智能体流水线（规划 → 起草 → 红队反驳 → 定稿 → 验收）逐步产出，每步可见。</p>
+            {isMock && <p className="set-hint">当前无真实 Key：只能演示流程、内容为示例，非本单真实分析；到设置为本阶段配置真实模型后再生成。</p>}
+            <button type="button" className="app-btn" onClick={() => setStarted(true)}>生成深度分析 →</button>
+          </div>
+        )}
+        {started && <div className="sec-head">生成进度</div>}
+        {started && <ol className="pipe">
           {REPORT_PIPELINE.map((s, i) => {
             const st = status[s.id] ?? "待执行";
             return (
@@ -83,9 +92,9 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
               </li>
             );
           })}
-        </ol>
+        </ol>}
 
-        {!done && <div className="set-hint" style={{ marginTop: 10 }}>多智能体流水线运行中……真实模型接入后，这里逐条显示各 agent 的真实思考与产物。</div>}
+        {started && !done && <div className="set-hint" style={{ marginTop: 10 }}>多智能体流水线运行中……</div>}
 
         {/* 成品：待审初稿 */}
         {done && report && (

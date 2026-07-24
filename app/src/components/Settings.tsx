@@ -37,7 +37,6 @@ export default function Settings() {
     <div className="dash">
       <div className="dash-head">
         <h2>设置</h2>
-        <div className="dash-sub">选主用提供商、填 Key 即用；选定后所有分析阶段默认走它，个别阶段想换在下方单独改。Key 仅本地保存（第二段改存 OS 密钥库、不入库）。</div>
       </div>
 
       <div className="sec-head">主用提供商（填 Key 即用）</div>
@@ -69,7 +68,7 @@ export default function Settings() {
             <input className="key-input wide" value={activeP.baseUrl} onChange={(e) => patch({ baseUrl: e.target.value })} />
           </label>
           <label className="fld"><span>模型列表（逗号分隔）</span>
-            <input className="key-input wide" value={activeP.models.join(", ")} onChange={(e) => patch({ models: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+            <input className="key-input wide" value={activeP.models.join(", ")} onChange={(e) => patch({ models: e.target.value.split(/[,，、]+/).map((s) => s.trim()).filter(Boolean) })} />
           </label>
         </div>
       )}

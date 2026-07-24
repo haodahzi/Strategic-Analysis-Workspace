@@ -54,12 +54,8 @@ export default function App() {
           <span className="app-logo">◆</span>
           <div>
             <div className="app-title">战略发展分析工作台</div>
-            <div className="app-sub">决策副驾 · 洽谈+评估 · M1 Web 内核</div>
           </div>
         </div>
-        <nav className="app-actions">
-          <button type="button" className="app-btn" onClick={() => setView("new")}>+ 新建分析</button>
-        </nav>
       </header>
 
       <div className="app-body">

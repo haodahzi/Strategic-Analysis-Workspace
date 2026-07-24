@@ -20,17 +20,8 @@ export default function QuestionList(
   return (
     <div className="ql">
       <div className="ql-head">
-        <div>
-          洽谈重点清单 · <strong>{items.length}</strong> 条（{items.filter((q) => q.dealBreaker).length} 条能推翻这单）
-          {mode === "核对" && <span className="ql-open"> · 待核对 {open}</span>}
-        </div>
+        <div>洽谈清单 · <strong>{items.length}</strong> 条{mode === "核对" && <span className="ql-open"> · 待核对 {open}</span>}</div>
         <button type="button" className="app-btn ghost dark" onClick={add}>+ 加一条</button>
-      </div>
-
-      <div className="ql-note">
-        {mode === "编辑"
-          ? "清单由前提假设自动转化（能推翻这单的排最前）。你可以直接改措辞、改意图、增删——AI 给的是初稿，你说了算。"
-          : "洽谈中带着清单逐条核对：勾「已答」并回填对方的说法/证据；能推翻这单的先问。"}
       </div>
 
       <ol className="ql-list">

@@ -14,8 +14,8 @@ const PHASE_TABS: Record<Stage, { key: string; label: string }[]> = {
   定框: [{ key: "step0", label: "Step 0 定框" }],
   调研前: [
     { key: "board", label: "两轴总览" },
-    { key: "deep", label: "深度分析（多智能体）" },
-    { key: "questions", label: "洽谈重点清单" },
+    { key: "deep", label: "深度分析" },
+    { key: "questions", label: "洽谈清单" },
   ],
   洽谈中: [
     { key: "desk", label: "对照问题 · 记录 · 导入" },

@@ -16,7 +16,7 @@ export const DEFAULT_PROVIDERS: Record<ProviderId, Omit<ProviderConfig, "apiKey"
   deepseek: {
     id: "deepseek", label: "DeepSeek", style: "openai",
     baseUrl: "https://api.deepseek.com/v1",
-    models: ["deepseek-chat", "deepseek-reasoner"],
+    models: ["deepseek-v4-pro", "deepseek-v4-flash"],
   },
   zhipu: {
     id: "zhipu", label: "智谱 GLM", style: "openai",
