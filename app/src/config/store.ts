@@ -25,12 +25,15 @@ export function loadConfig(): AppConfig {
         .flatMap((m) => m.split(/[,，、]+/)).map((s) => s.trim()).filter(Boolean);
       return { ...bp, apiKey: sp.apiKey, baseUrl: sp.baseUrl || bp.baseUrl, models: models.length ? models : bp.models };
     });
-    return {
+    const cfg: AppConfig = {
       providers,
       defaultProvider: saved.defaultProvider ?? base.defaultProvider,
       step0: saved.step0 ?? base.step0,                    // 旧结构（routing）缺这些字段 → 回落默认
       agents: { ...base.agents, ...(saved.agents ?? {}) },
     };
+    // 迁移旧配置：若之前已选过真实主用提供商但还没有子任务路由，自动铺到定框+各子任务（Key 不用重配）
+    if (!saved.agents && cfg.defaultProvider !== "mock") return applyMainProvider(cfg, cfg.defaultProvider);
+    return cfg;
   } catch {
     return defaultConfig();
   }
