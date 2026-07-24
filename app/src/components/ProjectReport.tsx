@@ -100,20 +100,24 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
 
       {/* 交易框架（并入项目报告 #5；此阶段只到框架，四流合规探测留到需要时再上） */}
       <div className="sec-head">交易框架</div>
-      <div className="pr-tx">
-        <table className="rp-table">
-          <thead><tr><th>从</th><th>给出 / 内容</th><th>到</th></tr></thead>
-          <tbody>
-            {sampleTx.flows.map((f) => (
-              <tr key={f.id}>
-                <td>{partyName(f.from)}</td>
-                <td><span className="pr-flowtype">{f.type}</span> {f.instrument ?? "—"}{f.amount ? `（${f.amount} 万元）` : ""}</td>
-                <td>{partyName(f.to)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {analysis.hasIndustryReport ? (
+        <div className="pr-tx">
+          <table className="rp-table">
+            <thead><tr><th>从</th><th>给出 / 内容</th><th>到</th></tr></thead>
+            <tbody>
+              {sampleTx.flows.map((f) => (
+                <tr key={f.id}>
+                  <td>{partyName(f.from)}</td>
+                  <td><span className="pr-flowtype">{f.type}</span> {f.instrument ?? "—"}{f.amount ? `（${f.amount} 万元）` : ""}</td>
+                  <td>{partyName(f.to)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="pr-tx"><p className="set-hint">尚无交易框架——洽谈后据实录入这单的资金 / 货物 / 合同怎么走。</p></div>
+      )}
     </div>
   );
 }

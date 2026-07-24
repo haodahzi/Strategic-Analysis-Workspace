@@ -3,6 +3,7 @@ import { Analysis } from "../types";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
+import Markdown from "./Markdown";
 import {
   MockReport, PipelineCtx, PipelineInput, REPORT_PIPELINE, StageResult,
   buildStageRequest, mockReport, mockStageOutput,
@@ -121,7 +122,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
                     <span className="pipe-status">{st}</span>
                   </div>
                   <div className="pipe-detail">{s.detail}</div>
-                  {outMap.has(s.id) && <div className="pipe-out">{outMap.get(s.id)}</div>}
+                  {outMap.has(s.id) && <div className="pipe-out"><Markdown text={outMap.get(s.id)!} /></div>}
                 </div>
               </li>
             );
@@ -135,7 +136,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
         {done && realReport !== null && (
           <div className="rp-realwrap">
             <div className="pipe-done-tag">✓ 定稿 · 待审初稿（可推翻；到「洽谈后 · 项目报告」可行内编辑 / 驳回 / 重估）</div>
-            <div className="rp-realbody">{realReport}</div>
+            <div className="rp-realbody"><Markdown text={realReport} /></div>
           </div>
         )}
 
