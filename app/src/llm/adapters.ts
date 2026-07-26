@@ -32,7 +32,7 @@ export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
       model,
       max_tokens: req.maxTokens ?? 8000,
       messages,
-      // 非严格结构化输出的通用退化：JSON mode（+ 本地 schema 校验重试，见 orchestrate）
+      // 传入 jsonSchema 时的通用退化：走 JSON mode（非 Anthropic 系模型）
       ...(req.jsonSchema ? { response_format: { type: "json_object" } } : {}),
     },
   };

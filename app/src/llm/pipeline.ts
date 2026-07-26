@@ -38,6 +38,15 @@ const AGENT_SYS: Record<AgentRole, string> = {
   验收: "你是质检，对照验收线逐条打钩，缺一条就点名。",
 };
 
+// 内置行业研究框架：资深分析师看一门生意的决策式结构（方法内化，不贴教科书标签）。
+// 定框已并入此处——由「规划」agent 落到具体行业，不再是独立 UI 步骤。
+export const INDUSTRY_FRAME =
+  "① 这门生意的本质（靠什么赚钱、价值从哪来）｜② 需求（真不真、多大、增速去向、驱动与拐点）｜" +
+  "③ 格局（谁在赢、凭什么、集中还是分散、进入壁垒）｜④ 价值链与利润池（钱被哪段赚走、卡脖子在哪）｜" +
+  "⑤ 盈利公式与单位经济（收入＝量×价、成本结构、利润驱动、规模 / 网络效应）｜⑥ 护城河（头部靠什么守、能否复制）｜" +
+  "⑦ 周期与时点（现在处在什么位置、风往哪吹、该等还是该抢）｜⑧ 命门与风险（什么会杀死这门生意、前瞻信号）｜" +
+  "⑨ 对我方的含义（该盯什么、筹码 / 软肋、什么条件下值得下注）";
+
 export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model: string): ChatRequest {
   const { industry, ourRole, focus } = ctx.input;
   const o = ctx.outputs;
@@ -45,7 +54,7 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
   let user = "";
   switch (stage.id) {
     case "plan":
-      user = `${head}\n以资深分析师视角规划这份深度分析的骨架：决策主心骨（一句话）+ 要害板块（本质 / 需求 / 格局 / 价值链利润池 / 盈利公式与单位经济 / 护城河 / 周期时点 / 命门风险 / 对我方的含义）+ 每块的命门问题 + 需要哪些资料。不要出现「PEST」「波特五力」等框架名，直接给要害。简洁分点。`;
+      user = `${head}\n先给这份深度分析定框（内置研究框架，按决策逻辑、方法内化、不贴教科书框架名）。把下面九个要害逐一落到「${ctx.input.industry}」的具体情形——每个先给一句结论 / 主张，再点出本行业下最关键的问题、变量与需要的资料：\n${INDUSTRY_FRAME}\n\n最后用一句话点出全篇「决策主心骨」。简洁、有数感。`;
       break;
     case "research":
       user = `${head}\n骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」。不要编造。`;
@@ -84,9 +93,9 @@ export function mockStageOutput(stage: PipelineStage, input: PipelineInput): Sta
   const ind = input.industry, role = input.ourRole;
   switch (stage.role) {
     case "规划":
-      return { stageId: stage.id, summary: `锁定「${ind}」报告骨架：以「时点×筹码」为决策主心骨；按[资产层/运营层/资本层]分层；命门变量＝真实上架率、租约锁定期、电价与能耗、终端信用。` };
+      return { stageId: stage.id, summary: `按内置框架把「${ind}」定框：本质 → 需求 → 格局 → 价值链利润池 → 盈利公式与单位经济 → 护城河 → 周期时点 → 命门风险 → 对我方含义，逐一落到本行业；决策主心骨一句话拎全篇。` };
     case "资料":
-      return { stageId: stage.id, summary: `读入本单材料，抽取关键事实与数据；缺料处标「需补」。示例：${ind}区域电价、租户名单与履约记录、机房 PUE 实测——未提供则标注需补。` };
+      return { stageId: stage.id, summary: `读入本单材料，抽取关键事实与数据；缺料处标「需补」。示例：${ind}的价格 / 成本数据、主要玩家与市占、政策 / 牌照要点——未提供则标注需补，不杜撰。` };
     case "起草":
       return { stageId: stage.id, summary: "产出 4 张判断卡 + 3 条量化区间（均标口径），例：整柜租赁毛利 18–28%（口径：不含电费转售、按 3 年租期摊）。" };
     case "红队":

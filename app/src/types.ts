@@ -1,6 +1,6 @@
 // 核心数据类型（第一段 Web 内核）。详见 docs/详细设计-核心数据结构.md。
 export type PhaseCol = "调研前" | "洽谈中" | "洽谈后";
-export type Stage = "定框" | "调研前" | "洽谈中" | "洽谈后";
+export type Stage = "调研前" | "洽谈中" | "洽谈后";
 export type DimensionKey =
   | "行业理解" | "对方画像" | "项目评估"
   | "风险维度" | "战略布局匹配" | "我方角色";
@@ -58,5 +58,5 @@ export interface KbEnterprise {
 export const DIMENSIONS: DimensionKey[] = [
   "行业理解", "对方画像", "我方角色", "项目评估", "风险维度", "战略布局匹配",
 ];
-export const STAGES: Stage[] = ["定框", "调研前", "洽谈中", "洽谈后"];
+export const STAGES: Stage[] = ["调研前", "洽谈中", "洽谈后"];
 export const PHASE_COLS: PhaseCol[] = ["调研前", "洽谈中", "洽谈后"];

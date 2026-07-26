@@ -1,20 +1,18 @@
 import { useState } from "react";
 import { Analysis, QItem, Stage } from "../types";
 import PhaseRail from "./PhaseRail";
-import Step0 from "./Step0";
 import TwoAxisBoard from "./TwoAxisBoard";
 import ReportProgress from "./ReportProgress";
 import QuestionList from "./QuestionList";
 import NegotiationDesk from "./NegotiationDesk";
 import ProjectReport from "./ProjectReport";
 
-const STAGE_CLASS: Record<Stage, string> = { 定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
+const STAGE_CLASS: Record<Stage, string> = { 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
 
 const PHASE_TABS: Record<Stage, { key: string; label: string }[]> = {
-  定框: [{ key: "step0", label: "Step 0 定框" }],
   调研前: [
-    { key: "board", label: "两轴总览" },
     { key: "deep", label: "深度分析" },
+    { key: "board", label: "两轴总览" },
     { key: "questions", label: "洽谈清单" },
   ],
   洽谈中: [
@@ -67,9 +65,6 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
       </div>
 
       <div className="pw-body">
-        {phase === "定框" && tab === "step0" && (
-          <Step0 analysis={analysis} onBack={() => pickPhase("调研前")} />
-        )}
         {phase === "调研前" && tab === "board" && <TwoAxisBoard project={analysis} />}
         {phase === "调研前" && tab === "deep" && (
           <ReportProgress analysis={analysis} onBack={() => setTab("board")} />

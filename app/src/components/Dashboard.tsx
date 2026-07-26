@@ -2,7 +2,7 @@ import { kbIndustry, kbEnterprise } from "../data/seed";
 import { Analysis, STAGES, Stage } from "../types";
 
 const STAGE_CLASS: Record<Stage, string> = {
-  定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
+  调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
 };
 
 function StageProgress({ stage }: { stage: Stage }) {

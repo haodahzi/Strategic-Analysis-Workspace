@@ -11,7 +11,7 @@ import ProjectWorkspace from "./components/ProjectWorkspace";
 type View = "dashboard" | "project" | "kb" | "settings" | "new";
 
 const STAGE_CLASS: Record<Stage, string> = {
-  定框: "st-def", 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
+  调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
 };
 
 export default function App() {

@@ -40,12 +40,12 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
       ourRole: role,
       industry: industry.trim(),
       focus,
-      stage: "定框",
+      stage: "调研前",
       updatedAt: new Date().toISOString().slice(0, 10),
       assumptions: 0,
       dealBreakers: 0,
       matrix: emptyMatrix(),
-      deliverables: [{ kind: "评估框架（活草稿）", durability: "易耗", status: "初稿" }],
+      deliverables: [],
     };
     onCreate(a);
   };
@@ -92,7 +92,7 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
         </label>
 
         <div className="na-actions">
-          <button type="button" className="app-btn" disabled={!canCreate} onClick={create}>建好并进入 Step 0 定框 →</button>
+          <button type="button" className="app-btn" disabled={!canCreate} onClick={create}>建好并开始深度分析 →</button>
           <button type="button" className="app-btn ghost dark" onClick={onCancel}>取消</button>
           {!canCreate && <span className="set-hint">分析名称、行业、我方角色为必填。</span>}
         </div>

@@ -107,7 +107,7 @@ export const analyses: Analysis[] = [
     name: "医疗器械代运营 · 渠道合作",
     ourRole: "运营方",
     industry: "医疗器械流通",
-    stage: "定框",
+    stage: "调研前",
     updatedAt: "2026-07-21",
     assumptions: 0,
     dealBreakers: 0,
