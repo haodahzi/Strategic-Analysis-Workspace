@@ -45,13 +45,13 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
   let user = "";
   switch (stage.id) {
     case "plan":
-      user = `${head}\n为这份深度分析规划骨架：决策主心骨（一句话拎全篇）、分层轴（3 层，切开而非罗列）、命门变量（3–5 个）、需要哪些资料。简洁分点。`;
+      user = `${head}\n按行业研究通用方法论（行业生命周期、市场规模 TAM/CAGR、PEST、波特五力、产业链 / 价值链与利润池、单位经济、护城河 / KSF、关键企业、周期与时点、风险命门）规划这份深度分析的骨架：决策主心骨（一句话拎全篇）+ 要覆盖的板块清单 + 每块的命门问题 + 需要哪些资料。简洁分点。`;
       break;
     case "research":
       user = `${head}\n骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」。不要编造。`;
       break;
     case "draft":
-      user = `${head}\n骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草深度分析初稿：主心骨、分层论述、量化区间（每条带口径）、命门风险（有名有姓 + 识别信号）、可行性判断卡（立场/依据/把握度/falsifiers）。`;
+      user = `${head}\n研究框架 / 骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草深度分析初稿，紧扣框架各板块（竞争格局 / 市场规模 / 盈利公式与单位经济 / 护城河 / 产业链利润池 / 周期时点等）：要有决策主心骨、分层论述、量化区间（每条带口径）、命门风险（有名有姓 + 识别信号）、可行性判断卡（立场 / 依据 / 把握度 / falsifiers）。用 markdown。`;
       break;
     case "red":
       user = `审下面这份初稿，逐条挑硬伤（证据不足 / 口径含糊 / 风险没点名 / falsifiers 不够狠），并列出必须补的清单：\n\n${o.draft ?? ""}`;
