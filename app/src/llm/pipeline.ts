@@ -10,7 +10,7 @@ export interface PipelineStage {
   detail: string;  // 这个 agent 干什么
 }
 
-export interface PipelineInput { industry: string; ourRole: string; focus: string; }
+export interface PipelineInput { industry: string; ourRole: string; focus: string; company?: string; counterparty?: string; }
 export interface StageResult { stageId: string; summary: string; }
 
 export const REPORT_PIPELINE: PipelineStage[] = [
@@ -47,20 +47,41 @@ export const INDUSTRY_FRAME =
   "⑦ 周期与时点（现在处在什么位置、风往哪吹、该等还是该抢）｜⑧ 命门与风险（什么会杀死这门生意、前瞻信号）｜" +
   "⑨ 对我方的含义（该盯什么、筹码 / 软肋、什么条件下值得下注）";
 
+// 企业画像框架
+export const COMPANY_FRAME =
+  "① 真实诉求与动机（想干什么、为什么找我方、急不急）｜② 资质与实力（财务 / 信用 / 牌照 / 交付能力 / 过往战绩，有名有姓）｜" +
+  "③ 决策链（谁拍板、谁把关、关键人各自诉求）｜④ 替代选项与筹码（对方的退路 BATNA、我方的筹码与软肋）｜" +
+  "⑤ 风险与软肋（履约风险、隐性关联、名实是否一致、有无硬伤）｜⑥ 对我方的含义（该盯什么、怎么谈、什么条件下可信 / 可合作）";
+
+// 项目分析框架
+export const DEAL_FRAME =
+  "① 能不能做（合规红线、资质 / 牌照、硬约束）｜② 值不值得做（ROI、价值分配、对我方的收益与代价）｜" +
+  "③ 合作点与结构（各方出什么 / 拿什么、交易框架）｜④ 关键前提与命门（哪几条前提错了这单就翻）｜" +
+  "⑤ 风险（合规 / 财务 / 履约 / 退出，有名有姓）｜⑥ 对我方的含义（角色、筹码、什么条件下值得下注）";
+
+// 按类型选内置框架并给出分析对象的措辞
+export function frameFor(input: PipelineInput): { frame: string; subject: string; kind: string } {
+  const f = input.focus ?? "";
+  if (f.includes("企业")) return { frame: COMPANY_FRAME, subject: `企业「${input.company || input.industry}」`, kind: "企业画像" };
+  if (f.includes("项目")) return { frame: DEAL_FRAME, subject: `这单（行业「${input.industry}」，对方「${input.counterparty || "待填"}」）`, kind: "项目分析" };
+  return { frame: INDUSTRY_FRAME, subject: `「${input.industry}」行业`, kind: "行业深度分析" };
+}
+
 export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model: string): ChatRequest {
-  const { industry, ourRole, focus } = ctx.input;
+  const { ourRole, focus } = ctx.input;
   const o = ctx.outputs;
-  const head = `行业「${industry}」· 我方「${ourRole}」· 本次重点「${focus}」。`;
+  const { frame, subject } = frameFor(ctx.input);
+  const head = `${subject} · 我方「${ourRole}」· 类型「${focus}」。`;
   let user = "";
   switch (stage.id) {
     case "plan":
-      user = `${head}\n先给这份深度分析定框（内置研究框架，按决策逻辑、方法内化、不贴教科书框架名）。把下面九个要害逐一落到「${ctx.input.industry}」的具体情形——每个先给一句结论 / 主张，再点出本行业下最关键的问题、变量与需要的资料：\n${INDUSTRY_FRAME}\n\n最后用一句话点出全篇「决策主心骨」。简洁、有数感。`;
+      user = `${head}\n先给这份深度分析定框（内置框架，按决策逻辑、方法内化、不贴教科书框架名）。把下面要害逐一落到 ${subject} 的具体情形——每个先给一句结论 / 主张，再点出最关键的问题、变量与需要的资料：\n${frame}\n\n最后用一句话点出全篇「决策主心骨」。简洁、有数感。`;
       break;
     case "research":
       user = `${head}\n骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」。不要编造。`;
       break;
     case "draft":
-      user = `${head}\n骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草深度分析初稿，像资深分析师给决策者的备忘：每段先结论后依据、具体有数感；覆盖 本质 / 需求 / 格局 / 价值链利润池 / 盈利公式与单位经济 / 护城河 / 周期时点 / 命门风险 / 对我方含义；要有量化区间（带口径）、有名有姓的风险、可行性判断卡（立场 / 依据 / 把握度 / falsifiers）。不要出现框架名或教科书标签，不要清单感。用 markdown。`;
+      user = `${head}\n骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草初稿，像资深分析师给决策者的备忘：每段先结论后依据、具体有数感；紧扣上面框架的各要害；要有量化区间（带口径）、有名有姓的风险、判断卡（立场 / 依据 / 把握度 / falsifiers）。不要出现框架名或教科书标签，不要清单感。用 markdown。`;
       break;
     case "red":
       user = `审下面这份初稿，逐条挑硬伤（证据不足 / 口径含糊 / 风险没点名 / falsifiers 不够狠），并列出必须补的清单：\n\n${o.draft ?? ""}`;

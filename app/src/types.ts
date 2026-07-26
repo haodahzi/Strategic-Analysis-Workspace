@@ -27,7 +27,9 @@ export interface Analysis {
   name: string;
   ourRole: string;
   industry: string;
-  focus?: string;               // 本次分析重点：项目可行性 / 行业深度分析 / 企业画像
+  focus?: string;               // 本次分析类型：项目可行性 / 行业深度分析 / 企业画像
+  company?: string;             // 企业画像：被分析的企业名称
+  counterparty?: string;        // 项目分析：对方 / 对手方
   stage: Stage;
   updatedAt: string;
   assumptions: number;
