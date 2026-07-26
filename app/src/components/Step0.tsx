@@ -68,7 +68,7 @@ export default function Step0({ analysis, onBack }: { analysis: Analysis; onBack
 
         {md && (
           <div className="rp-realwrap">
-            <div className="pipe-done-tag">✓ 行业研究框架（待审）· 生命周期 / 市场规模 / 波特五力 / 价值链 / 盈利公式 / 护城河 …；确认后据此做「调研前」深度分析</div>
+            <div className="pipe-done-tag">✓ 行业框架（待审）· 本质 / 需求 / 格局 / 价值链利润池 / 盈利公式 / 护城河 / 周期 / 命门 / 对我方含义；确认后据此做「调研前」深度分析</div>
             <div className="rp-realbody"><Markdown text={md} /></div>
           </div>
         )}
