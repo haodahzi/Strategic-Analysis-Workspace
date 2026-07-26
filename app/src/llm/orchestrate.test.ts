@@ -1,38 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { buildStep0Request, parseStep0, mockStep0Json } from "./orchestrate";
+import { buildStep0Request, mockStep0Markdown } from "./orchestrate";
 
-describe("Step 0 编排", () => {
-  it("buildStep0Request 带 jsonSchema / system / model / 行业", () => {
-    const r = buildStep0Request({ industry: "算力租赁", ourRole: "资金方", lightScan: "" }, "claude-opus-4-8");
-    expect(r.model).toBe("claude-opus-4-8");
-    expect(r.jsonSchema).toBeTruthy();
-    expect(r.system).toContain("决策副驾");
+describe("Step 0 · 行业定框", () => {
+  it("buildStep0Request 带 model/system/行业，覆盖竞争格局/盈利公式等板块，且不强依赖严格 JSON", () => {
+    const r = buildStep0Request({ industry: "算力租赁", ourRole: "资金方", lightScan: "" }, "deepseek-v4-pro");
+    expect(r.model).toBe("deepseek-v4-pro");
+    expect(r.system).toContain("行业研究");
     expect(r.messages[0].content).toContain("算力租赁");
-    expect(r.messages[0].content).toContain("资金方");
+    expect(r.messages[0].content).toContain("竞争格局");
+    expect(r.messages[0].content).toContain("盈利公式");
+    expect(r.messages[0].content).toContain("商业模式");
+    expect(r.jsonSchema).toBeUndefined();     // 稳健：非 Claude 模型也不会因 JSON 解析失败退回默认
   });
 
-  it("parseStep0 解析 ```json 围栏", () => {
-    const t = "```json\n{\"coreDimensions\":[{\"key\":\"行业理解\",\"weight\":70,\"weightReason\":\"x\"}],\"industryOverlay\":[],\"reflexive\":[\"a\"]}\n```";
-    const f = parseStep0(t);
-    expect(f.coreDimensions[0].key).toBe("行业理解");
-    expect(f.reflexive).toContain("a");
-  });
-
-  it("parseStep0 垃圾输入 → 回退 6 维", () => {
-    const f = parseStep0("这不是 JSON");
-    expect(f.coreDimensions.length).toBe(6);
-  });
-
-  it("mockStep0Json 产出合法 JSON、6 维、叠加层与反问齐全", () => {
-    const f = parseStep0(mockStep0Json({ industry: "冷链物流", ourRole: "场地资源方", lightScan: "" }));
-    expect(f.coreDimensions.length).toBe(6);
-    expect(f.industryOverlay.length).toBeGreaterThan(0);
-    expect(f.reflexive.length).toBeGreaterThan(0);
-  });
-
-  it("mockStep0Json 角色不同→我方角色维权重带角色名", () => {
-    const f = parseStep0(mockStep0Json({ industry: "光伏", ourRole: "牵头整合", lightScan: "" }));
-    const role = f.coreDimensions.find((d) => d.key === "我方角色");
-    expect(role?.weightReason).toContain("牵头整合");
+  it("mockStep0Markdown 产出含各板块 ## 小标题的 markdown、引用行业名", () => {
+    const md = mockStep0Markdown({ industry: "冷链物流", ourRole: "场地资源方", lightScan: "" });
+    expect(md).toContain("## 竞争格局");
+    expect(md).toContain("## 盈利公式");
+    expect(md).toContain("## 关键企业");
+    expect(md).toContain("冷链物流");
   });
 });

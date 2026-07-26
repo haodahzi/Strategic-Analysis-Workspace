@@ -1,7 +1,7 @@
 import { STAGES, Stage } from "../types";
 
 const STAGE_DESC: Record<Stage, string> = {
-  定框: "立框架 · 排权重",
+  定框: "立行业研究框架",
   调研前: "深度分析 + 洽谈清单",
   洽谈中: "带问题去核 · 记录录入",
   洽谈后: "项目报告 · 交易框架 · 定调",
