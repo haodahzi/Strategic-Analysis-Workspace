@@ -49,8 +49,10 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
           <h2>{analysis.name}</h2>
           <div className="pw-meta">
             <span className="role-badge">我方：{analysis.ourRole}</span>
-            <span className="ind-badge">{analysis.industry}</span>
-            {analysis.focus && <span className="ind-badge">重点：{analysis.focus}</span>}
+            {analysis.company && <span className="ind-badge">企业：{analysis.company}</span>}
+            {analysis.industry && <span className="ind-badge">{analysis.industry}</span>}
+            {analysis.counterparty && <span className="ind-badge">对方：{analysis.counterparty}</span>}
+            {analysis.focus && <span className="ind-badge">类型：{analysis.focus}</span>}
             <span className={"st-chip " + STAGE_CLASS[analysis.stage]}>当前：{analysis.stage}</span>
           </div>
         </div>

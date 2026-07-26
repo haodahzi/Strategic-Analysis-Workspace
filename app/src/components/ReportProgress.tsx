@@ -1,84 +1,30 @@
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { Analysis } from "../types";
 import { loadConfig, providerById } from "../config/store";
-import { makeClient } from "../llm/adapters";
-import { getLlmFetch } from "../llm/runtime";
 import Markdown from "./Markdown";
-import {
-  MockReport, PipelineCtx, PipelineInput, REPORT_PIPELINE, StageResult,
-  buildStageRequest, mockReport, mockStageOutput,
-} from "../llm/pipeline";
-
-type Status = "待执行" | "进行中" | "完成";
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+import { PipelineInput, REPORT_PIPELINE } from "../llm/pipeline";
+import { getRun, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
 
 const ROLE_CLASS: Record<string, string> = {
   规划: "r-plan", 资料: "r-plan", 起草: "r-draft", 红队: "r-red", 定稿: "r-final", 验收: "r-check",
 };
 
 export default function ReportProgress({ analysis, onBack }: { analysis: Analysis; onBack: () => void }) {
-  const input: PipelineInput = { industry: analysis.industry, ourRole: analysis.ourRole, focus: analysis.focus ?? "行业深度分析" };
-  const [status, setStatus] = useState<Record<string, Status>>({});
-  const [outputs, setOutputs] = useState<StageResult[]>([]);
-  const [done, setDone] = useState(false);
-  const [runKey, setRunKey] = useState(0);
-  const [report, setReport] = useState<MockReport | null>(null);
-  const [started, setStarted] = useState(false);
-  const [realReport, setRealReport] = useState<string | null>(null);
-  const [materials, setMaterials] = useState("");
-  const [err, setErr] = useState("");
+  const input: PipelineInput = {
+    industry: analysis.industry, ourRole: analysis.ourRole, focus: analysis.focus ?? "行业深度分析",
+    company: analysis.company, counterparty: analysis.counterparty,
+  };
+  const subjectLabel = analysis.company || analysis.industry || analysis.name;
+
+  // 生成状态来自 store（后台运行、切页不丢），组件只订阅
+  const sub = useCallback((cb: () => void) => subscribe(analysis.id, cb), [analysis.id]);
+  const snap = useCallback(() => getRun(analysis.id), [analysis.id]);
+  const run = useSyncExternalStore(sub, snap);
+  const { started, running, done, status, outputs, report, realReport, err, materials } = run;
 
   const cfg = loadConfig();
   const draftProv = providerById(cfg, cfg.agents["起草"].provider);
   const realMode = draftProv.id !== "mock";
-
-  useEffect(() => {
-    if (!started) return;              // 不自动生成：新建的单默认空白，点「生成」才跑
-    let cancelled = false;
-    setStatus({}); setOutputs([]); setDone(false); setReport(null); setRealReport(null); setErr("");
-    (async () => {
-      if (!realMode) {                 // Mock 演示：计时逐步、内容为示例
-        for (const s of REPORT_PIPELINE) {
-          if (cancelled) return;
-          setStatus((m) => ({ ...m, [s.id]: "进行中" }));
-          await sleep(480);
-          if (cancelled) return;
-          setOutputs((o) => [...o, mockStageOutput(s, input)]);
-          setStatus((m) => ({ ...m, [s.id]: "完成" }));
-        }
-        if (cancelled) return;
-        setReport(mockReport(input));
-        setDone(true);
-        return;
-      }
-      // 真实链：各子任务各自模型，前一步产物喂后一步；任一步出错即停在该步
-      const ctx: PipelineCtx = { input, materials, outputs: {} };
-      const fetchImpl = await getLlmFetch();
-      for (const s of REPORT_PIPELINE) {
-        if (cancelled) return;
-        setStatus((m) => ({ ...m, [s.id]: "进行中" }));
-        const pick = cfg.agents[s.role];
-        const p2 = providerById(cfg, pick.provider);
-        try {
-          const res = await makeClient(p2, fetchImpl).send(buildStageRequest(s, ctx, pick.model));
-          if (cancelled) return;
-          ctx.outputs[s.id] = res.text;
-          setOutputs((o) => [...o, { stageId: s.id, summary: res.text }]);
-          setStatus((m) => ({ ...m, [s.id]: "完成" }));
-        } catch (e) {
-          if (cancelled) return;
-          setErr(`${p2.label}（${s.role}）：${(e as Error).message.slice(0, 160)}`);
-          setStatus((m) => ({ ...m, [s.id]: "待执行" }));
-          return;
-        }
-      }
-      if (cancelled) return;
-      setRealReport(ctx.outputs["final"] ?? "");
-      setDone(true);
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runKey, started]);
 
   const outMap = new Map(outputs.map((o) => [o.stageId, o.summary]));
   const doneCount = REPORT_PIPELINE.filter((s) => status[s.id] === "完成").length;
@@ -88,12 +34,12 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
       <div className="report-bar">
         <button type="button" className="app-btn ghost" onClick={onBack}>← 返回工作区</button>
         <div className="report-bar-title">
-          深度分析 · {analysis.industry} · {input.focus}
+          深度分析 · {subjectLabel} · {input.focus}
           <span className="report-bar-tag">{!started ? "未生成" : done ? "待审初稿" : `进行中 ${doneCount}/${REPORT_PIPELINE.length}`}</span>
         </div>
         <div className="report-bar-actions">
           <span className="rb-meta">{realMode ? `真实 · 起草 ${draftProv.label} · 红队 ${providerById(cfg, cfg.agents["红队"].provider).label}` : "流水线演示 · Mock（无 Key）"}</span>
-          {done && <button type="button" className="app-btn ghost" onClick={() => setRunKey((k) => k + 1)}>重新生成</button>}
+          {done && <button type="button" className="app-btn ghost" onClick={() => void startRun(analysis.id, input)}>重新生成</button>}
         </div>
       </div>
 
@@ -101,14 +47,14 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
         {!started && (
           <div className="pipe-empty">
             <div className="pipe-empty-h">深度分析尚未生成</div>
-            <p>多智能体流水线（规划 → 资料 → 起草 → 红队 → 定稿 → 验收）逐步产出。{realMode ? "各子任务走你配置的真实模型，红队换一款互查。" : "当前无真实 Key，仅演示流程、内容为示例；到设置为子任务配置真实模型后再生成本单真实分析。"}</p>
+            <p>多智能体流水线（规划 → 资料 → 起草 → 红队 → 定稿 → 验收）逐步产出，<strong>后台运行、切换页面不中断</strong>。{realMode ? "各子任务走你配置的真实模型，红队换一款互查。" : "当前无真实 Key，仅演示流程、内容为示例；到设置为子任务配置真实模型后再生成本单真实分析。"}</p>
             <label className="fld" style={{ textAlign: "left", maxWidth: 560, margin: "0 auto 14px" }}><span>本单资料（可选，喂给「资料 / 起草」：尽调稿 / 对方资料 / 已知数据）</span>
-              <textarea className="key-input wide" rows={4} value={materials} placeholder="粘贴本单已知材料…（越具体，分析越有据）" onChange={(e) => setMaterials(e.target.value)} />
+              <textarea className="key-input wide" rows={4} value={materials} placeholder="粘贴本单已知材料…（越具体，分析越有据）" onChange={(e) => setMaterials(analysis.id, e.target.value)} />
             </label>
-            <button type="button" className="app-btn" onClick={() => setStarted(true)}>生成深度分析 →</button>
+            <button type="button" className="app-btn" onClick={() => void startRun(analysis.id, input)}>生成深度分析 →</button>
           </div>
         )}
-        {started && <div className="sec-head">生成进度</div>}
+        {started && <div className="sec-head">生成进度{running ? "（后台运行中，可切走）" : ""}</div>}
         {started && <ol className="pipe">
           {REPORT_PIPELINE.map((s, i) => {
             const st = status[s.id] ?? "待执行";
@@ -130,7 +76,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
         </ol>}
 
         {err && <div className="pr-finding red" style={{ marginTop: 12 }}><div className="pr-finding-tag">出错 · 已停在该步</div><p>{err}</p></div>}
-        {started && !done && !err && <div className="set-hint" style={{ marginTop: 10 }}>流水线运行中……</div>}
+        {started && !done && !err && <div className="set-hint" style={{ marginTop: 10 }}>流水线运行中……（可切到别的页面，回来仍在）</div>}
 
         {/* 真实模型成品：定稿文本 */}
         {done && realReport !== null && (
