@@ -60,6 +60,6 @@ jobs:
           projectPath: app
           tagName: v__VERSION__
           releaseName: "战略发展分析工作台 v__VERSION__"
-          releaseBody: "Windows 安装包：.msi（企业批量部署）/ -setup.exe（个人安装）。首次运行若弹 SmartScreen，点「更多信息 → 仍要运行」。"
+          releaseBody: "Windows 个人安装包：-setup.exe（双击安装）。首次运行若弹 SmartScreen，点「更多信息 → 仍要运行」。"
           releaseDraft: false
           prerelease: false
