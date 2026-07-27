@@ -73,6 +73,10 @@ export function frameFor(input: PipelineInput): { frame: string; subject: string
 const NEUTRALITY =
   "全程中性客观、正反兼陈，不做空也不唱多；只用给定材料与公认事实，缺失处标「需补」或「未公开」，绝不虚构数据，尤其绝不虚构「我方」的能力、数据或筹码。";
 
+// 排版约定：让定稿用这些标记，报告库「房子样式」会渲染成对应的语义模块（结论框/风险框/洞察框/表格）。
+const MARKUP_HINT =
+  "排版约定：重要结论用「> 结论：…」、主要风险用「> 风险：…」、关键洞察用「> 洞察：…」各自成段标注（适度、不滥用）；需要对比的数据用 markdown 表格；层次用 ## / ### 小标题。";
+
 function typeNote(kind: string, company?: string): string {
   if (kind === "公司介绍")
     return `这是一份公司介绍（面向不了解这家公司的读者）：标题就写「${company || "该公司"} 公司介绍」，文风朴素、不用噱头；不做投资建议，不写做空 / 空头逻辑，不写决策链 / 筹码。`;
@@ -95,13 +99,13 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
       user = `${head}\n内容骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」、公开渠道查不到的标「未公开」。不要编造。`;
       break;
     case "draft":
-      user = `${head}\n内容骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草正文，像一份严谨的研究综述：每部分先讲清事实与逻辑、再给有节制的判断；量化数据必带口径与来源，无来源标「需补 / 未公开」。紧扣上面框架各要点，不要出现框架名或教科书标签，不要清单感。用 markdown。${note} ${NEUTRALITY}`;
+      user = `${head}\n内容骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草正文，像一份严谨的研究综述：每部分先讲清事实与逻辑、再给有节制的判断；量化数据必带口径与来源，无来源标「需补 / 未公开」。紧扣上面框架各要点，不要出现框架名或教科书标签，不要清单感。用 markdown。${note} ${NEUTRALITY} ${MARKUP_HINT}`;
       break;
     case "red":
       user = `对下面这份初稿做事实与中立性审查，逐条指出问题（无来源的断言 / 疑似编造，尤其编造我方数据或筹码 / 一边倒的倾向 / 口径含糊），并列出必须修正处；不要添加新的倾向：\n\n${o.draft ?? ""}`;
       break;
     case "final":
-      user = `初稿：\n${o.draft ?? ""}\n\n审查意见：\n${o.red ?? ""}\n\n逐条采纳并修改，产出定稿（markdown，结构清晰、中性客观、正反兼陈）。信息不足处如实说明、不臆断。仍标注为待审初稿。${note}`;
+      user = `初稿：\n${o.draft ?? ""}\n\n审查意见：\n${o.red ?? ""}\n\n逐条采纳并修改，产出定稿（markdown，结构清晰、中性客观、正反兼陈）。信息不足处如实说明、不臆断。仍标注为待审初稿。${note} ${MARKUP_HINT}`;
       break;
     case "check":
       user = `对照 5 条验收线逐条打 ✓/✗ 并一句话说明：事实有据（数据带口径 / 来源）｜缺口已标（需补 / 未公开）｜中性无编造（无虚构我方数据 / 筹码、无一边倒倾向）｜结构清楚｜该类型该有的内容齐全。\n\n定稿：\n${o.final ?? ""}`;
