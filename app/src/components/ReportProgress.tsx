@@ -3,11 +3,11 @@ import { Analysis } from "../types";
 import { loadConfig, providerById } from "../config/store";
 import Markdown from "./Markdown";
 import { PipelineInput, REPORT_PIPELINE } from "../llm/pipeline";
-import { getRun, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
+import { addAttachment, getRun, removeAttachment, resumeRun, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
 import { houseDocFromMarkdown } from "../export/exporter";
 import { saveReport } from "../llm/reportLib";
 import ReportView from "./ReportView";
-import { extractPdfText } from "../lib/pdf";
+import MaterialsInput from "./MaterialsInput";
 
 const ROLE_CLASS: Record<string, string> = {
   规划: "r-plan", 资料: "r-plan", 起草: "r-draft", 红队: "r-red", 定稿: "r-final", 验收: "r-check",
@@ -24,12 +24,11 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   const sub = useCallback((cb: () => void) => subscribe(analysis.id, cb), [analysis.id]);
   const snap = useCallback(() => getRun(analysis.id), [analysis.id]);
   const run = useSyncExternalStore(sub, snap);
-  const { started, running, done, status, outputs, report, realReport, err, materials } = run;
+  const { started, running, done, status, outputs, report, realReport, err, materials, attachments } = run;
 
   const cfg = loadConfig();
   const draftProv = providerById(cfg, cfg.agents["起草"].provider);
   const realMode = draftProv.id !== "mock";
-  const [pdfBusy, setPdfBusy] = useState("");
   const [houseView, setHouseView] = useState<{ title: string; doc: string } | null>(null);
 
   // 一键排版（#7）：把定稿 markdown 排成房子样式，存入报告库并在工作台内查看
@@ -39,27 +38,6 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
     const doc = houseDocFromMarkdown(md, { title, badges: [input.focus, analysis.industry].filter(Boolean) as string[] });
     saveReport({ analysisId: analysis.id, title, subject: subjectLabel, focus: input.focus, markdown: md });
     setHouseView({ title, doc });
-  };
-
-  const appendMaterials = (text: string) => {
-    if (!text) return;
-    const cur = getRun(analysis.id).materials;
-    setMaterials(analysis.id, cur ? cur + "\n\n" + text : text);
-  };
-  const onPickFile = async (f?: File) => {
-    if (!f) return;
-    if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") {
-      setPdfBusy("解析 PDF…");
-      try {
-        const text = await extractPdfText(f, (p, t) => setPdfBusy(`解析 PDF… ${p}/${t} 页`));
-        appendMaterials(text);
-        setPdfBusy(text.trim() ? "" : "这份 PDF 没提取到文本（多为扫描件 / 图片，需 OCR，暂不支持）");
-      } catch (e) { setPdfBusy("PDF 解析失败：" + (e as Error).message.slice(0, 120)); }
-    } else {
-      const r = new FileReader();
-      r.onload = () => appendMaterials(String(r.result ?? ""));
-      r.readAsText(f);
-    }
   };
 
   const outMap = new Map(outputs.map((o) => [o.stageId, o.summary]));
@@ -84,15 +62,15 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
           <div className="pipe-empty">
             <div className="pipe-empty-h">深度分析尚未生成</div>
             <p>多智能体流水线（规划 → 资料 → 起草 → 红队 → 定稿 → 验收）逐步产出，<strong>后台运行、切换页面不中断</strong>。{realMode ? "各子任务走你配置的真实模型，红队换一款互查。" : "当前无真实 Key，仅演示流程、内容为示例；到设置为子任务配置真实模型后再生成本单真实分析。"}</p>
-            <label className="fld" style={{ textAlign: "left", maxWidth: 560, margin: "0 auto 8px" }}>
-              <span>本单资料（可选，喂给「资料 / 起草」：尽调稿 / 对方资料 / 已知数据）
-                <label className="mn-upload" style={{ marginLeft: 8 }}>上传 PDF / 文本
-                  <input type="file" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain" onChange={(e) => { void onPickFile(e.target.files?.[0]); e.target.value = ""; }} />
-                </label>
-              </span>
-              <textarea className="key-input wide" rows={4} value={materials} placeholder="粘贴本单已知材料，或上传尽调 PDF 自动提取…（越具体，分析越有据）" onChange={(e) => setMaterials(analysis.id, e.target.value)} />
-            </label>
-            {pdfBusy && <div className="set-hint" style={{ maxWidth: 560, margin: "0 auto 12px" }}>{pdfBusy}</div>}
+            <div className="fld" style={{ textAlign: "left", maxWidth: 560, margin: "0 auto 12px" }}>
+              <span>本单资料（可选，喂给「资料 / 起草」）· 可上传多份 PDF，后台提取喂模型</span>
+              <MaterialsInput
+                materials={materials} onMaterials={(v) => setMaterials(analysis.id, v)}
+                attachments={attachments}
+                onAdd={(a) => addAttachment(analysis.id, a)}
+                onRemove={(n) => removeAttachment(analysis.id, n)}
+              />
+            </div>
             <button type="button" className="app-btn" onClick={() => void startRun(analysis.id, input)}>生成深度分析 →</button>
           </div>
         )}
@@ -117,7 +95,16 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
           })}
         </ol>}
 
-        {err && <div className="pr-finding red" style={{ marginTop: 12 }}><div className="pr-finding-tag">出错 · 已停在该步</div><p>{err}</p></div>}
+        {err && !running && (
+          <div className="pr-finding red" style={{ marginTop: 12 }}>
+            <div className="pr-finding-tag">出错 · 已停在该步（其余已完成的步骤都保留）</div>
+            <p>{err}</p>
+            <div className="pr-err-actions">
+              <button type="button" className="app-btn" onClick={() => void resumeRun(analysis.id, input)}>继续 · 从这步接着跑</button>
+              <button type="button" className="app-btn ghost dark" onClick={() => void startRun(analysis.id, input)}>重新开始</button>
+            </div>
+          </div>
+        )}
         {started && !done && !err && <div className="set-hint" style={{ marginTop: 10 }}>流水线运行中……（可切到别的页面，回来仍在）</div>}
 
         {/* 真实模型成品：定稿文本 */}

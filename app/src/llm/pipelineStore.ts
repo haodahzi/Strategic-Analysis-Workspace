@@ -7,8 +7,10 @@ import {
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
+import { saveReport } from "./reportLib";
 
 export type RunStatus = "待执行" | "进行中" | "完成";
+export interface Attachment { name: string; text: string; }   // 上传资料提取出的文本（后台喂模型，不在前台展示原文 #5）
 export interface RunState {
   started: boolean;
   running: boolean;
@@ -18,7 +20,8 @@ export interface RunState {
   report: MockReport | null;   // Mock 结构化成品
   realReport: string | null;   // 真实模型的定稿文本
   err: string;
-  materials: string;
+  materials: string;           // 用户手写的备注 / 已知要点
+  attachments: Attachment[];   // 上传的 PDF / 文本提取出的正文
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -26,7 +29,7 @@ const runs = new Map<string, RunState>();
 const listeners = new Map<string, Set<() => void>>();
 
 function empty(): RunState {
-  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "" };
+  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "", attachments: [] };
 }
 
 // 惰性初始化并返回稳定引用（配合 useSyncExternalStore）
@@ -47,19 +50,34 @@ function notify(id: string) { listeners.get(id)?.forEach((fn) => fn()); }
 function patch(id: string, p: Partial<RunState>) { runs.set(id, { ...getRun(id), ...p }); notify(id); }
 
 export function setMaterials(id: string, materials: string) { patch(id, { materials }); }
+export function addAttachment(id: string, a: Attachment) {
+  const cur = getRun(id).attachments.filter((x) => x.name !== a.name);
+  patch(id, { attachments: [...cur, a] });
+}
+export function removeAttachment(id: string, name: string) {
+  patch(id, { attachments: getRun(id).attachments.filter((x) => x.name !== name) });
+}
 
-// 启动/重跑一份深度分析。异步循环活在 store 里，组件卸载也继续。
-export async function startRun(id: string, input: PipelineInput): Promise<void> {
+// 手写备注 + 附件正文合并成喂给模型的材料（附件原文只在这里进模型，不在前台展示）
+function effectiveMaterials(s: RunState): string {
+  return [s.materials.trim(), ...s.attachments.map((a) => `【附件：${a.name}】\n${a.text}`)].filter(Boolean).join("\n\n");
+}
+
+// 启动 / 续跑一份深度分析。异步循环活在 store 里，组件卸载也继续。resume=从已完成的步接着跑（#6）。
+async function runPipeline(id: string, input: PipelineInput, resume: boolean): Promise<void> {
   if (getRun(id).running) return;
-  const materials = getRun(id).materials;
-  patch(id, { started: true, running: true, done: false, status: {}, outputs: [], report: null, realReport: null, err: "" });
-
   const cfg = loadConfig();
-  const draftProv = providerById(cfg, cfg.agents["起草"].provider);
-  const realMode = draftProv.id !== "mock";
+  const realMode = providerById(cfg, cfg.agents["起草"].provider).id !== "mock";
+
+  if (resume) patch(id, { running: true, err: "" });
+  else patch(id, { started: true, running: true, done: false, status: {}, outputs: [], report: null, realReport: null, err: "" });
+
+  const materials = effectiveMaterials(getRun(id));
 
   if (!realMode) {
+    const doneIds = new Set(getRun(id).outputs.map((o) => o.stageId));
     for (const s of REPORT_PIPELINE) {
+      if (resume && doneIds.has(s.id)) continue;
       patch(id, { status: { ...getRun(id).status, [s.id]: "进行中" } });
       await sleep(480);
       patch(id, { outputs: [...getRun(id).outputs, mockStageOutput(s, input)], status: { ...getRun(id).status, [s.id]: "完成" } });
@@ -69,19 +87,30 @@ export async function startRun(id: string, input: PipelineInput): Promise<void> 
   }
 
   const ctx: PipelineCtx = { input, materials, outputs: {} };
+  for (const o of getRun(id).outputs) ctx.outputs[o.stageId] = o.summary;   // resume：复原已完成步的产物，供后续步依赖
   const fetchImpl = await getLlmFetch();
   for (const s of REPORT_PIPELINE) {
+    if (resume && ctx.outputs[s.id] != null) continue;
     patch(id, { status: { ...getRun(id).status, [s.id]: "进行中" } });
     const pick = cfg.agents[s.role];
     const p2 = providerById(cfg, pick.provider);
     try {
       const res = await makeClient(p2, fetchImpl).send(buildStageRequest(s, ctx, pick.model));
       ctx.outputs[s.id] = res.text;
-      patch(id, { outputs: [...getRun(id).outputs, { stageId: s.id, summary: res.text }], status: { ...getRun(id).status, [s.id]: "完成" } });
+      patch(id, { outputs: [...getRun(id).outputs.filter((o) => o.stageId !== s.id), { stageId: s.id, summary: res.text }], status: { ...getRun(id).status, [s.id]: "完成" } });
     } catch (e) {
       patch(id, { err: `${p2.label}（${s.role}）：${(e as Error).message.slice(0, 160)}`, status: { ...getRun(id).status, [s.id]: "待执行" }, running: false });
       return;
     }
   }
-  patch(id, { realReport: ctx.outputs["final"] ?? "", done: true, running: false });
+  const md = ctx.outputs["final"] ?? "";
+  patch(id, { realReport: md, done: true, running: false });
+  // #8：定稿完成即联动进报告库（同一单同类型自动更新，不产生重复）
+  if (md.trim()) {
+    const subject = input.company || input.industry;
+    saveReport({ analysisId: id, title: `${subject} · ${input.focus}`, subject, focus: input.focus, markdown: md });
+  }
 }
+
+export function startRun(id: string, input: PipelineInput): Promise<void> { return runPipeline(id, input, false); }
+export function resumeRun(id: string, input: PipelineInput): Promise<void> { return runPipeline(id, input, true); }

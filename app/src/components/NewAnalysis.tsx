@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Analysis, CellState, DIMENSIONS, Matrix, PHASE_COLS, PhaseCol } from "../types";
+import { Attachment } from "../llm/pipelineStore";
+import MaterialsInput from "./MaterialsInput";
 
 const ROLES = ["资金方", "场地资源方", "货源方", "运营方", "牵头整合", "客户方", "其他"];
 
@@ -30,6 +32,7 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
   const [ourRole, setOurRole] = useState("资金方");
   const [roleOther, setRoleOther] = useState("");
   const [materials, setMaterials] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const isCompany = focus === "企业画像";
   const isDeal = focus === "项目可行性";
@@ -54,7 +57,8 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
       matrix: emptyMatrix(),
       deliverables: [],
     };
-    onCreate(a, materials.trim());
+    const combined = [materials.trim(), ...attachments.map((x) => `【附件：${x.name}】\n${x.text}`)].filter(Boolean).join("\n\n");
+    onCreate(a, combined);
   };
 
   return (
@@ -118,9 +122,14 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
           </div>
         )}
 
-        <label className="fld"><span>本单资料（选填）</span>
-          <textarea className="key-input wide" rows={4} value={materials} placeholder="尽调稿 / 公开资料 / 已知数据…（越具体，分析越有据；建好即开始生成，也可稍后在深度分析里补充或上传 PDF）" onChange={(e) => setMaterials(e.target.value)} />
-        </label>
+        <div className="fld"><span>本单资料（选填）· 可上传多份 PDF，后台自动提取喂给分析</span>
+          <MaterialsInput
+            materials={materials} onMaterials={setMaterials}
+            attachments={attachments}
+            onAdd={(a) => setAttachments((xs) => [...xs.filter((x) => x.name !== a.name), a])}
+            onRemove={(n) => setAttachments((xs) => xs.filter((x) => x.name !== n))}
+          />
+        </div>
 
         <div className="na-actions">
           <button type="button" className="app-btn" disabled={!canCreate} onClick={create}>建好并开始深度分析 →</button>
