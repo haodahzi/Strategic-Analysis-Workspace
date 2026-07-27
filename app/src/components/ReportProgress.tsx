@@ -1,10 +1,12 @@
-import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { Analysis } from "../types";
 import { loadConfig, providerById } from "../config/store";
 import Markdown from "./Markdown";
 import { PipelineInput, REPORT_PIPELINE } from "../llm/pipeline";
 import { getRun, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
-import { exportClean } from "../export/exporter";
+import { houseDocFromMarkdown } from "../export/exporter";
+import { saveReport } from "../llm/reportLib";
+import ReportView from "./ReportView";
 import { extractPdfText } from "../lib/pdf";
 
 const ROLE_CLASS: Record<string, string> = {
@@ -27,8 +29,17 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   const cfg = loadConfig();
   const draftProv = providerById(cfg, cfg.agents["起草"].provider);
   const realMode = draftProv.id !== "mock";
-  const realRef = useRef<HTMLDivElement>(null);
   const [pdfBusy, setPdfBusy] = useState("");
+  const [houseView, setHouseView] = useState<{ title: string; doc: string } | null>(null);
+
+  // 一键排版（#7）：把定稿 markdown 排成房子样式，存入报告库并在工作台内查看
+  const openHouse = () => {
+    const md = realReport ?? "";
+    const title = `${subjectLabel} · ${input.focus}`;
+    const doc = houseDocFromMarkdown(md, { title, badges: [input.focus, analysis.industry].filter(Boolean) as string[] });
+    saveReport({ analysisId: analysis.id, title, subject: subjectLabel, focus: input.focus, markdown: md });
+    setHouseView({ title, doc });
+  };
 
   const appendMaterials = (text: string) => {
     if (!text) return;
@@ -114,9 +125,9 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
           <div className="rp-realwrap">
             <div className="rp-realhead">
               <div className="pipe-done-tag">✓ 定稿 · 待审初稿（可推翻；到「洽谈后 · 项目报告」可行内编辑 / 驳回 / 重估）</div>
-              <button type="button" className="app-btn ghost" onClick={() => exportClean(realRef.current, `${subjectLabel} · ${input.focus}`, `我方视角：${analysis.ourRole}`)}>一键排版 · 导出清洁版 HTML</button>
+              <button type="button" className="app-btn" onClick={openHouse}>一键排版 · 房子样式查看（存入报告库）</button>
             </div>
-            <div className="rp-realbody" ref={realRef}><Markdown text={realReport} /></div>
+            <div className="rp-realbody"><Markdown text={realReport} /></div>
           </div>
         )}
 
@@ -183,6 +194,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
           </div>
         )}
       </div>
+      {houseView && <ReportView title={houseView.title} doc={houseView.doc} onClose={() => setHouseView(null)} />}
     </div>
   );
 }

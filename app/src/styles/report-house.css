@@ -1,0 +1,133 @@
+/* 报告「房子样式」设计系统（复刻算力租赁样张，字体改为系统回退、去外链，供 iframe 隔离渲染 + 导出复用）。
+   类名与样张一致，作为报告母版；离线 / 无网络字体时经宋体·黑体·等宽回退仍正常。#15 */
+:root{
+  --bg:#f4f1eb;--surface:#fff;--surface2:#faf8f3;
+  --ink:#1a1712;--ink2:#484440;--ink3:#8a847c;
+  --border:#ddd8ce;--border2:#ece8e0;
+  --red:#b03020;--gold:#9a6c00;--teal:#1a6050;--blue:#1a3f72;--purple:#4a2878;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;
+  --sans:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans SC","Noto Sans CJK SC",sans-serif;
+  --mono:"IBM Plex Mono","SFMono-Regular",Consolas,"DejaVu Sans Mono",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.75}
+.wrap{max-width:980px;margin:0 auto;padding:0 24px 80px;background:var(--surface)}
+
+/* HERO */
+.hero{padding:48px 0 34px;border-bottom:3px double var(--border)}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--ink3);margin-bottom:16px;text-transform:uppercase}
+.hero-h{font-family:var(--serif);font-size:36px;font-weight:900;line-height:1.18;margin-bottom:12px}
+.hero-h em{font-style:normal;color:var(--gold)}
+.hero-sub{font-size:15px;color:var(--ink2);line-height:1.8;border-left:3px solid var(--gold);padding-left:18px;max-width:700px;margin-top:18px}
+.hero-badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.badge{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:4px 10px;border:1px solid var(--border);color:var(--ink3)}
+
+/* PART / CHAPTER / SECTION */
+.part{margin-top:56px;padding:22px 26px;background:var(--ink);color:#fff;display:flex;gap:20px;align-items:center}
+.part .p-n{font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--gold)}
+.part .p-t{font-family:var(--serif);font-size:22px;font-weight:700}
+.chapter{margin-top:44px}
+.ch-hd{display:flex;gap:18px;align-items:baseline;margin-bottom:22px;padding-bottom:12px;border-bottom:2px solid var(--ink)}
+.ch-n{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--border);line-height:1}
+.ch-meta .ch-title{font-family:var(--serif);font-size:20px;font-weight:700}
+.sec-t{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--ink);margin:22px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border2)}
+.sub-tag{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--ink3);margin:20px 0 9px;text-transform:uppercase}
+p{color:var(--ink2);margin:0 0 11px;font-size:14px}
+strong{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:.88em;background:var(--surface2);border:1px solid var(--border2);border-radius:3px;padding:1px 5px}
+a{color:var(--blue)}
+
+/* LISTS（样张缺，补齐） */
+.md-list{margin:8px 0 12px;padding-left:20px}
+.md-list li{color:var(--ink2);font-size:14px;line-height:1.7;margin:4px 0}
+.md-list li strong{color:var(--ink)}
+.md-ol{list-style:decimal}
+
+/* INSIGHT（结论 / 洞察框） */
+.insight{margin:16px 0;padding:18px 22px}
+.insight-tag{font-family:var(--mono);font-size:9px;letter-spacing:2px;margin-bottom:8px}
+.insight p{font-size:13px;margin-bottom:0;line-height:1.7}
+.insight.dark{background:var(--ink);color:rgba(255,255,255,.8)}.insight.dark .insight-tag{color:rgba(255,255,255,.4)}.insight.dark p{color:rgba(255,255,255,.72)}.insight.dark strong{color:#fff}
+.insight.gold{background:#faf3e0;border:1px solid #d4a017}.insight.gold .insight-tag{color:var(--gold)}.insight.gold p{color:var(--ink2)}
+.insight.teal{background:#e8f5f1;border:1px solid var(--teal)}.insight.teal .insight-tag{color:var(--teal)}.insight.teal p{color:var(--ink2)}
+.insight.red{background:#fdf0ee;border:1px solid var(--red)}.insight.red .insight-tag{color:var(--red)}.insight.red p{color:var(--ink2)}
+
+/* ANNO（批注 / 风险框） */
+.anno{border-left:3px solid var(--gold);padding:11px 16px;background:var(--surface2);margin:14px 0}
+.anno-tag{font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:1.5px;margin-bottom:5px}
+.anno p{font-size:13px;margin:0;line-height:1.65}
+.anno.blue{border-left-color:var(--blue)}.anno.teal{border-left-color:var(--teal)}.anno.red{border-left-color:var(--red)}.anno.purple{border-left-color:var(--purple)}.anno.gold{border-left-color:var(--gold)}
+
+/* GRID / CARD */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:14px 0}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+.card{background:var(--surface);border:1px solid var(--border2);padding:18px}
+.card-tag{font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:1.5px;margin-bottom:7px}
+.card-val{font-family:var(--serif);font-size:24px;font-weight:700;color:var(--ink);line-height:1.1;margin-bottom:3px}
+.card-val.teal{color:var(--teal)}.card-val.gold{color:var(--gold)}.card-val.red{color:var(--red)}.card-val.blue{color:var(--blue)}
+.card-sub{font-size:11px;color:var(--ink3);line-height:1.45}
+.card-body{font-size:13px;color:var(--ink2);line-height:1.65}
+.card-body strong{color:var(--ink)}
+.card-name{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px}
+
+/* QUOTE */
+.quote{font-family:var(--serif);font-size:18px;color:var(--ink);line-height:1.7;padding:20px 0;margin:22px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center}
+.quote span{display:block;font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:1px;margin-top:10px}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+th{text-align:left;padding:7px 12px;background:var(--ink);color:rgba(255,255,255,.82);font-weight:400;font-family:var(--mono);font-size:10px;letter-spacing:.4px}
+td{padding:8px 12px;border-bottom:1px solid var(--border2);color:var(--ink2);vertical-align:top}
+td:first-child{color:var(--ink);font-weight:500}
+tr:hover td{background:var(--surface2)}
+.tw{overflow-x:auto}
+
+/* VERDICT（深色结论区） */
+.verdict{background:var(--ink);padding:32px;margin-top:36px}
+.verdict-t{font-family:var(--serif);font-size:18px;font-weight:700;color:#fff;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.12)}
+.v-text{font-size:13px;color:rgba(255,255,255,.7);line-height:1.65}.v-text strong{color:#fff}
+
+hr{border:none;border-top:1px solid var(--border2);margin:26px 0}
+.foot{padding:22px 0;font-family:var(--mono);font-size:10px;color:var(--ink3);line-height:1.7;border-top:1px solid var(--border2);margin-top:32px}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+@media(max-width:720px){
+  .hero-h{font-size:28px}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .wrap{padding:0 16px 60px}
+}
+
+/* ============ A4 PRINT ============ */
+@page{size:A4;margin:15mm 14mm 16mm}
+@media print{
+  html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body{font-size:10.3pt;line-height:1.6}
+  .wrap{max-width:none;margin:0;padding:0}
+  .hero{padding:2mm 0 6mm;border-bottom-width:2px}
+  .hero-h{font-size:24pt;line-height:1.14}
+  .hero-sub{font-size:11pt;margin-top:12px}
+  .badge{font-size:8pt}.eyebrow{font-size:8.5pt}
+  .part{break-before:page;margin-top:0;padding:14px 18px}.part .p-t{font-size:16pt}
+  .chapter{margin-top:8mm}.chapter:first-of-type{margin-top:4mm}
+  .ch-hd{break-inside:avoid;break-after:avoid;margin-bottom:12px}
+  .ch-n{font-size:22pt}.ch-meta .ch-title{font-size:15pt}
+  .sec-t{break-after:avoid;font-size:12pt;margin-top:12px}
+  .sub-tag{break-after:avoid;font-size:8pt}
+  p{font-size:10.3pt;margin-bottom:7px;orphans:2;widows:2}
+  .md-list li{font-size:10.3pt}
+  .card,.anno,.insight,.quote,.foot,.verdict{break-inside:avoid}
+  .g2,.g3,.g4{gap:9px;margin:9px 0}
+  .card{padding:11px 13px}.card-val{font-size:20pt}
+  .anno p,.insight p{font-size:9.3pt;line-height:1.5}
+  .quote{font-size:14pt;padding:14px 0}
+  table{font-size:9pt;break-inside:auto}
+  thead{display:table-header-group}
+  tr{break-inside:avoid}
+  th,td{padding:5px 9px}
+  .tw{overflow:visible}
+  a{color:var(--ink);text-decoration:none}
+}

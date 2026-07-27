@@ -1,6 +1,8 @@
 // 浏览器侧导出胶水（Tauri webview 内运行）。第二段可换成 Tauri fs/dialog 保存到本地。
 import reportCss from "../styles/report.css?raw";
+import houseCss from "../styles/report-house.css?raw";
 import { buildCleanDoc, buildStandaloneHtml, buildWordHtml } from "./build";
+import { HouseMeta, buildHouseDoc, mdToHouseHtml } from "./house";
 
 export type ExportKind = "html" | "word" | "pdf";
 
@@ -33,4 +35,14 @@ export function exportReport(el: HTMLElement | null, title: string, kind: Export
 /** 一键排版·清洁版 HTML（#4c）：把深度分析成稿（.md 结构）导成印刷级独立文档。 */
 export function exportClean(el: HTMLElement | null, title: string, subtitle?: string) {
   download(`${title}.html`, buildCleanDoc(el ? el.innerHTML : "", title, subtitle), "text/html;charset=utf-8");
+}
+
+/** 把 markdown 定稿排成「房子样式」独立文档（用于工作台内 iframe 查看 + 导出，同一份 HTML）。#7 #15 */
+export function houseDocFromMarkdown(markdown: string, meta: HouseMeta): string {
+  return buildHouseDoc(mdToHouseHtml(markdown), houseCss, meta);
+}
+
+/** 下载一份已经构建好的 HTML 文档。 */
+export function downloadHtmlDoc(title: string, doc: string) {
+  download(`${title}.html`, doc, "text/html;charset=utf-8");
 }

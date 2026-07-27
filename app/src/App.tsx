@@ -7,8 +7,9 @@ import IndustryReport from "./components/IndustryReport";
 import Settings from "./components/Settings";
 import NewAnalysis from "./components/NewAnalysis";
 import ProjectWorkspace from "./components/ProjectWorkspace";
+import ReportLibrary from "./components/ReportLibrary";
 
-type View = "dashboard" | "project" | "kb" | "settings" | "new";
+type View = "dashboard" | "project" | "kb" | "settings" | "new" | "reports";
 
 const STAGE_CLASS: Record<Stage, string> = {
   调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -63,6 +64,7 @@ export default function App() {
           <div className="nav-group">导航</div>
           {navItem("dashboard", "▤ 研究分析总览")}
           {navItem("new", "✚ 新建分析")}
+          {navItem("reports", "▦ 报告库")}
           {navItem("kb", "▧ 交付物库")}
           {navItem("settings", "⚙ 设置")}
 
@@ -87,6 +89,7 @@ export default function App() {
             ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
             : <ProjectWorkspace analysis={project} />)}
           {view === "kb" && <KnowledgeBase onOpenSample={() => openProject(suanli.id, true)} />}
+          {view === "reports" && <ReportLibrary />}
           {view === "settings" && <Settings />}
         </main>
       </div>
