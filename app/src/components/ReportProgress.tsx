@@ -1,10 +1,11 @@
-import { useCallback, useRef, useSyncExternalStore } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { Analysis } from "../types";
 import { loadConfig, providerById } from "../config/store";
 import Markdown from "./Markdown";
 import { PipelineInput, REPORT_PIPELINE } from "../llm/pipeline";
 import { getRun, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
 import { exportClean } from "../export/exporter";
+import { extractPdfText } from "../lib/pdf";
 
 const ROLE_CLASS: Record<string, string> = {
   规划: "r-plan", 资料: "r-plan", 起草: "r-draft", 红队: "r-red", 定稿: "r-final", 验收: "r-check",
@@ -27,6 +28,28 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   const draftProv = providerById(cfg, cfg.agents["起草"].provider);
   const realMode = draftProv.id !== "mock";
   const realRef = useRef<HTMLDivElement>(null);
+  const [pdfBusy, setPdfBusy] = useState("");
+
+  const appendMaterials = (text: string) => {
+    if (!text) return;
+    const cur = getRun(analysis.id).materials;
+    setMaterials(analysis.id, cur ? cur + "\n\n" + text : text);
+  };
+  const onPickFile = async (f?: File) => {
+    if (!f) return;
+    if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") {
+      setPdfBusy("解析 PDF…");
+      try {
+        const text = await extractPdfText(f, (p, t) => setPdfBusy(`解析 PDF… ${p}/${t} 页`));
+        appendMaterials(text);
+        setPdfBusy(text.trim() ? "" : "这份 PDF 没提取到文本（多为扫描件 / 图片，需 OCR，暂不支持）");
+      } catch (e) { setPdfBusy("PDF 解析失败：" + (e as Error).message.slice(0, 120)); }
+    } else {
+      const r = new FileReader();
+      r.onload = () => appendMaterials(String(r.result ?? ""));
+      r.readAsText(f);
+    }
+  };
 
   const outMap = new Map(outputs.map((o) => [o.stageId, o.summary]));
   const doneCount = REPORT_PIPELINE.filter((s) => status[s.id] === "完成").length;
@@ -50,9 +73,15 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
           <div className="pipe-empty">
             <div className="pipe-empty-h">深度分析尚未生成</div>
             <p>多智能体流水线（规划 → 资料 → 起草 → 红队 → 定稿 → 验收）逐步产出，<strong>后台运行、切换页面不中断</strong>。{realMode ? "各子任务走你配置的真实模型，红队换一款互查。" : "当前无真实 Key，仅演示流程、内容为示例；到设置为子任务配置真实模型后再生成本单真实分析。"}</p>
-            <label className="fld" style={{ textAlign: "left", maxWidth: 560, margin: "0 auto 14px" }}><span>本单资料（可选，喂给「资料 / 起草」：尽调稿 / 对方资料 / 已知数据）</span>
-              <textarea className="key-input wide" rows={4} value={materials} placeholder="粘贴本单已知材料…（越具体，分析越有据）" onChange={(e) => setMaterials(analysis.id, e.target.value)} />
+            <label className="fld" style={{ textAlign: "left", maxWidth: 560, margin: "0 auto 8px" }}>
+              <span>本单资料（可选，喂给「资料 / 起草」：尽调稿 / 对方资料 / 已知数据）
+                <label className="mn-upload" style={{ marginLeft: 8 }}>上传 PDF / 文本
+                  <input type="file" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain" onChange={(e) => { void onPickFile(e.target.files?.[0]); e.target.value = ""; }} />
+                </label>
+              </span>
+              <textarea className="key-input wide" rows={4} value={materials} placeholder="粘贴本单已知材料，或上传尽调 PDF 自动提取…（越具体，分析越有据）" onChange={(e) => setMaterials(analysis.id, e.target.value)} />
             </label>
+            {pdfBusy && <div className="set-hint" style={{ maxWidth: 560, margin: "0 auto 12px" }}>{pdfBusy}</div>}
             <button type="button" className="app-btn" onClick={() => void startRun(analysis.id, input)}>生成深度分析 →</button>
           </div>
         )}

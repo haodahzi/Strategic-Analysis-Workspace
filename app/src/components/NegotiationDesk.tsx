@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Analysis, QItem } from "../types";
 import QuestionList from "./QuestionList";
+import { extractPdfText } from "../lib/pdf";
 
 // 洽谈中 · 单屏工作台：对照问题逐条记录（查漏补缺）+ 清单外额外信息 + 事后导入解析。
 // 三块合一，不再切 tab。
@@ -10,9 +11,19 @@ export default function NegotiationDesk(
 ) {
   const [paste, setPaste] = useState("");
   const [parsed, setParsed] = useState<string[] | null>(null);
+  const [pdfBusy, setPdfBusy] = useState("");
 
-  const onUpload = (f: File | undefined) => {
+  const onUpload = async (f: File | undefined) => {
     if (!f) return;
+    if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") {
+      setPdfBusy("解析 PDF…");
+      try {
+        const text = await extractPdfText(f, (p, t) => setPdfBusy(`解析 PDF… ${p}/${t} 页`));
+        setPaste(text);
+        setPdfBusy(text.trim() ? "" : "这份 PDF 没提取到文本（多为扫描件 / 图片，需 OCR，暂不支持）");
+      } catch (e) { setPdfBusy("PDF 解析失败：" + (e as Error).message.slice(0, 120)); }
+      return;
+    }
     const r = new FileReader();
     r.onload = () => setPaste(String(r.result ?? ""));
     r.readAsText(f);
@@ -44,14 +55,15 @@ export default function NegotiationDesk(
       />
 
       <div className="sec-head">③ 事后导入 · 解析（同屏，无需切页）
-        <label className="mn-upload">上传文本
-          <input type="file" accept=".txt,.md,.csv,text/plain" onChange={(e) => onUpload(e.target.files?.[0])} />
+        <label className="mn-upload">上传 PDF / 文本
+          <input type="file" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain" onChange={(e) => { void onUpload(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
       </div>
+      {pdfBusy && <div className="set-hint" style={{ marginBottom: 8 }}>{pdfBusy}</div>}
       <textarea
         className="nd-paste"
         value={paste}
-        placeholder="粘贴会议纪要 / 转写文本，或点上方「上传文本」…（V1 只收文本，语音转写留后续）"
+        placeholder="粘贴会议纪要 / 转写文本，或点上方「上传 PDF / 文本」自动提取…（语音转写留后续）"
         onChange={(e) => setPaste(e.target.value)}
       />
       <div className="nd-actions">
