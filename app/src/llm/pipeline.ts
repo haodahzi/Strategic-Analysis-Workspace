@@ -131,6 +131,77 @@ export function mockStageOutput(stage: PipelineStage, input: PipelineInput): Sta
   }
 }
 
+// ——洽谈清单一键生成（#5）：由深度分析（有则接地）提炼「洽谈前必须搞清」的重点。——
+export interface ChecklistItem { text: string; intent: "要查" | "要问对方" | "待搞清"; dealBreaker?: boolean; }
+
+export function buildChecklistRequest(input: PipelineInput, reportText: string, model: string): ChatRequest {
+  const { subject } = frameFor(input);
+  const head = `${subject} · 我方「${input.ourRole}」· 类型「${input.focus}」。`;
+  const ground = reportText.trim()
+    ? `下面是这单已完成的深度分析，请据此提炼（紧扣其中的命门变量、有名有姓的风险、判断卡里的 falsifiers）：\n\n${reportText.trim()}`
+    : "（暂无深度分析，按内置框架与常识提炼。）";
+  const user = `${head}\n${ground}\n\n列出这次洽谈前必须搞清的重点清单——只留「能改变决策」的问题，不要泛泛而谈。每行一条，严格用下面的标签格式，不加编号、不加解释：\n` +
+    "[要查] 我方自己能核实 / 查证的（数据、资质、履约记录、四流一致…）\n" +
+    "[要问对方] 只有当面问对方才能确认的（真实诉求、底线、决策链、退路…）\n" +
+    "[待搞清] 归属未定、但必须弄清的\n" +
+    "若某条错了就能推翻整单，在该行末尾加 ◆。最多 12 条，按重要性排序，能推翻这单的排最前。";
+  return { model, system: "你是我方的洽谈军师，只列能改变决策的关键问题，严格按给定标签格式逐行输出。", messages: [{ role: "user", content: user }], maxTokens: 1500 };
+}
+
+const INTENT_TAGS: ChecklistItem["intent"][] = ["要查", "要问对方", "待搞清"];
+
+// 容错解析：吃掉编号/项目符号，认标签（半/全角括号皆可），◆/★/「能推翻」判 deal-breaker。
+export function parseChecklist(text: string): ChecklistItem[] {
+  const out: ChecklistItem[] = [];
+  for (const raw of text.replace(/\r/g, "").split("\n")) {
+    let line = raw.trim().replace(/^[-*·•]\s*/, "").replace(/^\d+[.、)]\s*/, "").trim();
+    if (!line) continue;
+    const dealBreaker = /◆|★|能推翻|deal[-\s]?breaker/i.test(line);
+    line = line.replace(/[◆★]/g, "").replace(/[（(]?能推翻(这单|整单)?[）)]?/g, "").trim();
+    const m = /^[【\[]\s*(要查|要问对方|待搞清)\s*[】\]]\s*[:：]?\s*(.+)$/.exec(line);
+    let intent: ChecklistItem["intent"] = "待搞清";
+    let body = line;
+    if (m) { intent = m[1] as ChecklistItem["intent"]; body = m[2].trim(); }
+    else if (/^(要查|要问对方|待搞清)\s*[:：]/.test(line)) {
+      const t = INTENT_TAGS.find((x) => line.startsWith(x))!;
+      intent = t; body = line.slice(t.length).replace(/^[:：]\s*/, "").trim();
+    } else if (/^(查证?|核实|核查)/.test(line)) intent = "要查";
+    else if (/(问对方|向对方|当面问)/.test(line)) intent = "要问对方";
+    body = body.replace(/[:：]\s*$/, "").trim();
+    if (body.length >= 2 && /[\p{L}\p{N}]/u.test(body)) out.push({ text: body, intent, dealBreaker: dealBreaker || undefined });
+  }
+  return out;
+}
+
+export function mockChecklist(input: PipelineInput): ChecklistItem[] {
+  const { focus, counterparty, company, industry } = input;
+  const who = company || counterparty || "对方";
+  if (focus?.includes("企业")) return [
+    { text: `${who}的真实诉求：为什么现在找我方、急不急、退路（BATNA）是什么`, intent: "要问对方", dealBreaker: true },
+    { text: `${who}最近 3 年财务：增长、利润率、现金流是否与其说法一致`, intent: "要查" },
+    { text: "谁真正拍板、关键人各自诉求（决策链）", intent: "要问对方" },
+    { text: `${who}客户集中度与大客户履约 / 续约情况`, intent: "要查" },
+    { text: "名实是否一致——有无对外披露与实际经营背离的硬伤", intent: "要查", dealBreaker: true },
+    { text: "我方筹码与软肋：这桩合作里我方不可替代在哪、命门在哪", intent: "待搞清" },
+  ];
+  if (focus?.includes("项目")) return [
+    { text: "合规红线 / 资质牌照是否齐全（能不能做的硬约束）", intent: "要查", dealBreaker: true },
+    { text: `资金 / 货物 / 合同 / 发票四流是否一致（${who}）`, intent: "要查", dealBreaker: true },
+    { text: `${who}的真实诉求与底线、退路是什么`, intent: "要问对方" },
+    { text: "各方出什么 / 拿什么，交易结构与增信安排", intent: "要问对方" },
+    { text: "ROI 测算的关键口径（成本、周期、退出路径）能否复核", intent: "要查" },
+    { text: "履约与退出风险：违约怎么办、怎么退得出来", intent: "待搞清" },
+  ];
+  return [
+    { text: `${industry}的盈利公式与单位经济是否成立（收入＝量×价、成本结构）`, intent: "要查" },
+    { text: "主要玩家、集中度与进入壁垒——头部靠什么守", intent: "要查" },
+    { text: "利润沉在价值链哪一段、议价力沿链条如何转移", intent: "要查" },
+    { text: "政策 / 牌照 / 监管方向有无硬约束或临界变化", intent: "要查", dealBreaker: true },
+    { text: "现在处在周期什么位置——该等还是该抢", intent: "待搞清" },
+    { text: "反方：什么会杀死这门生意、是否正被高估或结构性衰退", intent: "待搞清" },
+  ];
+}
+
 export function mockReport(input: PipelineInput): MockReport {
   const ind = input.industry, role = input.ourRole;
   return {

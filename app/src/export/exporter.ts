@@ -1,6 +1,6 @@
 // 浏览器侧导出胶水（Tauri webview 内运行）。第二段可换成 Tauri fs/dialog 保存到本地。
 import reportCss from "../styles/report.css?raw";
-import { buildStandaloneHtml, buildWordHtml } from "./build";
+import { buildCleanDoc, buildStandaloneHtml, buildWordHtml } from "./build";
 
 export type ExportKind = "html" | "word" | "pdf";
 
@@ -28,4 +28,9 @@ export function exportReport(el: HTMLElement | null, title: string, kind: Export
   } else {
     download(`${title}.doc`, buildWordHtml(inner, reportCss, title), "application/msword");
   }
+}
+
+/** 一键排版·清洁版 HTML（#4c）：把深度分析成稿（.md 结构）导成印刷级独立文档。 */
+export function exportClean(el: HTMLElement | null, title: string, subtitle?: string) {
+  download(`${title}.html`, buildCleanDoc(el ? el.innerHTML : "", title, subtitle), "text/html;charset=utf-8");
 }

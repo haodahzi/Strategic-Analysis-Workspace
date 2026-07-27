@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { buildStandaloneHtml, buildWordHtml, escapeHtml } from "./build";
+import { buildCleanDoc, buildStandaloneHtml, buildWordHtml, escapeHtml } from "./build";
 
 const css = ":root{--gold:#9a6c00}\n.report .hero{padding:1px}";
 const inner = '<div class="report"><div class="wrap"><h1 class="hero-h">判断的样子</h1></div></div>';
@@ -26,6 +26,16 @@ describe("导出构建器", () => {
     expect(w).toContain('<div class="WordSection1">');
     expect(w).toContain("@page WordSection1");
     expect(w).toContain("判断的样子");
+  });
+
+  it("清洁版文档：doctype / 标题 / 副标题 / 自带样式 / 打印 @page / 内容", () => {
+    const c = buildCleanDoc('<div class="md"><div class="md-h2">格局</div><p>正文</p></div>', "算力租赁·深度分析", "我方视角：资金方");
+    expect(c).toContain("<!doctype html");
+    expect(c).toContain("<h1 class=\"c-title\">算力租赁·深度分析</h1>");
+    expect(c).toContain("我方视角：资金方");
+    expect(c).toContain(".md-h2");
+    expect(c).toContain("@page");
+    expect(c).toContain("格局");
   });
 });
 

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { REPORT_PIPELINE, mockStageOutput, mockReport, buildStageRequest } from "./pipeline";
+import {
+  REPORT_PIPELINE, mockStageOutput, mockReport, buildStageRequest,
+  buildChecklistRequest, parseChecklist, mockChecklist,
+} from "./pipeline";
 
 describe("多智能体报告流水线", () => {
   it("流水线为 规划→资料→起草→红队→定稿→验收 六步", () => {
@@ -43,5 +46,41 @@ describe("多智能体报告流水线", () => {
     expect(rep.risks.some((r) => r.dealBreaker)).toBe(true);
     expect(rep.judgment.falsifiers.length).toBeGreaterThan(0);
     expect(rep.judgment.stance && rep.judgment.confidence && rep.judgment.grounds.length).toBeTruthy();
+  });
+});
+
+describe("洽谈清单一键生成（#5）", () => {
+  it("buildChecklistRequest：有成稿时接地，带主体与标签格式说明", () => {
+    const input = { industry: "算力租赁", ourRole: "资金方", focus: "项目可行性", counterparty: "某智算" };
+    const req = buildChecklistRequest(input, "报告正文：命门是四流一致…", "m1");
+    expect(req.model).toBe("m1");
+    expect(req.messages[0].content).toContain("某智算");
+    expect(req.messages[0].content).toContain("命门是四流一致");
+    expect(req.messages[0].content).toContain("[要问对方]");
+  });
+
+  it("parseChecklist：认标签、吃编号/项目符号、◆ 判 deal-breaker，纯分隔行丢弃", () => {
+    const items = parseChecklist(
+      "1. [要查] 四流是否一致 ◆\n- [要问对方] 对方真实诉求是什么\n【待搞清】周期位置\n\n---",
+    );
+    expect(items.length).toBe(3);
+    expect(items[0]).toMatchObject({ intent: "要查", dealBreaker: true });
+    expect(items[0].text).toBe("四流是否一致");
+    expect(items[1].intent).toBe("要问对方");
+    expect(items[2].intent).toBe("待搞清");
+  });
+
+  it("parseChecklist：无标签行按关键词兜底归类，纯分隔符行丢弃", () => {
+    const items = parseChecklist("核实对方资质\n向对方问清底线\n————");
+    expect(items.map((i) => i.intent)).toEqual(["要查", "要问对方"]);
+  });
+
+  it("mockChecklist：三种类型都产出、意图取值合法、至少一条 deal-breaker", () => {
+    for (const focus of ["行业深度分析", "企业画像", "项目可行性"]) {
+      const items = mockChecklist({ industry: "算力租赁", ourRole: "资金方", focus, company: "甲", counterparty: "乙" });
+      expect(items.length).toBeGreaterThan(3);
+      expect(items.every((i) => ["要查", "要问对方", "待搞清"].includes(i.intent))).toBe(true);
+      expect(items.some((i) => i.dealBreaker)).toBe(true);
+    }
   });
 });

@@ -3,9 +3,10 @@ import { QItem } from "../types";
 const INTENTS: QItem["intent"][] = ["要查", "要问对方", "待搞清"];
 
 // 洽谈重点清单 —— 全条目可编辑（#6）：改文字/意图、增删、标 deal-breaker、洽谈中回填答案。
+// onGenerate 存在时露出「一键生成」（#5），由父组件负责调模型。
 export default function QuestionList(
-  { items, onChange, mode }:
-  { items: QItem[]; onChange: (next: QItem[]) => void; mode: "编辑" | "核对" },
+  { items, onChange, mode, onGenerate, generating }:
+  { items: QItem[]; onChange: (next: QItem[]) => void; mode: "编辑" | "核对"; onGenerate?: () => void; generating?: boolean },
 ) {
   const upd = (id: string, p: Partial<QItem>) => onChange(items.map((q) => (q.id === id ? { ...q, ...p } : q)));
   const del = (id: string) => onChange(items.filter((q) => q.id !== id));
@@ -21,7 +22,10 @@ export default function QuestionList(
     <div className="ql">
       <div className="ql-head">
         <div>洽谈清单 · <strong>{items.length}</strong> 条{mode === "核对" && <span className="ql-open"> · 待核对 {open}</span>}</div>
-        <button type="button" className="app-btn ghost dark" onClick={add}>+ 加一条</button>
+        <div className="ql-head-actions">
+          {onGenerate && <button type="button" className="app-btn" disabled={generating} onClick={onGenerate}>{generating ? "生成中…" : "✨ 一键生成"}</button>}
+          <button type="button" className="app-btn ghost dark" onClick={add}>+ 加一条</button>
+        </div>
       </div>
 
       <ol className="ql-list">
@@ -64,7 +68,7 @@ export default function QuestionList(
           </li>
         ))}
       </ol>
-      {items.length === 0 && <div className="set-hint">清单为空——点「+ 加一条」，或先在「调研前」生成深度分析以立起前提假设。</div>}
+      {items.length === 0 && <div className="set-hint">清单为空——{onGenerate ? "点「✨ 一键生成」由 AI 按本单情形提炼重点（有深度分析会更贴命门），" : ""}或「+ 加一条」自己写。</div>}
     </div>
   );
 }

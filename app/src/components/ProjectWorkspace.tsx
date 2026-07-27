@@ -6,6 +6,8 @@ import ReportProgress from "./ReportProgress";
 import QuestionList from "./QuestionList";
 import NegotiationDesk from "./NegotiationDesk";
 import ProjectReport from "./ProjectReport";
+import { generateChecklist } from "../llm/checklist";
+import { getRun } from "../llm/pipelineStore";
 
 const STAGE_CLASS: Record<Stage, string> = { 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
 
@@ -38,9 +40,29 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
   });
   const [questions, setQuestions] = useState<QItem[]>(() => seedQuestions(analysis));
   const [notes, setNotes] = useState("");
+  const [genLoading, setGenLoading] = useState(false);
+  const [genErr, setGenErr] = useState("");
 
   const pickPhase = (s: Stage) => { setPhase(s); setTab(PHASE_TABS[s][0].key); };
   const tabs = PHASE_TABS[phase];
+
+  const genChecklist = async () => {
+    setGenLoading(true); setGenErr("");
+    try {
+      const input = {
+        industry: analysis.industry, ourRole: analysis.ourRole, focus: analysis.focus ?? "行业深度分析",
+        company: analysis.company, counterparty: analysis.counterparty,
+      };
+      const items = await generateChecklist(input, getRun(analysis.id).realReport ?? "");
+      const now = Date.now().toString(36);
+      const add: QItem[] = items.map((it, i) => ({ id: `q-gen-${now}-${i}`, text: it.text, intent: it.intent, dealBreaker: it.dealBreaker }));
+      setQuestions((cur) => [...cur, ...add]);
+    } catch (e) {
+      setGenErr((e as Error).message.slice(0, 140));
+    } finally {
+      setGenLoading(false);
+    }
+  };
 
   return (
     <div className="pw">
@@ -72,7 +94,10 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
           <ReportProgress analysis={analysis} onBack={() => setTab("board")} />
         )}
         {phase === "调研前" && tab === "questions" && (
-          <div className="dash"><QuestionList items={questions} onChange={setQuestions} mode="编辑" /></div>
+          <div className="dash">
+            <QuestionList items={questions} onChange={setQuestions} mode="编辑" onGenerate={() => void genChecklist()} generating={genLoading} />
+            {genErr && <div className="set-hint" style={{ color: "var(--danger,#c0392b)", marginTop: 8 }}>生成失败：{genErr}（可先到设置为「起草」配置真实模型，或手动加条目）</div>}
+          </div>
         )}
         {phase === "洽谈中" && tab === "desk" && (
           <div className="dash">

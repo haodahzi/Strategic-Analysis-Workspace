@@ -1,9 +1,10 @@
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useRef, useSyncExternalStore } from "react";
 import { Analysis } from "../types";
 import { loadConfig, providerById } from "../config/store";
 import Markdown from "./Markdown";
 import { PipelineInput, REPORT_PIPELINE } from "../llm/pipeline";
 import { getRun, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
+import { exportClean } from "../export/exporter";
 
 const ROLE_CLASS: Record<string, string> = {
   规划: "r-plan", 资料: "r-plan", 起草: "r-draft", 红队: "r-red", 定稿: "r-final", 验收: "r-check",
@@ -25,6 +26,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   const cfg = loadConfig();
   const draftProv = providerById(cfg, cfg.agents["起草"].provider);
   const realMode = draftProv.id !== "mock";
+  const realRef = useRef<HTMLDivElement>(null);
 
   const outMap = new Map(outputs.map((o) => [o.stageId, o.summary]));
   const doneCount = REPORT_PIPELINE.filter((s) => status[s.id] === "完成").length;
@@ -81,8 +83,11 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
         {/* 真实模型成品：定稿文本 */}
         {done && realReport !== null && (
           <div className="rp-realwrap">
-            <div className="pipe-done-tag">✓ 定稿 · 待审初稿（可推翻；到「洽谈后 · 项目报告」可行内编辑 / 驳回 / 重估）</div>
-            <div className="rp-realbody"><Markdown text={realReport} /></div>
+            <div className="rp-realhead">
+              <div className="pipe-done-tag">✓ 定稿 · 待审初稿（可推翻；到「洽谈后 · 项目报告」可行内编辑 / 驳回 / 重估）</div>
+              <button type="button" className="app-btn ghost" onClick={() => exportClean(realRef.current, `${subjectLabel} · ${input.focus}`, `我方视角：${analysis.ourRole}`)}>一键排版 · 导出清洁版 HTML</button>
+            </div>
+            <div className="rp-realbody" ref={realRef}><Markdown text={realReport} /></div>
           </div>
         )}
 
