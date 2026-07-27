@@ -1,6 +1,7 @@
-// 多智能体报告流水线：规划→资料研判→起草→红队反驳→定稿→验收。
-// 每个 stage 都是用户可见的「子任务」，各自可路由不同模型；红队宜换一家/一款互查。
-// 纯逻辑（stage 定义、Mock 内容、各 agent 的请求组装）在此；异步链在 ReportProgress 里驱动。
+// 多智能体研究流水线：规划→资料研判→起草→事实与中立性审查→定稿→验收。
+// 定位（重要）：所有报告都是中性、客观的研究——把行业/公司/这单「到底是什么样」讲清楚，
+// 有节制的判断、正反兼陈，绝不编造事实，尤其绝不虚构「我方」的数据、能力或筹码。
+// 每个 stage 是用户可见的「子任务」，各自可路由不同模型；审查宜换一家/一款互查。
 import { AgentRole, ChatRequest } from "./types";
 
 export interface PipelineStage {
@@ -14,138 +15,116 @@ export interface PipelineInput { industry: string; ourRole: string; focus: strin
 export interface StageResult { stageId: string; summary: string; }
 
 export const REPORT_PIPELINE: PipelineStage[] = [
-  { id: "plan", role: "规划", title: "拆解框架", detail: "依据 Step 0 定框，列出报告骨架：决策主心骨 / 分层轴 / 命门变量" },
-  { id: "research", role: "资料", title: "资料研判", detail: "读入本单材料（尽调稿 / 对方资料 / 交付物库），抽取关键事实与数据作为起草依据；缺料处标「需补」" },
-  { id: "draft", role: "起草", title: "起草初稿", detail: "按骨架 + 资料产出判断卡、行业分层、量化区间（每条标口径）" },
-  { id: "red", role: "红队", title: "红队反驳", detail: "换一模型挑漏洞：证据够不够、口径清不清、风险有没有名有姓、falsifiers 够不够狠" },
-  { id: "final", role: "定稿", title: "吸收反驳 · 定稿", detail: "逐条回应红队意见，产出终稿（仍为待审初稿）" },
-  { id: "check", role: "验收", title: "自检验收 6 线", detail: "对照 6 条验收线逐条打钩，缺项打回" },
+  { id: "plan", role: "规划", title: "拆解框架", detail: "按内置研究框架列出内容骨架：这门生意 / 这家公司 / 这单到底是什么样" },
+  { id: "research", role: "资料", title: "资料研判", detail: "读入本单材料（尽调稿 / 公开资料 / 已知数据），抽取关键事实与数据；缺料标「需补」、未公开标「未公开」" },
+  { id: "draft", role: "起草", title: "起草初稿", detail: "按骨架 + 资料产出中性客观的研究综述：先事实与逻辑、再有节制的判断，量化必带口径 / 来源" },
+  { id: "red", role: "红队", title: "事实与中立性审查", detail: "换一模型审查：有无无来源的断言、疑似编造（尤其编造我方数据 / 筹码）、一边倒的倾向、口径含糊" },
+  { id: "final", role: "定稿", title: "采纳意见 · 定稿", detail: "逐条采纳审查意见，产出中性定稿（正反兼陈、信息不足处如实说明；仍为待审初稿）" },
+  { id: "check", role: "验收", title: "自检验收 5 线", detail: "对照 5 条验收线逐条打钩：事实有据 / 缺口已标 / 中性无编造 / 结构清楚 / 内容齐全" },
 ];
 
 // ——真实模型路径：每个 stage 的提示词组装（纯函数、可单测）。前一步产物喂给下一步。——
 export interface PipelineCtx {
   input: PipelineInput;
-  materials: string;                 // 用户提供的本单资料（尽调稿/对方资料等）
+  materials: string;                 // 用户提供的本单资料（尽调稿/公开资料等）
   outputs: Record<string, string>;   // 已完成 stage 的文本产出，按 stageId
 }
 
 const AGENT_SYS: Record<AgentRole, string> = {
-  规划: "你是资深行研规划师，先搭骨架再落笔。",
-  资料: "你是尽调分析师：只依据给定材料抽取事实，材料没有的标「需补」，绝不杜撰。",
-  起草: "你是行业深度分析师。每个判断给「立场/依据/把握度/falsifiers」四段，每个量化区间必带口径。直接输出分析正文，不写「作为分析师」「以下是」这类自我指涉或套话，不复述任务；用 markdown 小标题与要点列表，便于阅读复核。",
-  红队: "你是红队评审，专挑漏洞、不留情面，只针对证据、口径、风险命名与 falsifiers 的硬伤。",
-  定稿: "你是主笔，吸收红队意见定稿；结论仍是「待审初稿」，可被推翻。直接输出成稿正文，不要自我指涉或复述任务，用 markdown 结构（小标题+要点列表）清晰呈现，便于阅读。",
+  规划: "你是严谨的研究分析师，先搭客观的内容骨架，只据事实、不预设立场。",
+  资料: "你是尽调分析师：只依据给定材料抽取事实，材料没有的标「需补」、未公开的标「未公开」，绝不杜撰。",
+  起草: "你是严谨的行业 / 企业研究分析师。行文中性客观，把对象「到底是什么样」讲清楚：先事实与逻辑，再给有节制的判断；正反兼陈，不做空也不唱多。只用给定材料与公认事实，缺失处标「需补」或「未公开」，绝不虚构数据，也绝不虚构「我方」的能力、数据或筹码。直接输出正文，不写自我指涉或套话，用 markdown 小标题与要点列表。",
+  红队: "你是事实与中立性审查员：检查有无未标来源的断言、有无编造（尤其编造我方数据 / 筹码）、有无一边倒的倾向、口径是否清楚。只列必须修正处，不添加新的倾向。",
+  定稿: "你是主笔，据审查意见定稿：保持中性客观、正反兼陈；结论有节制，信息不足处如实说明、不臆断。直接输出成稿正文，用 markdown 结构清晰呈现。",
   验收: "你是质检，对照验收线逐条打钩，缺一条就点名。",
 };
 
-// 内置行业研究框架：资深分析师看一门生意的决策式结构（方法内化，不贴教科书标签）。
-// 定框已并入此处——由「规划」agent 落到具体行业，不再是独立 UI 步骤。
+// 内置行业研究框架：客观讲清「这个行业到底是什么样」——不给投资建议、不谈卡位、不预设立场。
 export const INDUSTRY_FRAME =
-  "① 这门生意的本质（靠什么赚钱、价值从哪来）｜② 需求（谁在买、为什么买、付费意愿与需求趋势）｜" +
-  "③ 供给与格局（主要玩家、集中度、进入壁垒）｜④ 价值链与利润池（利润沉在哪段、议价力沿链条如何转移、卡脖子在哪）｜" +
-  "⑤ 技术与替代（颠覆性技术、替代方案、技术成熟度曲线）｜⑥ 盈利公式与单位经济（收入＝量×价、成本结构、利润驱动、规模 / 网络效应）｜" +
-  "⑦ 护城河（头部靠什么守、能否复制）｜⑧ 政策与宏观（监管方向、政策风险、宏观周期）｜" +
-  "⑨ 资本视角（谁在投、估值倍数、并购活跃度——钱往哪走本身是信号）｜⑩ 周期与时点（现在处在什么位置、风往哪吹、该等还是该抢）｜" +
-  "⑪ 唱衰 / 反方（当前是否被高估、是否正结构性衰退、什么会杀死这门生意、前瞻信号）｜⑫ 对我方的含义（该盯什么、筹码 / 软肋、什么条件下值得下注）";
+  "① 行业本质（这门生意靠什么创造价值、靠什么赚钱）｜② 需求侧（谁在买、为什么买、需求由什么驱动、趋势）｜" +
+  "③ 供给与竞争格局（主要玩家、集中度、进入壁垒）｜④ 价值链与利润分布（上下游构成、利润沉在哪段、议价力如何分布）｜" +
+  "⑤ 商业模式与盈利公式（典型收入＝量×价、成本结构、单位经济、规模 / 网络效应）｜" +
+  "⑥ 技术与演进（关键技术与路线、成熟度、替代与迭代方向）｜⑦ 政策与监管（相关政策方向、准入与合规约束）｜" +
+  "⑧ 发展阶段与趋势（当前所处阶段、增长驱动、未来走向与不确定性）｜" +
+  "⑨ 风险与争议（客观呈现主要风险与正反两方观点，不预设立场）";
 
-// 企业分析框架（投研级客观面 + 交易/洽谈面 合并）
+// 内置公司介绍框架：面向「不了解这家公司」的读者的一份朴素介绍——不做空、不谈决策链 / 筹码、不写噱头。
 export const COMPANY_FRAME =
-  "① 商业模式与单位经济（怎么赚钱、单位经济是否成立）｜② 财务（增长、利润率、现金流、资产负债健康度）｜" +
-  "③ 护城河（壁垒来源与可持续性）｜④ 客户与产品（留存、NPS、产品市场契合度 PMF、客户集中度）｜" +
-  "⑤ 管理层与治理（团队履历、激励结构、公司治理）｜⑥ 增长与战略（增长引擎、战略清晰度与执行力）｜" +
-  "⑦ 真实诉求与动机（想干什么、为什么找我方、急不急）｜⑧ 决策链与筹码（谁拍板、关键人诉求、对方退路 BATNA、我方筹码与软肋）｜" +
-  "⑨ 空头 / 做空逻辑（完整反方：什么会让它崩、名实是否一致、有无硬伤）｜⑩ 对我方的含义（该盯什么、怎么谈、什么条件下可信 / 值得合作）";
+  "① 公司简介（成立时间、总部、定位、发展沿革简述）｜② 业务板块（主营业务、主要产品 / 服务、各板块构成）｜" +
+  "③ 商业模式（靠什么赚钱、客户是谁）｜④ 财务数据（营收、利润、增长、现金流等——有公开数据则列并标来源，无则标「未公开」）｜" +
+  "⑤ 高管团队（核心创始人与高管背景）｜⑥ 融资与股权（主要轮次与投资方——如有）｜" +
+  "⑦ 行业位势（在所处行业中的位置、主要竞争对手、市场份额——如有）";
 
-// 项目分析框架
+// 内置项目可行性框架：客观评估「能不能做、怎么做、值不值得」——先研究、不预设立场，我方信息只用给定材料。
 export const DEAL_FRAME =
-  "① 能不能做（合规红线、资质 / 牌照、硬约束）｜② 值不值得做（ROI、价值分配、对我方的收益与代价）｜" +
-  "③ 合作点与结构（各方出什么 / 拿什么、交易框架）｜④ 关键前提与命门（哪几条前提错了这单就翻）｜" +
-  "⑤ 风险（合规 / 财务 / 履约 / 退出，有名有姓）｜⑥ 对我方的含义（角色、筹码、什么条件下值得下注）";
+  "① 这单是什么（合作 / 交易的实质、各方与标的）｜② 能不能做（合规红线、资质 / 牌照、硬性约束）｜" +
+  "③ 怎么做（合作结构、各方角色与投入——依据已知材料）｜④ 值不值得做（成本、收益、周期与回收——依据材料，缺口标「需补」）｜" +
+  "⑤ 关键前提与风险（哪几条前提错了这单就不成立；合规 / 履约 / 退出风险，有名有姓）｜" +
+  "⑥ 结论（基于已知信息的客观判断；信息不足处如实说明，不臆断）";
 
-// 按类型选内置框架并给出分析对象的措辞
+// 按类型选内置框架并给出研究对象的措辞
 export function frameFor(input: PipelineInput): { frame: string; subject: string; kind: string } {
   const f = input.focus ?? "";
-  if (f.includes("企业")) return { frame: COMPANY_FRAME, subject: `企业「${input.company || input.industry}」`, kind: "企业画像" };
-  if (f.includes("项目")) return { frame: DEAL_FRAME, subject: `这单（行业「${input.industry}」，对方「${input.counterparty || "待填"}」）`, kind: "项目分析" };
+  if (f.includes("企业")) return { frame: COMPANY_FRAME, subject: `「${input.company || input.industry}」这家公司`, kind: "公司介绍" };
+  if (f.includes("项目")) return { frame: DEAL_FRAME, subject: `这单（${input.industry}${input.counterparty ? `，对方「${input.counterparty}」` : ""}）`, kind: "项目可行性" };
   return { frame: INDUSTRY_FRAME, subject: `「${input.industry}」行业`, kind: "行业深度分析" };
 }
 
+const NEUTRALITY =
+  "全程中性客观、正反兼陈，不做空也不唱多；只用给定材料与公认事实，缺失处标「需补」或「未公开」，绝不虚构数据，尤其绝不虚构「我方」的能力、数据或筹码。";
+
+function typeNote(kind: string, company?: string): string {
+  if (kind === "公司介绍")
+    return `这是一份公司介绍（面向不了解这家公司的读者）：标题就写「${company || "该公司"} 公司介绍」，文风朴素、不用噱头；不做投资建议，不写做空 / 空头逻辑，不写决策链 / 筹码。`;
+  if (kind === "行业深度分析")
+    return "这是一份行业研究：客观讲清这个行业到底是什么样、怎么运转、发展逻辑；不要给投资组合建议或卡位点，不预设我方立场。";
+  return "这是一份项目可行性研究：客观评估能不能做、怎么做、值不值得；先做研究、不预设立场，「我方」信息只用给定材料、绝不虚构。";
+}
+
 export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model: string): ChatRequest {
-  const { ourRole, focus } = ctx.input;
   const o = ctx.outputs;
-  const { frame, subject } = frameFor(ctx.input);
-  const head = `${subject} · 我方「${ourRole}」· 类型「${focus}」。`;
+  const { frame, subject, kind } = frameFor(ctx.input);
+  const head = `${subject} · 类型「${kind}」。`;
+  const note = typeNote(kind, ctx.input.company);
   let user = "";
   switch (stage.id) {
     case "plan":
-      user = `${head}\n先给这份深度分析定框（内置框架，按决策逻辑、方法内化、不贴教科书框架名）。把下面要害逐一落到 ${subject} 的具体情形——每个先给一句结论 / 主张，再点出最关键的问题、变量与需要的资料：\n${frame}\n\n最后用一句话点出全篇「决策主心骨」。简洁、有数感。`;
+      user = `${head}\n先为这份研究定内容骨架（内置框架，方法内化、不贴教科书框架名）。把下面要点逐一落到 ${subject} 的具体情形——每点先给一句客观概述，再点出关键事实、变量与需要补的资料：\n${frame}\n\n最后用一句话概括核心逻辑（中性，不带倾向）。${note} ${NEUTRALITY}`;
       break;
     case "research":
-      user = `${head}\n骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」。不要编造。`;
+      user = `${head}\n内容骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」、公开渠道查不到的标「未公开」。不要编造。`;
       break;
     case "draft":
-      user = `${head}\n骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草初稿，像资深分析师给决策者的备忘：每段先结论后依据、具体有数感；紧扣上面框架的各要害；要有量化区间（带口径）、有名有姓的风险、判断卡（立场 / 依据 / 把握度 / falsifiers）。不要出现框架名或教科书标签，不要清单感。用 markdown。`;
+      user = `${head}\n内容骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草正文，像一份严谨的研究综述：每部分先讲清事实与逻辑、再给有节制的判断；量化数据必带口径与来源，无来源标「需补 / 未公开」。紧扣上面框架各要点，不要出现框架名或教科书标签，不要清单感。用 markdown。${note} ${NEUTRALITY}`;
       break;
     case "red":
-      user = `审下面这份初稿，逐条挑硬伤（证据不足 / 口径含糊 / 风险没点名 / falsifiers 不够狠），并列出必须补的清单：\n\n${o.draft ?? ""}`;
+      user = `对下面这份初稿做事实与中立性审查，逐条指出问题（无来源的断言 / 疑似编造，尤其编造我方数据或筹码 / 一边倒的倾向 / 口径含糊），并列出必须修正处；不要添加新的倾向：\n\n${o.draft ?? ""}`;
       break;
     case "final":
-      user = `初稿：\n${o.draft ?? ""}\n\n红队意见：\n${o.red ?? ""}\n\n逐条回应并修改，产出定稿（markdown，结构清晰）。仍标注为待审初稿。`;
+      user = `初稿：\n${o.draft ?? ""}\n\n审查意见：\n${o.red ?? ""}\n\n逐条采纳并修改，产出定稿（markdown，结构清晰、中性客观、正反兼陈）。信息不足处如实说明、不臆断。仍标注为待审初稿。${note}`;
       break;
     case "check":
-      user = `对照 6 条验收线逐条打 ✓/✗ 并一句话说明：决策主心骨 / 分层轴 / 量化+口径 / 命门变量 / 有名有姓的风险 / ${ourRole}角色视角。\n\n定稿：\n${o.final ?? ""}`;
+      user = `对照 5 条验收线逐条打 ✓/✗ 并一句话说明：事实有据（数据带口径 / 来源）｜缺口已标（需补 / 未公开）｜中性无编造（无虚构我方数据 / 筹码、无一边倒倾向）｜结构清楚｜该类型该有的内容齐全。\n\n定稿：\n${o.final ?? ""}`;
       break;
   }
   return { model, system: AGENT_SYS[stage.role], messages: [{ role: "user", content: user }], maxTokens: 4000 };
 }
 
-// ——报告成品（结构化，供 .report 样式渲染；也是"深度"的载体）——
-export interface JudgmentCardData {
-  stance: string; grounds: string[]; confidence: "高" | "中" | "低"; confidenceReason: string; falsifiers: string[];
-}
-export interface MockReport {
-  title: string;
-  backbone: string;                                   // 决策主心骨
-  layers: { name: string; note: string }[];           // 分层轴
-  metrics: { metric: string; range: string; caliber: string }[];  // 量化 + 口径
-  risks: { risk: string; signal: string; dealBreaker?: boolean }[]; // 有名有姓的风险 + 识别信号
-  judgment: JudgmentCardData;                          // 判断卡
-  acceptance: string[];                               // 6 条验收线
-}
-
-export function mockStageOutput(stage: PipelineStage, input: PipelineInput): StageResult {
-  const ind = input.industry, role = input.ourRole;
-  switch (stage.role) {
-    case "规划":
-      return { stageId: stage.id, summary: `按内置框架把「${ind}」定框：本质 → 需求 → 格局 → 价值链利润池 → 盈利公式与单位经济 → 护城河 → 周期时点 → 命门风险 → 对我方含义，逐一落到本行业；决策主心骨一句话拎全篇。` };
-    case "资料":
-      return { stageId: stage.id, summary: `读入本单材料，抽取关键事实与数据；缺料处标「需补」。示例：${ind}的价格 / 成本数据、主要玩家与市占、政策 / 牌照要点——未提供则标注需补，不杜撰。` };
-    case "起草":
-      return { stageId: stage.id, summary: "产出 4 张判断卡 + 3 条量化区间（均标口径），例：整柜租赁毛利 18–28%（口径：不含电费转售、按 3 年租期摊）。" };
-    case "红队":
-      return { stageId: stage.id, summary: "挑出 3 处硬伤：①「需求旺盛」无量化→打回；②退出路径缺场景；③未点名「名实分离/回租套利」红线。要求补 falsifiers。" };
-    case "定稿":
-      return { stageId: stage.id, summary: "逐条回应：补需求量化与口径、加退出三情景、点名名实分离红线并给识别信号；终稿仍为待审初稿，可被推翻。" };
-    case "验收":
-      return { stageId: stage.id, summary: `6 线自检：主心骨✓ 分层轴✓ 量化+口径✓ 命门变量✓ 有名有姓风险✓ 角色视角(${role})✓` };
-  }
-}
-
-// ——洽谈清单一键生成（#5）：由深度分析（有则接地）提炼「洽谈前必须搞清」的重点。——
+// ——洽谈清单一键生成（#5）：聚焦「能不能进 / 能不能做 / 值不值得 / 合规风险」这些能改变决策的问题。——
 export interface ChecklistItem { text: string; intent: "要查" | "要问对方" | "待搞清"; dealBreaker?: boolean; }
 
 export function buildChecklistRequest(input: PipelineInput, reportText: string, model: string): ChatRequest {
   const { subject } = frameFor(input);
-  const head = `${subject} · 我方「${input.ourRole}」· 类型「${input.focus}」。`;
+  const head = `${subject} · 类型「${input.focus}」。`;
   const ground = reportText.trim()
-    ? `下面是这单已完成的深度分析，请据此提炼（紧扣其中的命门变量、有名有姓的风险、判断卡里的 falsifiers）：\n\n${reportText.trim()}`
-    : "（暂无深度分析，按内置框架与常识提炼。）";
-  const user = `${head}\n${ground}\n\n列出这次洽谈前必须搞清的重点清单——只留「能改变决策」的问题，不要泛泛而谈。每行一条，严格用下面的标签格式，不加编号、不加解释：\n` +
-    "[要查] 我方自己能核实 / 查证的（数据、资质、履约记录、四流一致…）\n" +
-    "[要问对方] 只有当面问对方才能确认的（真实诉求、底线、决策链、退路…）\n" +
+    ? `下面是这单已完成的研究，请据此提炼（紧扣其中的关键前提、风险与信息缺口）：\n\n${reportText.trim()}`
+    : "（暂无研究成稿，按内置框架与常识提炼。）";
+  const user = `${head}\n${ground}\n\n列出这次洽谈 / 决策前必须搞清的重点清单——只留「能改变决策」的问题：能不能进、能不能做、值不值得做、合规风险、关键前提能否证实。不要列供应商名录、边角技术进展这类非核心信息。每行一条，严格用下面的标签格式，不加编号、不加解释：\n` +
+    "[要查] 我方自己能核实 / 查证的（数据、资质、合规、履约记录…）\n" +
+    "[要问对方] 只有当面问对方才能确认的（真实诉求、边界条件、时间表…）\n" +
     "[待搞清] 归属未定、但必须弄清的\n" +
     "若某条错了就能推翻整单，在该行末尾加 ◆。最多 12 条，按重要性排序，能推翻这单的排最前。";
-  return { model, system: "你是我方的洽谈军师，只列能改变决策的关键问题，严格按给定标签格式逐行输出。", messages: [{ role: "user", content: user }], maxTokens: 1500 };
+  return { model, system: "你是严谨的研究助理，只列能改变决策的关键问题（能不能进 / 做 / 值不值得 / 合规），严格按给定标签格式逐行输出。", messages: [{ role: "user", content: user }], maxTokens: 1500 };
 }
 
 const INTENT_TAGS: ChecklistItem["intent"][] = ["要查", "要问对方", "待搞清"];
@@ -177,72 +156,103 @@ export function mockChecklist(input: PipelineInput): ChecklistItem[] {
   const { focus, counterparty, company, industry } = input;
   const who = company || counterparty || "对方";
   if (focus?.includes("企业")) return [
-    { text: `${who}的真实诉求：为什么现在找我方、急不急、退路（BATNA）是什么`, intent: "要问对方", dealBreaker: true },
-    { text: `${who}最近 3 年财务：增长、利润率、现金流是否与其说法一致`, intent: "要查" },
-    { text: "谁真正拍板、关键人各自诉求（决策链）", intent: "要问对方" },
-    { text: `${who}客户集中度与大客户履约 / 续约情况`, intent: "要查" },
-    { text: "名实是否一致——有无对外披露与实际经营背离的硬伤", intent: "要查", dealBreaker: true },
-    { text: "我方筹码与软肋：这桩合作里我方不可替代在哪、命门在哪", intent: "待搞清" },
+    { text: `${who}最近 3 年财务是否与其对外说法一致（营收、利润、现金流）`, intent: "要查" },
+    { text: `${who}主营业务与主要客户构成、客户集中度`, intent: "要查" },
+    { text: "核心高管与创始团队背景是否属实", intent: "要查" },
+    { text: `${who}是否存在重大合规 / 诉讼 / 股权瑕疵`, intent: "要查", dealBreaker: true },
+    { text: "对方希望达成什么、时间表与边界条件", intent: "要问对方" },
+    { text: "公开信息里仍不清楚、需进一步确认的关键点", intent: "待搞清" },
   ];
   if (focus?.includes("项目")) return [
     { text: "合规红线 / 资质牌照是否齐全（能不能做的硬约束）", intent: "要查", dealBreaker: true },
-    { text: `资金 / 货物 / 合同 / 发票四流是否一致（${who}）`, intent: "要查", dealBreaker: true },
-    { text: `${who}的真实诉求与底线、退路是什么`, intent: "要问对方" },
-    { text: "各方出什么 / 拿什么，交易结构与增信安排", intent: "要问对方" },
-    { text: "ROI 测算的关键口径（成本、周期、退出路径）能否复核", intent: "要查" },
+    { text: `这单能不能进：行业准入、政策与硬性门槛（${industry}）`, intent: "要查" },
+    { text: "值不值得做：成本、收益、周期与回收的关键口径能否复核", intent: "要查" },
+    { text: `${who}的真实诉求、边界条件与时间表`, intent: "要问对方" },
+    { text: "各方出什么 / 拿什么，合作结构如何", intent: "要问对方" },
     { text: "履约与退出风险：违约怎么办、怎么退得出来", intent: "待搞清" },
   ];
   return [
-    { text: `${industry}的盈利公式与单位经济是否成立（收入＝量×价、成本结构）`, intent: "要查" },
-    { text: "主要玩家、集中度与进入壁垒——头部靠什么守", intent: "要查" },
-    { text: "利润沉在价值链哪一段、议价力沿链条如何转移", intent: "要查" },
-    { text: "政策 / 牌照 / 监管方向有无硬约束或临界变化", intent: "要查", dealBreaker: true },
-    { text: "现在处在周期什么位置——该等还是该抢", intent: "待搞清" },
-    { text: "反方：什么会杀死这门生意、是否正被高估或结构性衰退", intent: "待搞清" },
+    { text: `能不能进：${industry}的行业准入、政策与硬性门槛`, intent: "要查", dealBreaker: true },
+    { text: "值不值得进：盈利公式与单位经济是否成立（量×价、成本结构）", intent: "要查" },
+    { text: "格局与壁垒：主要玩家、集中度、头部靠什么守", intent: "要查" },
+    { text: "利润分布：利润沉在价值链哪一段、议价力如何", intent: "要查" },
+    { text: "所处发展阶段与主要不确定性", intent: "待搞清" },
+    { text: "主要风险与争议（正反两面）", intent: "待搞清" },
   ];
 }
 
+// ——报告成品（结构化，供 .report 样式渲染的 Mock 演示；真实成品是模型输出的 markdown 定稿）——
+export interface JudgmentCardData {
+  stance: string; grounds: string[]; confidence: "高" | "中" | "低"; confidenceReason: string; falsifiers: string[];
+}
+export interface MockReport {
+  title: string;
+  backbone: string;                                   // 核心逻辑一句话
+  layers: { name: string; note: string }[];           // 分层看
+  metrics: { metric: string; range: string; caliber: string }[];  // 量化 + 口径
+  risks: { risk: string; signal: string; dealBreaker?: boolean }[]; // 主要风险 + 识别信号
+  judgment: JudgmentCardData;                          // 研判
+  acceptance: string[];                               // 验收线
+}
+
+export function mockStageOutput(stage: PipelineStage, input: PipelineInput): StageResult {
+  const subj = input.company || input.industry;
+  switch (stage.role) {
+    case "规划":
+      return { stageId: stage.id, summary: `按内置框架把${subj}（${input.industry}）定框：本质 → 需求 → 供给格局 → 价值链利润 → 商业模式 → 技术演进 → 政策 → 发展阶段 → 风险争议，逐一落到具体情形；中性客观、不预设立场。` };
+    case "资料":
+      return { stageId: stage.id, summary: "读入本单材料，抽取关键事实与数据；缺料标「需补」、公开查不到标「未公开」，不杜撰。" };
+    case "起草":
+      return { stageId: stage.id, summary: "产出中性研究综述：每部分先讲清事实与逻辑、再给有节制的判断；量化带口径 / 来源，正反兼陈。" };
+    case "红队":
+      return { stageId: stage.id, summary: "事实与中立性审查：指出无来源的断言、疑似编造、一边倒的倾向、口径含糊之处，列出必须修正项。" };
+    case "定稿":
+      return { stageId: stage.id, summary: "逐条采纳审查意见：补来源与口径、平衡正反表述、信息不足处如实说明；终稿仍为待审初稿。" };
+    case "验收":
+      return { stageId: stage.id, summary: "5 线自检：事实有据✓ 缺口已标✓ 中性无编造✓ 结构清楚✓ 内容齐全✓" };
+  }
+}
+
 export function mockReport(input: PipelineInput): MockReport {
-  const ind = input.industry, role = input.ourRole;
+  const subj = input.company || input.industry;
   return {
-    title: `${ind} · 行业深度分析（${role}视角 · 待审初稿）`,
-    backbone: `这单能不能做，取决于「在什么时点、以什么筹码锁定」——${ind}是强周期 + 强监管行业，同样的标的在周期顶/底、议价强/弱下结论可以相反。`,
+    title: `${subj} · ${input.focus || "研究"}（示例 · 待审初稿）`,
+    backbone: `一句话概括：${subj}的核心逻辑与看点——（示例文本；真实生成时会据资料给出中性判断，不带倾向）。`,
     layers: [
-      { name: "资产层", note: "标的本身的质地：算力集群规格、上架率、机房 PUE/电价" },
-      { name: "运营层", note: "谁在运营、租户是谁、租约结构与履约记录" },
-      { name: "资本层", note: "钱怎么进、怎么退：出资结构、增信、退出路径" },
+      { name: "需求侧", note: "谁在买、为什么买、需求由什么驱动" },
+      { name: "供给与格局", note: "主要玩家、集中度、进入壁垒" },
+      { name: "价值链与利润", note: "上下游构成、利润沉在哪段、议价力如何分布" },
     ],
     metrics: [
-      { metric: "整柜租赁毛利率", range: "18%–28%", caliber: "不含电费转售、按 3 年租期摊销" },
-      { metric: "真实上架率", range: "≥ 80% 视为健康", caliber: "以电表负荷 + 租约双口径交叉核" },
-      { metric: "投资回收期", range: "3.5–5 年", caliber: "含一次性接入与季度电价波动" },
+      { metric: "市场规模", range: "（示例区间）", caliber: "口径：统计范围与年份需据来源标注" },
+      { metric: "增速", range: "（示例）", caliber: "口径：同比 / 复合增速，需注明" },
+      { metric: "典型毛利区间", range: "（示例）", caliber: "口径：按主流业务、剔除一次性项" },
     ],
     risks: [
-      { risk: "名实分离 / 回租套利", signal: "签约主体≠收款/开票主体；租金与市场价背离；回购/兜底暗条款", dealBreaker: true },
-      { risk: "终端租户信用塌方", signal: "单一大客户占比过高、账期越拉越长、续约含糊" },
-      { risk: "电价 / 能耗击穿测算", signal: "地方电价补贴到期、PUE 实测高于承诺" },
+      { risk: "政策 / 合规变化", signal: "相关准入、监管口径或补贴的变动", dealBreaker: true },
+      { risk: "需求不及预期", signal: "下游采购放缓、渗透率低于假设" },
+      { risk: "竞争加剧 / 价格战", signal: "新进入者增多、毛利被压缩" },
     ],
     judgment: {
-      stance: `谨慎可做——但必须先验穿「四流一致」，作为${role}这是命门。`,
+      stance: `（中性）${subj}是一门什么样的生意、目前处在什么阶段——是否值得进入 / 合作取决于下列关键变量（示例；真实生成会据资料给出）。`,
       grounds: [
-        "标的资产质地与区域电价具备结构性优势（资产层成立）",
-        "但终端需求与租约锁定期尚为假设，未见硬证据",
+        "（示例）需求与商业模式的客观描述",
+        "（示例）竞争格局与利润分布的客观描述",
       ],
       confidence: "中",
-      confidenceReason: "资产层证据较足，运营层/资本层仍靠假设，量化区间口径已标但数据源单一。",
+      confidenceReason: "示例内容；真实生成时按证据充分度评估把握度，缺口如实标注。",
       falsifiers: [
-        "若四流不一致（名实分离）→ 整单法律/合规定性翻转，弃",
-        "若真实上架率 < 60% 或租期 < 2 年 → ROI 测算不成立，缓",
-        "若终端为单一关联方 → 需求真实性存疑，降级重估",
+        "若关键前提缺乏来源支撑 → 相应判断需下调",
+        "若数据口径不一致 / 无法复核 → 结论需重估",
       ],
     },
     acceptance: [
-      "决策主心骨：时点×筹码，一句话拎起全篇",
-      "分层轴：资产/运营/资本三层，切开而非罗列",
-      "量化 + 口径：每个区间都带口径，可复核",
-      "命门变量：上架率/租期/电价/信用，四个",
-      "有名有姓的风险：名实分离等，附识别信号",
-      `角色视角：全篇站在${role}立场排序`,
+      "事实有据：量化都带口径 / 来源",
+      "缺口已标：需补 / 未公开处均标注",
+      "中性无编造：无虚构数据、无虚构我方筹码、无一边倒倾向",
+      "结构清楚：按内容骨架分层，不罗列",
+      "正反兼陈：风险与争议客观呈现两面",
+      "类型齐全：该类型该有的内容都覆盖",
     ],
   };
 }
