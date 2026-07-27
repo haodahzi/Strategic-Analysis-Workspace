@@ -195,6 +195,13 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 .rl-open:hover{border-color:var(--gold)}
 .rl-title{font-size:14px;font-weight:600;color:var(--ink)}
 .rl-meta{font-size:11px;color:var(--ink3);font-family:monospace}
+
+/* 设置 · 各提供商独立卡片（多 Key 并存 #12） */
+.prov-card{background:#fff;border:1px solid var(--border2);padding:14px 16px;margin-bottom:12px}
+.prov-card-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.prov-card-name{font-weight:600;font-size:14px;color:var(--ink)}
+.prov-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:720px){.prov-two{grid-template-columns:1fr}}
 /* 极简 markdown 渲染 */
 .md{font-size:13px;line-height:1.85;color:var(--ink)}
 .md p{margin:0 0 10px}

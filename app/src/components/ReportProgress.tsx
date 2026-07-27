@@ -13,7 +13,7 @@ const ROLE_CLASS: Record<string, string> = {
   规划: "r-plan", 资料: "r-plan", 起草: "r-draft", 红队: "r-red", 定稿: "r-final", 验收: "r-check",
 };
 
-export default function ReportProgress({ analysis, onBack }: { analysis: Analysis; onBack: () => void }) {
+export default function ReportProgress({ analysis, onBack }: { analysis: Analysis; onBack?: () => void }) {
   const input: PipelineInput = {
     industry: analysis.industry, ourRole: analysis.ourRole, focus: analysis.focus ?? "行业深度分析",
     company: analysis.company, counterparty: analysis.counterparty,
@@ -68,7 +68,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   return (
     <div className="report-view">
       <div className="report-bar">
-        <button type="button" className="app-btn ghost" onClick={onBack}>← 返回工作区</button>
+        {onBack && <button type="button" className="app-btn ghost" onClick={onBack}>← 返回洽谈清单</button>}
         <div className="report-bar-title">
           深度分析 · {subjectLabel} · {input.focus}
           <span className="report-bar-tag">{!started ? "未生成" : done ? "待审初稿" : `进行中 ${doneCount}/${REPORT_PIPELINE.length}`}</span>

@@ -8,6 +8,7 @@ import Settings from "./components/Settings";
 import NewAnalysis from "./components/NewAnalysis";
 import ProjectWorkspace from "./components/ProjectWorkspace";
 import ReportLibrary from "./components/ReportLibrary";
+import { setMaterials, startRun } from "./llm/pipelineStore";
 
 type View = "dashboard" | "project" | "kb" | "settings" | "new" | "reports";
 
@@ -31,11 +32,17 @@ export default function App() {
     setView("project");
   };
 
-  const createAnalysis = (a: Analysis) => {
+  const createAnalysis = (a: Analysis, materials: string) => {
     setItems((xs) => [a, ...xs]);
     setPid(a.id);
     setSampleOn(false);
     setView("project");
+    // #3：建好即开始生成——喂入本单资料并直接启动流水线，不再二次点击
+    if (materials) setMaterials(a.id, materials);
+    void startRun(a.id, {
+      industry: a.industry, ourRole: a.ourRole, focus: a.focus ?? "行业深度分析",
+      company: a.company, counterparty: a.counterparty,
+    });
   };
 
   const navItem = (v: View, label: string) => (

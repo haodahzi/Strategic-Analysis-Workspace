@@ -5,9 +5,9 @@ const ROLES = ["资金方", "场地资源方", "货源方", "运营方", "牵头
 
 // 分析类型 = 决定填什么、走哪套内置框架（三者框架不同）。
 const FOCUS: { key: string; desc: string }[] = [
-  { key: "行业深度分析", desc: "把一个行业摸透（可跨项目复用）" },
-  { key: "企业画像", desc: "把一家企业摸透：诉求 / 资质 / 决策链 / 筹码" },
-  { key: "项目可行性", desc: "评估一单该不该做（含交易框架）" },
+  { key: "行业深度分析", desc: "把一个行业客观摸透：怎么运转、格局、商业逻辑" },
+  { key: "企业画像", desc: "一份朴素的公司介绍：业务 / 财务 / 团队 / 位势" },
+  { key: "项目可行性", desc: "评估一单能不能做、值不值得（含交易结构）" },
 ];
 
 function emptyMatrix(): Matrix {
@@ -20,7 +20,8 @@ function emptyMatrix(): Matrix {
   return out;
 }
 
-export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Analysis) => void; onCancel: () => void }) {
+// onCreate 带上本单资料：新建即开始生成（#3 合并「新建」与「开始分析」，不再二次填写）。
+export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Analysis, materials: string) => void; onCancel: () => void }) {
   const [name, setName] = useState("");
   const [focus, setFocus] = useState(() => new URLSearchParams(window.location.search).get("nf") || "行业深度分析");
   const [industry, setIndustry] = useState("");
@@ -28,13 +29,13 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
   const [counterparty, setCounterparty] = useState("");
   const [ourRole, setOurRole] = useState("资金方");
   const [roleOther, setRoleOther] = useState("");
-  const [lightScan, setLightScan] = useState("");
+  const [materials, setMaterials] = useState("");
 
-  const role = ourRole === "其他" ? roleOther.trim() : ourRole;
   const isCompany = focus === "企业画像";
   const isDeal = focus === "项目可行性";
+  const role = isDeal ? (ourRole === "其他" ? roleOther.trim() : ourRole) : "";
   const subjectOk = isCompany ? company.trim() : industry.trim();
-  const canCreate = !!(name.trim() && role && subjectOk && (isDeal ? counterparty.trim() : true));
+  const canCreate = !!(name.trim() && subjectOk && (isDeal ? counterparty.trim() : true));
 
   const create = () => {
     if (!canCreate) return;
@@ -53,7 +54,7 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
       matrix: emptyMatrix(),
       deliverables: [],
     };
-    onCreate(a);
+    onCreate(a, materials.trim());
   };
 
   return (
@@ -64,7 +65,7 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
 
       <div className="na-form">
         <label className="fld"><span>分析名称</span>
-          <input className="key-input wide" value={name} placeholder="如：某智算中心 · 算力租赁合作" onChange={(e) => setName(e.target.value)} />
+          <input className="key-input wide" value={name} placeholder="如：灵巧手 · 行业深度分析" onChange={(e) => setName(e.target.value)} />
         </label>
 
         <div className="fld"><span>分析类型</span>
@@ -82,16 +83,16 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
         {isCompany ? (
           <>
             <label className="fld"><span>企业名称</span>
-              <input className="key-input wide" value={company} placeholder="要摸透的企业全称" onChange={(e) => setCompany(e.target.value)} />
+              <input className="key-input wide" value={company} placeholder="要介绍的公司全称" onChange={(e) => setCompany(e.target.value)} />
             </label>
             <label className="fld"><span>行业（选填）</span>
-              <input className="key-input wide" value={industry} placeholder="这家企业所在行业" onChange={(e) => setIndustry(e.target.value)} />
+              <input className="key-input wide" value={industry} placeholder="这家公司所在行业" onChange={(e) => setIndustry(e.target.value)} />
             </label>
           </>
         ) : isDeal ? (
           <>
             <label className="fld"><span>行业</span>
-              <input className="key-input wide" value={industry} placeholder="如：算力租赁 / 冷链物流" onChange={(e) => setIndustry(e.target.value)} />
+              <input className="key-input wide" value={industry} placeholder="如：灵巧手 / 冷链物流" onChange={(e) => setIndustry(e.target.value)} />
             </label>
             <label className="fld"><span>对方 / 对手方</span>
               <input className="key-input wide" value={counterparty} placeholder="这单的合作 / 交易对方" onChange={(e) => setCounterparty(e.target.value)} />
@@ -99,29 +100,32 @@ export default function NewAnalysis({ onCreate, onCancel }: { onCreate: (a: Anal
           </>
         ) : (
           <label className="fld"><span>行业</span>
-            <input className="key-input wide" value={industry} placeholder="如：算力租赁 / 冷链物流 / 光伏 EPC" onChange={(e) => setIndustry(e.target.value)} />
+            <input className="key-input wide" value={industry} placeholder="如：灵巧手 / 冷链物流 / 光伏 EPC" onChange={(e) => setIndustry(e.target.value)} />
           </label>
         )}
 
-        <div className="fld"><span>我方角色</span>
-          <div className="na-roles">
-            {ROLES.map((r) => (
-              <button key={r} type="button" className={"na-chip" + (ourRole === r ? " on" : "")} onClick={() => setOurRole(r)}>{r}</button>
-            ))}
+        {/* 我方角色：仅项目可行性需要（研究优先、不预设立场，行业 / 企业分析不涉及我方） */}
+        {isDeal && (
+          <div className="fld"><span>我方角色（选填）</span>
+            <div className="na-roles">
+              {ROLES.map((r) => (
+                <button key={r} type="button" className={"na-chip" + (ourRole === r ? " on" : "")} onClick={() => setOurRole(r)}>{r}</button>
+              ))}
+            </div>
+            {ourRole === "其他" && (
+              <input className="key-input wide" style={{ marginTop: 8 }} value={roleOther} placeholder="填写我方角色…" onChange={(e) => setRoleOther(e.target.value)} />
+            )}
           </div>
-          {ourRole === "其他" && (
-            <input className="key-input wide" style={{ marginTop: 8 }} value={roleOther} placeholder="填写我方角色…" onChange={(e) => setRoleOther(e.target.value)} />
-          )}
-        </div>
+        )}
 
-        <label className="fld"><span>轻扫信息（可选）</span>
-          <textarea className="key-input wide" rows={3} value={lightScan} placeholder="已知的零碎信息：对方是谁、想干什么、卡在哪…" onChange={(e) => setLightScan(e.target.value)} />
+        <label className="fld"><span>本单资料（选填）</span>
+          <textarea className="key-input wide" rows={4} value={materials} placeholder="尽调稿 / 公开资料 / 已知数据…（越具体，分析越有据；建好即开始生成，也可稍后在深度分析里补充或上传 PDF）" onChange={(e) => setMaterials(e.target.value)} />
         </label>
 
         <div className="na-actions">
           <button type="button" className="app-btn" disabled={!canCreate} onClick={create}>建好并开始深度分析 →</button>
           <button type="button" className="app-btn ghost dark" onClick={onCancel}>取消</button>
-          {!canCreate && <span className="set-hint">{isCompany ? "分析名称、企业名称、我方角色为必填。" : isDeal ? "分析名称、行业、对方、我方角色为必填。" : "分析名称、行业、我方角色为必填。"}</span>}
+          {!canCreate && <span className="set-hint">{isCompany ? "分析名称、企业名称为必填。" : isDeal ? "分析名称、行业、对方为必填。" : "分析名称、行业为必填。"}</span>}
         </div>
       </div>
     </div>

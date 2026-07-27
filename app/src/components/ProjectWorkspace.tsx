@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Analysis, QItem, Stage } from "../types";
 import PhaseRail from "./PhaseRail";
-import TwoAxisBoard from "./TwoAxisBoard";
 import ReportProgress from "./ReportProgress";
 import QuestionList from "./QuestionList";
 import NegotiationDesk from "./NegotiationDesk";
@@ -10,18 +9,6 @@ import { generateChecklist } from "../llm/checklist";
 import { getRun } from "../llm/pipelineStore";
 
 const STAGE_CLASS: Record<Stage, string> = { 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
-
-const PHASE_TABS: Record<Stage, { key: string; label: string }[]> = {
-  调研前: [
-    { key: "deep", label: "深度分析" },
-    { key: "board", label: "两轴总览" },
-    { key: "questions", label: "洽谈清单" },
-  ],
-  洽谈中: [
-    { key: "desk", label: "对照问题 · 记录 · 导入" },
-  ],
-  洽谈后: [{ key: "report", label: "项目报告 · 定调" }],
-};
 
 function seedQuestions(a: Analysis): QItem[] {
   return (a.premises ?? []).map((p, i) => ({
@@ -33,6 +20,15 @@ function seedQuestions(a: Analysis): QItem[] {
 }
 
 export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
+  const isDeal = (analysis.focus ?? "").includes("项目");
+  // 洽谈清单只对项目分析有意义（#11）；两轴总览已删（#4）
+  const PHASE_TABS: Record<Stage, { key: string; label: string }[]> = {
+    调研前: isDeal
+      ? [{ key: "deep", label: "深度分析" }, { key: "questions", label: "洽谈清单" }]
+      : [{ key: "deep", label: "深度分析" }],
+    洽谈中: [{ key: "desk", label: "对照问题 · 记录 · 导入" }],
+    洽谈后: [{ key: "report", label: "项目报告 · 定调" }],
+  };
   const [phase, setPhase] = useState<Stage>(analysis.stage);
   const [tab, setTab] = useState<string>(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
@@ -70,7 +66,7 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
         <div>
           <h2>{analysis.name}</h2>
           <div className="pw-meta">
-            <span className="role-badge">我方：{analysis.ourRole}</span>
+            {analysis.ourRole && <span className="role-badge">我方：{analysis.ourRole}</span>}
             {analysis.company && <span className="ind-badge">企业：{analysis.company}</span>}
             {analysis.industry && <span className="ind-badge">{analysis.industry}</span>}
             {analysis.counterparty && <span className="ind-badge">对方：{analysis.counterparty}</span>}
@@ -89,9 +85,8 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
       </div>
 
       <div className="pw-body">
-        {phase === "调研前" && tab === "board" && <TwoAxisBoard project={analysis} />}
         {phase === "调研前" && tab === "deep" && (
-          <ReportProgress analysis={analysis} onBack={() => setTab("board")} />
+          <ReportProgress analysis={analysis} onBack={isDeal ? () => setTab("questions") : undefined} />
         )}
         {phase === "调研前" && tab === "questions" && (
           <div className="dash">
