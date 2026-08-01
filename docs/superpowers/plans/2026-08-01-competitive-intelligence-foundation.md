@@ -13,7 +13,7 @@
 - 目标仓库：`haodahzi/Strategic-Analysis-Workspace`。
 - 基线分支：`claude/business-project-docking-workbench-ccies1`；批准基线提交：`79d26128baae4c43ac08b7c62948fc986e62a941`。
 - 功能分支：`feature/competitive-intelligence`。
-- 工作台关闭后不采集；再次启动只根据 SQLite 检查点准备补采时间窗，本计划不执行补采。
+- 工作台关闭后不采集；应用顶层启动时根据 SQLite 检查点准备补采时间窗，本计划不执行补采。
 - 情报数据不得写入 localStorage；只允许非敏感 UI/模型偏好写入 localStorage。
 - 模型 API Key 不得写入 SQLite、localStorage、日志、快照或备份。
 - 首期不采集、跟踪或分析招聘岗位与招聘趋势。
@@ -21,7 +21,7 @@
 - React 组件不得直接调用 SQL、文件系统或任意外部 URL。
 - Rust HTTP 只接受 HTTPS，拒绝本机、私网、链路本地、未指定和云元数据地址。
 - 所有新增行为先写失败测试，再写最小实现；Rust 测试文件先注册到 crate，再运行目标测试确认因行为缺失而失败。
-- Rust MSRV 保持 `1.77.2`；从数据库任务开始跟踪 `app/src-tauri/Cargo.lock`。
+- Rust MSRV 保持 `1.77.2`；所有 Cargo check/test 验收显式使用 `+1.77.2-x86_64-pc-windows-msvc`，且命令组先打印该 toolchain 的 `rustc`/`cargo` 版本。1.85.1 仅允许用于 MSRV-aware 依赖解析和锁文件生成，不得用于实际 check/test 验收。
 - `app/src-tauri/capabilities/default.json` 保持不变。
 
 ---
@@ -31,13 +31,14 @@
 以下内容优先于原始步骤中任何相反表述：
 
 1. **惰性、可重试数据库初始化：** Tauri `setup` 不打开情报库；`intelligence_health` 首次调用时串行初始化。失败不得永久缓存，也不得阻止工作台启动；UI 重试会重新初始化。
-2. **只准备补采窗口：** 启动恢复只标记遗留运行、读取检查点并返回 `catchUpFrom/catchUpTo`；不调用 fetch、不创建新 run、不启动采集器。
+2. **应用顶层只准备补采窗口：** 恢复在 `main/bootstrap` 顶层、React StrictMode 外启动一次，标记遗留运行、读取检查点并共享 `catchUpFrom/catchUpTo`；不调用 fetch、不创建新 run、不启动采集器。UI retry 会重新惰性初始化。
 3. **DNS 固定与流式 5 MiB：** DNS 校验通过后把批准 IP 固定到本次 reqwest client；禁用重定向；正文逐块读取，累计超过 `5 * 1024 * 1024` 立即中止，不能先完整读取再检查。
 4. **Windows 原生凭据与浏览器安全行为：** `keyring` 只启用 `windows-native`；浏览器模式不调用 Tauri 凭据命令、不崩溃、不回退到 localStorage，秘密仅可留在当前内存会话。
 5. **显式安全保存：** 设置输入只更新本地状态；仅用户点击保存时调用 `saveConfigSecurely`，等待凭据写入/删除成功后再保存脱敏配置，并显示失败。
 6. **完整 Rust/HTTP TDD：** 先注册模块/测试，再验证失败；覆盖初始化重试、迁移幂等、命令健康信息、DNS 固定、地址拒绝、MIME、重定向与有/无 Content-Length 的流式上限。
 7. **锁文件：** `Cargo.lock` 自 Task 3 首次解析数据库依赖起纳入提交，并在后续 Rust 任务持续更新；不得删除或忽略。
-8. **capabilities 不变：** 情报请求由 Rust reqwest 完成，数据库/文件/keyring 也由 Rust 内部命令封装，不需要扩大 WebView 权限。
+8. **capabilities 不变：** 情报请求由 Rust reqwest 完成，数据库/文件/keyring 也由 Rust 内部命令封装，不需要扩大 WebView 权限；验收必须比较批准提交到 HEAD 的 committed diff，同步后再比较远端基线到 HEAD。
+9. **sourceId-only 抓取：** IPC 只接收 `sourceId`；Rust 从 SQLite `sources` 读取已启用来源的 `base_url` 和 `expected_host`。调用方提交任意 URL、未知或禁用来源均失败。
 
 ## Scope decomposition
 
@@ -62,6 +63,11 @@
 - `app/src/features/intelligence/infrastructure/tauriPlatform.test.ts`
 - `app/src/features/intelligence/application/startupRecovery.ts`
 - `app/src/features/intelligence/application/startupRecovery.test.ts`
+- `app/src/features/intelligence/application/intelligenceBoot.ts`
+- `app/src/features/intelligence/application/intelligenceBoot.test.ts`
+- `app/src/bootstrap.tsx`
+- `app/src/bootstrap.test.tsx`
+- `app/src/App.test.tsx`
 - `app/src/features/intelligence/infrastructure/secureConfig.ts`
 - `app/src/features/intelligence/infrastructure/secureConfig.test.ts`
 - `app/src/features/intelligence/styles.css`
@@ -86,7 +92,7 @@
 
 ### Explicitly unchanged
 
-- `app/src-tauri/capabilities/default.json`：不新增 HTTP、文件、数据库或凭据权限；Task 8 用 git diff 验证。
+- `app/src-tauri/capabilities/default.json`：不新增 HTTP、文件、数据库或凭据权限；Task 8 比较批准基线/同步后远端基线到 HEAD 的 committed diff。
 - 现有项目分析和报告库的数据文件与持久化逻辑。
 
 ---
@@ -109,12 +115,12 @@
 Run from `D:\工作文档\AI相关\对标企业情报功能`:
 
 ```powershell
-git -c http.schannelCheckRevoke=false clone --filter=blob:none --branch "claude/business-project-docking-workbench-ccies1" https://github.com/haodahzi/Strategic-Analysis-Workspace.git Strategic-Analysis-Workspace
+git clone --filter=blob:none --branch "claude/business-project-docking-workbench-ccies1" https://github.com/haodahzi/Strategic-Analysis-Workspace.git Strategic-Analysis-Workspace
 git -C Strategic-Analysis-Workspace fetch origin
 git -C Strategic-Analysis-Workspace remote show origin
 ```
 
-Expected: clone completes, origin is `haodahzi/Strategic-Analysis-Workspace`, the remote default branch has been inspected, and the approved base branch still exists. If the remote default/base changed, stop for review rather than silently changing the target.
+Expected: clone completes with normal HTTPS/TLS validation, origin is `haodahzi/Strategic-Analysis-Workspace`, the remote default branch has been inspected, and the approved base branch still exists. If HTTPS validation fails or the remote default/base changed, stop for review; do not weaken certificate or revocation checks.
 
 - [ ] **Step 2: Create and verify the isolated feature worktree**
 
@@ -147,7 +153,9 @@ npm ci
 npm test
 npm run typecheck
 npm run build
-cargo check --manifest-path src-tauri/Cargo.toml
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
 ```
 
 Expected: existing tests pass, typecheck/build exit 0, and Cargo check passes under Rust 1.77.2/MSVC.
@@ -177,6 +185,7 @@ Expected: exactly two Markdown files in one documentation-only commit.
 - Create: `app/src/features/intelligence/IntelligenceFeature.test.tsx`
 - Create: `app/src/features/intelligence/index.ts`
 - Create: `app/src/features/intelligence/styles.css`
+- Create: `app/src/App.test.tsx`
 - Modify: `app/src/App.tsx`
 - Modify: `app/src/main.tsx`
 
@@ -195,18 +204,29 @@ npx vitest run src/features/intelligence/IntelligenceFeature.test.tsx
 
 Expected: FAIL because the feature component is not registered yet.
 
-- [ ] **Step 2: Implement the minimal isolated shell**
+- [ ] **Step 2: Write and run the failing App navigation integration test**
+
+In `App.test.tsx`, render the application with deterministic window/storage stubs. Assert the top-level navigation contains `对标企业情报`; render with `?view=intelligence` and assert the module title is in the App output while existing dashboard/report/settings labels remain. This is an App integration test, not another isolated feature test.
+
+```powershell
+npx vitest run src/App.test.tsx
+```
+
+Expected: FAIL because the App `View` union, navigation item and render branch do not contain `intelligence`.
+
+- [ ] **Step 3: Implement the minimal isolated shell**
 
 Define `IntelligenceBootStatus = "initializing" | "ready" | "error"`; render initialization, retryable Chinese error, and ready copy `本地情报库已就绪，尚未执行首次同步。` Use only `.intel-*` CSS classes. Export through `index.ts`.
 
-- [ ] **Step 3: Register navigation without touching existing persistence**
+- [ ] **Step 4: Register navigation without touching existing persistence**
 
 Extend the existing `View` union with `intelligence`, add `◉ 对标企业情报` after report navigation, render the feature, and import its scoped stylesheet from `main.tsx`.
 
-- [ ] **Step 4: Verify and commit**
+- [ ] **Step 5: Verify and commit**
 
 ```powershell
 npx vitest run src/features/intelligence/IntelligenceFeature.test.tsx
+npx vitest run src/App.test.tsx
 npm test
 npm run typecheck
 git add app/src/App.tsx app/src/main.tsx app/src/features/intelligence
@@ -235,10 +255,12 @@ Expected: focused and regression tests pass; existing views retain behavior.
 
 - [ ] **Step 1: Add pinned-compatible database dependencies and track the lock**
 
-Add `rusqlite = { version = "0.32", features = ["bundled"] }`, `chrono = { version = "0.4", features = ["serde"] }`, and `thiserror = "2"`. Resolve with Rust 1.77.2; keep the generated `app/src-tauri/Cargo.lock` in this task.
+Add `rusqlite = { version = "0.32", features = ["bundled"] }`, `chrono = { version = "0.4", features = ["serde"] }`, and `thiserror = "2"`. Keep the generated `app/src-tauri/Cargo.lock` in this task. If dependency resolution needs Cargo 1.85.1's MSRV-aware resolver, use it only to generate/update the lock, then perform every check/test below with 1.77.2.
 
 ```powershell
-cargo check --manifest-path src-tauri/Cargo.toml
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
 git status --short src-tauri/Cargo.toml src-tauri/Cargo.lock
 ```
 
@@ -252,14 +274,17 @@ Add `mod intelligence;` to `lib.rs`, `pub mod database;` to `intelligence/mod.rs
 - `migration_is_idempotent_and_records_version_one`
 - `failed_initialization_can_be_retried`
 - `health_reports_schema_version_and_data_directory`
+- `concurrent_health_calls_share_one_initialization`
 
-Use a temp path/in-memory connection and an injectable open/migrate helper for deterministic failure. Do not implement the migration/init body before the failure run.
+Use a temp path/in-memory connection and an injectable open/migrate helper for deterministic failure. The concurrency test launches two health calls against one state, blocks the first initializer with a barrier, then asserts the open/migrate counter is exactly one and both callers receive the same ready state. Do not implement the migration/init body before the failure run.
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::database::tests
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::database::tests
 ```
 
-Expected: tests are discovered and FAIL for missing schema/initialization behavior, rather than failing because the module is absent.
+Expected: tests are discovered and FAIL for missing schema/initialization behavior; the concurrency test specifically fails because duplicate initialization is not yet deduplicated, rather than because the module is absent.
 
 - [ ] **Step 3: Add schema version 1**
 
@@ -274,13 +299,15 @@ Store an optional ready connection behind synchronization plus a separate initia
 Add `intelligence::intelligence_health` to `generate_handler!`. Verify command serialization uses camelCase and that concurrent health calls cannot run two migrations at once.
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::database
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::tests
-cargo check --manifest-path src-tauri/Cargo.toml
-git diff --exit-code -- src-tauri/capabilities/default.json
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::database
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::tests
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
-Expected: PASS; initialization failure test succeeds on its second attempt; capability diff is empty.
+Expected: PASS; initialization failure test succeeds on its second attempt; concurrent callers initialize once; committed capability diff from the approved baseline is empty.
 
 - [ ] **Step 6: Commit database, registration and lock together**
 
@@ -288,6 +315,14 @@ Expected: PASS; initialization failure test succeeds on its second attempt; capa
 git add app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/migrations/intelligence app/src-tauri/src/intelligence app/src-tauri/src/lib.rs
 git commit -m "feat(intelligence): add isolated SQLite foundation"
 ```
+
+- [ ] **Step 7: Verify the committed capability boundary against the approved baseline**
+
+```powershell
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
+```
+
+Expected: exit 0, proving no committed capability change from the approved baseline through this task.
 
 ---
 
@@ -304,7 +339,7 @@ git commit -m "feat(intelligence): add isolated SQLite foundation"
 
 **Interfaces:**
 
-- Consumes: `FetchSourceRequest { url, expectedHost }`.
+- Consumes: `FetchSourceRequest { sourceId }` only; unknown fields are rejected.
 - Produces: `fetch_source_snapshot -> FetchSourceResult { finalUrl, status, contentType, contentHash, snapshotPath, fetchedAt }`.
 
 - [ ] **Step 1: Add HTTP/snapshot dependencies**
@@ -315,6 +350,9 @@ Use reqwest with rustls, charset and streaming support; add tokio net, url, sha2
 
 Declare `pub mod fetch; pub mod snapshot;` and create tests for:
 
+- request deserialization rejects caller-supplied `url`/`expectedHost` even when the URL is public;
+- an unknown sourceId and a disabled source row are rejected before DNS/network access;
+- an enabled source uses exactly its SQLite `base_url` and `expected_host`;
 - rejection of `http`, embedded credentials, wrong host, empty DNS, loopback/private/link-local/unspecified/metadata IPv4 and IPv6;
 - acceptance of public HTTPS on the expected host;
 - resolver-approved addresses being installed into the request client (DNS pinning);
@@ -328,41 +366,60 @@ Declare `pub mod fetch; pub mod snapshot;` and create tests for:
 Use a local test server only as a byte-stream fixture; inject its socket as an already approved endpoint so production address policy itself is tested separately.
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::fetch::tests
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::snapshot::tests
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::fetch::tests
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::snapshot::tests
 ```
 
-Expected: tests are discovered and FAIL because validation, pinning, streaming and snapshot functions are not implemented.
+Expected: tests are discovered and FAIL because source lookup, arbitrary-URL rejection, validation, pinning, streaming and snapshot functions are not implemented.
 
-- [ ] **Step 3: Implement URL/address validation and DNS pinning**
+- [ ] **Step 3: Implement the sourceId-only command boundary**
 
-Parse only HTTPS, reject credentials, require exact expected host, resolve with tokio, reject if the set is empty or contains a blocked address, then configure the reqwest client to resolve that host to the validated socket address set. The connection must use this pinned set; it must not perform a second unvalidated DNS lookup. Disable redirects and set a 20-second timeout.
+Define the only request shape as:
 
-- [ ] **Step 4: Implement streaming 5 MiB enforcement**
+```rust
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FetchSourceRequest {
+    pub source_id: String,
+}
+```
+
+Under the database lock, query `SELECT base_url, expected_host FROM sources WHERE id = ?1 AND enabled = 1`. Return a stable error before network access when no row exists. The public command must not accept a URL or host argument; an enabled row's configured URL is the sole fetch target.
+
+- [ ] **Step 4: Implement URL/address validation and DNS pinning**
+
+Parse the database `base_url` only, reject non-HTTPS/credentials, require its host to match the database `expected_host`, resolve with tokio, reject if the set is empty or contains a blocked address, then configure the reqwest client to resolve that host to the validated socket address set. The connection must use this pinned set; it must not perform a second unvalidated DNS lookup. Disable redirects and set a 20-second timeout.
+
+- [ ] **Step 5: Implement streaming 5 MiB enforcement**
 
 Set `MAX_BODY_BYTES = 5 * 1024 * 1024`. Reject a larger Content-Length immediately. Iterate response chunks, check `accumulated + chunk.len()` before extending the buffer, abort on overflow, and never call an API that buffers the entire body first. Accept only `text/html`, `application/xhtml+xml`, `text/plain`, `application/xml`, `application/rss+xml`, and `application/atom+xml` (ignoring MIME parameters).
 
-- [ ] **Step 5: Implement immutable gzip snapshots and metadata-only IPC**
+- [ ] **Step 6: Implement immutable gzip snapshots and metadata-only IPC**
 
 Hash successful bytes with SHA-256 and store once at `snapshots/<hash>.html.gz`; ensure the directory exists and do not overwrite an existing content-addressed file. Return only URL/status/type/hash/path/time. Never serialize the response body.
 
-- [ ] **Step 6: Register the command after unit/integration tests pass**
+- [ ] **Step 7: Register the command after unit/integration tests pass**
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::fetch
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::snapshot
-cargo test --manifest-path src-tauri/Cargo.toml intelligence
-cargo check --manifest-path src-tauri/Cargo.toml
-git diff --exit-code -- src-tauri/capabilities/default.json
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::fetch
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::snapshot
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
 Expected: all PASS, including DNS-pin and chunked-over-limit tests; capability diff remains empty.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit and verify the committed capability boundary**
 
 ```powershell
 git add app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/src/intelligence app/src-tauri/src/lib.rs
 git commit -m "feat(intelligence): add secure source snapshots"
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
 ---
@@ -386,8 +443,10 @@ Use an injected `invoke` mock and assert exact command/argument mapping:
 
 ```ts
 health()                                  -> invoke("intelligence_health")
-fetchSnapshot(request)                    -> invoke("fetch_source_snapshot", { request })
+fetchSnapshot({ sourceId: "source-1" })    -> invoke("fetch_source_snapshot", { request: { sourceId: "source-1" } })
 ```
+
+Also make the type-level fixture use `FetchSnapshotRequest = { sourceId: string }`; no `url` or `expectedHost` property exists. The mock asserts an arbitrary URL never crosses IPC.
 
 ```powershell
 npx vitest run src/features/intelligence/infrastructure/tauriPlatform.test.ts
@@ -420,12 +479,21 @@ Expected: PASS and one focused commit.
 
 - Create: `app/src/features/intelligence/application/startupRecovery.ts`
 - Create: `app/src/features/intelligence/application/startupRecovery.test.ts`
+- Create: `app/src/features/intelligence/application/intelligenceBoot.ts`
+- Create: `app/src/features/intelligence/application/intelligenceBoot.test.ts`
+- Create: `app/src/bootstrap.tsx`
+- Create: `app/src/bootstrap.test.tsx`
 - Modify: `app/src-tauri/src/intelligence/database.rs`
 - Modify: `app/src-tauri/src/intelligence/mod.rs`
 - Modify: `app/src-tauri/src/lib.rs`
+- Modify: `app/src/main.tsx`
+- Modify: `app/src/App.tsx`
+- Modify: `app/src/App.test.tsx`
 - Modify: `app/src/features/intelligence/IntelligenceFeature.tsx`
+- Modify: `app/src/features/intelligence/IntelligenceFeature.test.tsx`
 - Modify: `app/src/features/intelligence/domain/platform.ts`
 - Modify: `app/src/features/intelligence/infrastructure/tauriPlatform.ts`
+- Modify: `app/src/features/intelligence/infrastructure/tauriPlatform.test.ts`
 
 **Interfaces:**
 
@@ -435,6 +503,8 @@ Expected: PASS and one focused commit.
   `listRecoverableRuns() -> list_recoverable_runs`,
   `markRunInterrupted(runId) -> mark_run_interrupted { runId }`, and
   `getLastSuccessfulSync() -> get_last_successful_sync`.
+- Produces one application-scoped `IntelligenceBootCoordinator` whose snapshot is subscribed by `App` and passed to `IntelligenceFeature`.
+- `bootstrapApplication` starts that coordinator before React render and outside `React.StrictMode`.
 
 - [ ] **Step 1: Write failing recovery tests**
 
@@ -444,9 +514,29 @@ Test that two running IDs are each marked interrupted, the last checkpoint becom
 npx vitest run src/features/intelligence/application/startupRecovery.test.ts
 ```
 
-Expected: FAIL because recovery is missing.
+Expected: FAIL because recovery is missing. The no-collection assertion must fail if the implementation calls `fetchSnapshot` or any injected `createCollectionRun` spy.
 
-- [ ] **Step 2: Register Rust command tests before implementation**
+- [ ] **Step 2: Write failing application-top-level boot and StrictMode tests**
+
+In `intelligenceBoot.test.ts`, use an injected `recoverOnStartup` spy and verify:
+
+- two concurrent/repeated `start()` calls return the same in-flight promise and invoke recovery once;
+- a completed start remains one-shot when the same coordinator is reused across simulated StrictMode unmount/remount;
+- an error snapshot can call `retry()`, which performs a new health/recovery attempt and publishes ready;
+- subscribers see the same `initializing/error/ready` snapshot that the feature receives.
+- a browser coordinator's single `start()` publishes `unavailable` without invoking any Tauri recovery/fetch command.
+
+In `bootstrap.test.tsx`, inject coordinator and render callbacks; assert bootstrap calls `coordinator.start()` before rendering `<React.StrictMode><App intelligenceBoot={coordinator} /></React.StrictMode>`, even when the initial view is dashboard. StrictMode render must not own or repeat the start side effect.
+
+In `App.test.tsx`/`IntelligenceFeature.test.tsx`, assert App passes the shared error state and retry callback to the feature; clicking/calling retry invokes the coordinator, enabling another lazy database initialization.
+
+```powershell
+npx vitest run src/features/intelligence/application/intelligenceBoot.test.ts src/bootstrap.test.tsx src/App.test.tsx src/features/intelligence/IntelligenceFeature.test.tsx
+```
+
+Expected: FAIL because there is no application-scoped coordinator/bootstrap integration, StrictMode guard, shared snapshot, or wired retry.
+
+- [ ] **Step 3: Register Rust command tests before implementation**
 
 Add test-only calls against a migrated temp database for the exact SQL semantics:
 
@@ -466,12 +556,14 @@ WHERE checkpoint_key = 'last_successful_sync';
 Register command symbols in the intelligence module so tests compile and are discovered, then run:
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::database::tests::recovery
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::database::tests::recovery
 ```
 
 Expected: FAIL for missing command/query behavior; a second mark of the same ID must ultimately be harmless.
 
-- [ ] **Step 3: Implement database commands and TypeScript recovery**
+- [ ] **Step 4: Implement database commands and pure TypeScript recovery**
 
 `recoverOnStartup` calls health, lists abandoned runs, marks each interrupted, reads the checkpoint, and returns:
 
@@ -483,25 +575,31 @@ interface StartupRecovery {
 }
 ```
 
-It does not call `fetchSnapshot`, does not create a run, and does not start timers/background work.
+It does not call `fetchSnapshot`, does not create a run, and does not start timers/background work. Register the three commands only after their Rust tests pass.
 
-- [ ] **Step 4: Wire retryable boot UI**
+- [ ] **Step 5: Implement application-scoped startup coordination**
 
-Start at `initializing`; call recovery once; move to `ready` with the prepared window retained in state; on error show a stable Chinese message and retry button. Retrying reruns health so a failed lazy database initialization gets another attempt. Keep the hook adjacent if the component would exceed 100 lines.
+Create a coordinator outside React component lifecycle with `start()`, `retry()`, `subscribe()` and `getSnapshot()`. `start()` deduplicates its promise and is one-shot after success; `retry()` is allowed from error and calls recovery again. `bootstrapApplication` invokes `start()` once before `ReactDOM.createRoot(...).render(<React.StrictMode>...)`; therefore StrictMode cannot duplicate recovery. `App` uses `useSyncExternalStore` on the injected application singleton and passes its snapshot/retry to `IntelligenceFeature` regardless of current view. The desktop feature displays shared `initializing | ready | error`; retry reruns health/lazy init. Extend the status with `unavailable` for browser mode; its coordinator starts once, performs zero Tauri calls and displays the desktop-required message.
 
-- [ ] **Step 5: Verify no collection starts and commit**
+- [ ] **Step 6: Verify top-level once-only recovery, no collection, Rust MSRV and commit**
 
 ```powershell
 npx vitest run src/features/intelligence/application/startupRecovery.test.ts
+npx vitest run src/features/intelligence/application/intelligenceBoot.test.ts src/bootstrap.test.tsx src/App.test.tsx src/features/intelligence/IntelligenceFeature.test.tsx
 npm test
 npm run typecheck
-cargo test --manifest-path src-tauri/Cargo.toml intelligence
-cargo check --manifest-path src-tauri/Cargo.toml
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 git add app/src/features/intelligence app/src-tauri
+git add app/src/bootstrap.tsx app/src/bootstrap.test.tsx app/src/App.tsx app/src/App.test.tsx app/src/main.tsx
 git commit -m "feat(intelligence): prepare interrupted work recovery"
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
-Expected: all PASS; tests explicitly assert zero fetch/collection calls.
+Expected: all PASS under the printed 1.77.2 MSVC toolchain; tests prove application startup recovers before feature navigation, StrictMode invokes recovery once, UI retry performs a new lazy initialization, and fetch/create-run spies remain at zero. The committed capability comparison exits 0.
 
 ---
 
@@ -512,12 +610,17 @@ Expected: all PASS; tests explicitly assert zero fetch/collection calls.
 - Create: `app/src-tauri/src/intelligence/secrets.rs`
 - Create: `app/src/features/intelligence/infrastructure/secureConfig.ts`
 - Create: `app/src/features/intelligence/infrastructure/secureConfig.test.ts`
+- Create: `app/src/components/Settings.test.tsx`
+- Modify: `app/src/bootstrap.tsx`
+- Modify: `app/src/bootstrap.test.tsx`
 - Modify: `app/src-tauri/src/intelligence/mod.rs`
 - Modify: `app/src-tauri/src/lib.rs`
 - Modify: `app/src/config/store.ts`
 - Modify: `app/src/config/store.test.ts`
 - Modify: `app/src/components/Settings.tsx`
 - Modify: `app/src/main.tsx`
+- Modify: `app/package.json`
+- Modify: `app/package-lock.json`
 - Modify: `app/src-tauri/Cargo.toml`
 - Modify: `app/src-tauri/Cargo.lock`
 
@@ -535,19 +638,21 @@ Add:
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
 ```
 
-Update the tracked lock and confirm Rust 1.77.2 compatibility.
+Update the tracked lock. Add exact dev test dependencies `@testing-library/react@16.3.0` and `jsdom@26.1.0` for Settings interaction RED tests. Rust compatibility is accepted only by the 1.77.2 commands below; a 1.85.1 resolver may update the lock but may not run check/test.
 
 - [ ] **Step 2: Register secret module and write failing Rust tests**
 
 Test provider validation (non-empty ASCII alphanumeric/hyphen), `NoEntry -> None`, idempotent delete, and backend errors mapped without secret values. Abstract the keyring operations behind a small trait/fake so tests never touch the real user credential store.
 
 ```powershell
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::secrets::tests
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::secrets::tests
 ```
 
 Expected: tests are discovered and FAIL because command behavior is missing.
 
-- [ ] **Step 3: Write failing secure-config/browser tests**
+- [ ] **Step 3: Write failing secure-config, bootstrap and Settings tests**
 
 Cover these exact cases:
 
@@ -555,15 +660,19 @@ Cover these exact cases:
 - failed keyring migration does not erase the legacy key;
 - explicit save writes/deletes all changed secrets, then persists only redacted provider config;
 - failed explicit save reports failure and does not claim/persist a successful redacted state;
-- editing without clicking save performs zero secret/store writes;
 - browser adapter returns no persisted secret, never calls Tauri, never writes Key to localStorage, and exposes a “desktop required for secure persistence” state.
+- native bootstrap first fails safely, renders no exception details, and its retry calls native bootstrap again before rendering the App;
+- browser bootstrap bypasses native secret and intelligence Tauri calls, renders the App with intelligence status `unavailable`, and never persists a Key even when the native adapter would throw;
+
+In `Settings.test.tsx` under jsdom, inject `saveConfigSecurely`, type into Key/base/model fields and assert zero writes before clicking the explicit save button. Click save and assert one awaited call with the draft; test a rejected save keeps the draft and renders a safe visible error; test blank Key causes delete only after save.
 
 ```powershell
 npx vitest run src/features/intelligence/infrastructure/secureConfig.test.ts
 npx vitest run src/config/store.test.ts
+npx vitest run src/bootstrap.test.tsx src/components/Settings.test.tsx
 ```
 
-Expected: FAIL before the secure layer is implemented.
+Expected: FAIL before the secure layer, retryable native/browser bootstrap controller, explicit save button and deferred Settings persistence are implemented.
 
 - [ ] **Step 4: Implement native commands and in-memory cache**
 
@@ -579,26 +688,31 @@ Change Settings so form edits call only `setCfg`. The user’s save button await
 
 - [ ] **Step 7: Bootstrap safely in desktop and browser modes**
 
-Before React render, choose the native adapter only when Tauri is available; otherwise choose the non-persistent browser adapter and continue rendering. A native bootstrap failure renders a small safe error with retry, without exception bodies that may contain platform details.
+Extend `bootstrapApplication` so secure config finishes before the intelligence coordinator starts and before React render. Choose the native adapter only when Tauri is available; otherwise choose the non-persistent browser adapter and continue rendering. A native bootstrap failure renders a small safe error with retry, without exception bodies that may contain platform details; retry reruns native bootstrap and then the normal top-level sequence. Browser mode never invokes the native adapter and never writes Key material to localStorage.
 
 - [ ] **Step 8: Verify and commit**
 
 ```powershell
 npx vitest run src/features/intelligence/infrastructure/secureConfig.test.ts
 npx vitest run src/config/store.test.ts
+npx vitest run src/bootstrap.test.tsx src/components/Settings.test.tsx
 npm test
 npm run typecheck
-cargo test --manifest-path src-tauri/Cargo.toml intelligence::secrets
-cargo check --manifest-path src-tauri/Cargo.toml
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence::secrets
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
 rg -n "apiKey.*localStorage|localStorage.*apiKey" src
-git diff --exit-code -- src-tauri/capabilities/default.json
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
 Expected: tests/checks pass; grep finds no intentional Key persistence; capabilities remain unchanged.
 
 ```powershell
 git add app/src app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/src
+git add app/package.json app/package-lock.json
 git commit -m "security: move model keys to OS credential storage"
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
 ---
@@ -621,14 +735,14 @@ Record and execute:
 
 1. Dashboard、新分析、报告库和设置正常打开。
 2. “对标企业情报”打开时不改变已有分析。
-3. 首次打开在 WebView 存储外创建 `competitive-intelligence.db`。
-4. 强制首次初始化失败后，其他页面仍可用；点击重试后初始化成功。
-5. 合成 `running` 记录在重启后变为 `interrupted`，UI 得到补采窗口，网络 fixture 记录零请求。
-6. HTTP 拒绝 http、localhost、127.0.0.1、169.254.169.254、IPv6 本地地址和主机不匹配；DNS 固定测试通过。
+3. 应用启动（仍停留 dashboard、未进入模块）即在 WebView 存储外创建 `competitive-intelligence.db` 并执行一次恢复；StrictMode 下仍只有一次。
+4. 强制首次初始化失败后，其他页面仍可用；模块共享 error 状态，点击重试后重新惰性初始化成功。
+5. 合成 `running` 记录在重启后变为 `interrupted`，UI 得到补采窗口，fetch 与 create-collection-run fixture 均记录零调用。
+6. IPC 任意公网 URL 字段、未知/禁用 sourceId 被拒绝；已启用来源只抓 SQLite 配置 URL。HTTP 地址策略与 DNS 固定测试通过。
 7. 无 Content-Length 的响应超过 5 MiB 时流式中止；合法 fixture 只保存一个 gzip 快照且 IPC 只有元数据。
 8. 旧 Key 成功迁移一次并从 `dw.config.v1` 消失；迁移失败不丢 Key；显式保存/删除可见且浏览器刷新不持久化。
 9. 没有招聘 UI、表、collector 或新增文案。
-10. `Cargo.lock` 被跟踪，`default.json` 无 diff。
+10. `Cargo.lock` 被跟踪；Rust 1.77.2 MSVC 完成所有 check/test；`default.json` 相对批准基线无 committed diff。
 
 - [ ] **Step 2: Run the complete automated gate**
 
@@ -639,16 +753,20 @@ npm ci
 npm test
 npm run typecheck
 npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo check --manifest-path src-tauri/Cargo.toml
+rustc +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc --version
+cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
 rg -n "招聘|岗位|recruitment" src src-tauri
 git ls-files src-tauri/Cargo.lock
-git diff --exit-code -- src-tauri/capabilities/default.json
+git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
-Expected: automated commands exit 0; Cargo.lock is printed as tracked; capability diff is empty. Review grep matches by path: the new module must have none, and pre-existing matches outside it are documented rather than deleted mechanically.
+Expected: printed `rustc`/`cargo` are exactly 1.77.2 MSVC; automated commands exit 0; Cargo.lock is printed as tracked; committed capability diff from the approved baseline is empty. Review grep matches by path: the new module must have none, and pre-existing matches outside it are documented rather than deleted mechanically.
 
 - [ ] **Step 3: Run the desktop and browser smoke tests**
+
+In terminal A, run desktop mode:
 
 ```powershell
 npm run tauri dev
@@ -656,13 +774,13 @@ npm run tauri dev
 
 Expected desktop behavior: all navigation works, the intelligence entry reaches ready, retry works, Windows-native secret save succeeds, and no console error appears.
 
-Then run:
+Stop terminal A's desktop dev process completely with `Ctrl+C` and confirm it exits. Only then, in a separate terminal B, run browser mode:
 
 ```powershell
 npm run dev
 ```
 
-Expected browser behavior: app starts without Tauri/keyring, non-secret functions work, secret persistence is clearly unavailable, and no Key is written to localStorage.
+Expected browser behavior: app starts without Tauri/keyring, non-secret functions work, secret persistence is clearly unavailable, and no Key is written to localStorage. Do not run desktop and browser smoke servers concurrently on the same configured port.
 
 - [ ] **Step 4: Commit verification documentation**
 
@@ -676,9 +794,10 @@ git commit -m "test: document intelligence foundation acceptance"
 ```powershell
 git fetch origin
 git rebase "origin/claude/business-project-docking-workbench-ccies1"
+git -C .. diff --exit-code "origin/claude/business-project-docking-workbench-ccies1"..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
-Resolve only genuine conflicts. If the rebase changes the tree, rerun Step 2 and both smoke modes.
+Resolve only genuine conflicts. The final command must exit 0, proving the committed capability boundary against the newly fetched remote base. If the rebase changes the tree, rerun Step 2 with the remote-base capability command substituted for the fixed approved hash, then rerun both smoke modes sequentially.
 
 - [ ] **Step 6: Push when repository write permission is available**
 
@@ -702,9 +821,9 @@ The body lists delivered scope, explicit recruitment exclusion, database locatio
 - [ ] Every new behavior has an explicit failing-test step before implementation.
 - [ ] Rust tests are registered before the first targeted Cargo test invocation.
 - [ ] Task 3 begins tracking `Cargo.lock`; later Rust tasks retain it.
-- [ ] Recovery prepares but never consumes the catch-up window.
-- [ ] HTTP combines address validation, DNS pinning, disabled redirects and streaming 5 MiB enforcement.
+- [ ] Application-top-level recovery runs once outside StrictMode, shares state, supports UI retry, and prepares but never consumes the catch-up window.
+- [ ] HTTP accepts sourceId only, loads URL/host from SQLite, and combines address validation, DNS pinning, disabled redirects and streaming 5 MiB enforcement.
 - [ ] Native secrets use only `windows-native`; browser behavior never persists Key.
 - [ ] Settings writes secrets only on explicit save.
-- [ ] `capabilities/default.json` is absent from modification lists and verified unchanged.
+- [ ] `capabilities/default.json` is absent from modification lists and verified by committed diffs from the approved and synchronized remote baselines.
 - [ ] Full frontend, build, Rust, desktop and browser gates are specified.
