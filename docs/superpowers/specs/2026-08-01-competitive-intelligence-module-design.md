@@ -191,6 +191,7 @@ TypeScript 使用 camelCase，Rust 结构以 serde rename 统一。IPC 错误对
 - `Cargo.lock` 已跟踪；所有 Rust 验收显示并使用 `1.77.2-x86_64-pc-windows-msvc`。Tauri capabilities 相对批准基线及同步后的远端基线均无 committed diff。
 - 新模块无招聘 UI、表、采集器或文案。
 - 前端测试、typecheck、build、Rust 测试和 Cargo check 全部通过。
+- 手工协议、自动化 gate、桌面 smoke 或浏览器 smoke 的任一失败都阻止验收文档提交；先复现并尽可能转为自动化 RED 回归测试，做最小修复，跑 focused/full gate，再顺序复验两种 smoke 模式，直到全部为绿。
 
 ## 12. 后续计划
 

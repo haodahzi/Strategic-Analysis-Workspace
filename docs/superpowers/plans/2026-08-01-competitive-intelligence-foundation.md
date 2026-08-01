@@ -99,7 +99,7 @@
 
 ### Task 1: Establish the isolated worktree and capture the clean baseline
 
-**Working directory:** repository root of the prepared `feature/competitive-intelligence` worktree. Do not change directory during this task.
+**Working directory:** choose exactly one safe preparation path. Path A starts in the intended parent directory and ends by entering the new feature worktree root. Path B starts in the controller/Codex-prepared feature worktree root. After either path, Steps 3–5 run from that feature worktree root without changing directory.
 
 **Files:**
 
@@ -112,20 +112,65 @@
 - Consumes: approved base and amendments.
 - Produces: isolated `feature/competitive-intelligence` worktree, clean baseline evidence, and one documentation-only commit.
 
-- [ ] **Step 1: Verify the prepared repository, remote and feature worktree**
+- [ ] **Step 1 (Path A — from zero): Clone safely and create the isolated feature worktree**
+
+Start in the parent directory that will contain the repository and worktree. Use normal HTTPS validation; do not set any option that disables TLS certificate or revocation checks.
 
 ```powershell
-git remote -v
-git fetch origin
-git remote show origin
-git branch --show-current
-git rev-parse HEAD
+$repoPath = Join-Path (Get-Location) "Strategic-Analysis-Workspace"
+$worktreePath = Join-Path (Get-Location) "Strategic-Analysis-Workspace-intelligence"
+$expectedOrigin = "https://github.com/haodahzi/Strategic-Analysis-Workspace.git"
+$expectedRemoteHead = "origin/claude/business-project-docking-workbench-ccies1"
+$expectedBase = "79d26128baae4c43ac08b7c62948fc986e62a941"
+git clone --filter=blob:none --branch "claude/business-project-docking-workbench-ccies1" https://github.com/haodahzi/Strategic-Analysis-Workspace.git $repoPath
+if ($LASTEXITCODE -ne 0) { throw "HTTPS clone failed; do not weaken TLS validation" }
+git -C $repoPath fetch origin
+if ($LASTEXITCODE -ne 0) { throw "HTTPS fetch failed; do not weaken TLS validation" }
+$originUrl = (git -C $repoPath remote get-url origin).Trim()
+$remoteHead = (git -C $repoPath symbolic-ref --short refs/remotes/origin/HEAD).Trim()
+$baseCommit = (git -C $repoPath rev-parse "origin/claude/business-project-docking-workbench-ccies1^{commit}").Trim()
+if ($originUrl -ne $expectedOrigin) { throw "Unexpected origin URL: $originUrl" }
+if ($remoteHead -ne $expectedRemoteHead) { throw "Unexpected remote HEAD: $remoteHead" }
+if ($baseCommit -ne $expectedBase) { throw "Unexpected baseline: $baseCommit" }
+git -C $repoPath worktree add $worktreePath -b feature/competitive-intelligence "origin/claude/business-project-docking-workbench-ccies1"
+if ($LASTEXITCODE -ne 0) { throw "Feature worktree creation failed" }
+Set-Location -LiteralPath $worktreePath
+$branch = (git branch --show-current).Trim()
+if ($branch -ne "feature/competitive-intelligence") { throw "Unexpected branch: $branch" }
+git worktree list --porcelain
 git status --short
 ```
 
-Expected: repository is `haodahzi/Strategic-Analysis-Workspace`, branch is `feature/competitive-intelligence`, the approved base exists, and only controller-owned task metadata may be untracked. Fetch uses normal HTTPS/TLS validation; if it fails, stop and do not weaken certificate or revocation checks. Repository cloning and worktree creation are controller preconditions, not commands run inside this task.
+Expected: clone/fetch succeeds with normal HTTPS/TLS validation; origin URL is exactly `https://github.com/haodahzi/Strategic-Analysis-Workspace.git`; remote HEAD is `origin/claude/business-project-docking-workbench-ccies1`; that remote branch resolves to approved baseline `79d26128baae4c43ac08b7c62948fc986e62a941`; the new isolated worktree is on `feature/competitive-intelligence` and clean. If any identity, HEAD, baseline or TLS check differs/fails, stop without weakening validation or creating the feature worktree.
 
-- [ ] **Step 2: Record the untouched baseline from repository root**
+- [ ] **Step 2 (Path B — controller/Codex prepared): Verify the existing worktree in place**
+
+Run from the prepared feature worktree root; do not clone or create another worktree.
+
+```powershell
+$expectedOrigin = "https://github.com/haodahzi/Strategic-Analysis-Workspace.git"
+$expectedRemoteHead = "origin/claude/business-project-docking-workbench-ccies1"
+$expectedBase = "79d26128baae4c43ac08b7c62948fc986e62a941"
+git fetch origin
+if ($LASTEXITCODE -ne 0) { throw "HTTPS fetch failed; do not weaken TLS validation" }
+$originUrl = (git remote get-url origin).Trim()
+$remoteHead = (git symbolic-ref --short refs/remotes/origin/HEAD).Trim()
+$baseCommit = (git rev-parse "origin/claude/business-project-docking-workbench-ccies1^{commit}").Trim()
+if ($originUrl -ne $expectedOrigin) { throw "Unexpected origin URL: $originUrl" }
+if ($remoteHead -ne $expectedRemoteHead) { throw "Unexpected remote HEAD: $remoteHead" }
+if ($baseCommit -ne $expectedBase) { throw "Unexpected baseline: $baseCommit" }
+git merge-base --is-ancestor 79d26128baae4c43ac08b7c62948fc986e62a941 HEAD
+if ($LASTEXITCODE -ne 0) { throw "Approved baseline is not an ancestor of HEAD" }
+$branch = (git branch --show-current).Trim()
+if ($branch -ne "feature/competitive-intelligence") { throw "Unexpected branch: $branch" }
+git rev-parse --is-inside-work-tree
+git worktree list --porcelain
+git status --short
+```
+
+Expected: normal HTTPS fetch succeeds; origin URL and remote HEAD exactly match Path A; the target remote branch resolves to approved baseline `79d26128...`; that baseline is an ancestor of current HEAD; branch is `feature/competitive-intelligence`; the directory is a registered worktree; only controller-owned task metadata may be untracked. Any mismatch or TLS failure stops execution without weakening validation.
+
+- [ ] **Step 3 (paths converge): Record the untouched baseline from feature worktree root**
 
 ```powershell
 npm --prefix app ci
@@ -139,11 +184,11 @@ cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path app/src-tauri/Cargo.t
 
 Expected: existing tests pass, typecheck/build exit 0, and Cargo check passes under Rust 1.77.2/MSVC.
 
-- [ ] **Step 3: Add the approved design and plan with apply_patch**
+- [ ] **Step 4: Add the approved design and plan with apply_patch**
 
 Create exactly the two docs named above. Confirm the plan contains all eight tasks and this approved-amendments section. Do not create product files in this task.
 
-- [ ] **Step 4: Commit only the documents**
+- [ ] **Step 5: Commit only the documents**
 
 ```powershell
 git add docs/superpowers/specs/2026-08-01-competitive-intelligence-module-design.md docs/superpowers/plans/2026-08-01-competitive-intelligence-foundation.md
@@ -757,26 +802,27 @@ git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app
 
 Expected: printed `rustc`/`cargo` are exactly 1.77.2 MSVC; automated commands exit 0; Cargo.lock is printed as tracked; committed capability diff from the approved baseline is empty. Review grep matches by path: the new module must have none, and pre-existing matches outside it are documented rather than deleted mechanically.
 
-- [ ] **Step 3: Close any gate failure with a RED-to-green focused fix**
+- [ ] **Step 3: Route any acceptance failure through one RED-to-green repair loop**
 
-If every Step 2 command passes, explicitly record “no gate failure” in the acceptance document and skip the repair commit in this step.
+This loop applies equally to any failure discovered by Step 1's manual protocol, Step 2's automated gate, or Step 4's desktop/browser smoke tests. Step 1 or Step 2 failures enter it immediately; Step 4 failures return here before Step 5. Only after Steps 1, 2 and 4 all pass with no repair needed may the acceptance document record “no gate failure” and skip the repair commit.
 
-If any command fails, do not edit production code immediately. Complete this loop in order:
+When any of those three acceptance classes fails, do not edit production code immediately. Complete this loop in order:
 
-1. Re-run the exact failing Step 2 command and record its output, exit code and smallest reproducible input.
-2. Add the narrowest regression test adjacent to the affected TypeScript/Rust module. Run only that exact test first and confirm RED for the observed defect (not for a missing import, module registration or fixture mistake). Rust RED uses the printed `+1.77.2-x86_64-pc-windows-msvc` toolchain.
+1. Reproduce the exact failed manual check, automated command or smoke scenario and record its output/observation, exit code where applicable, mode (`desktop` or `browser`) and smallest reproducible input.
+2. Add the narrowest automated regression test adjacent to the affected TypeScript/Rust module. Run only that exact test first and confirm RED for the observed defect (not for a missing import, module registration or fixture mistake). Rust RED uses the printed `+1.77.2-x86_64-pc-windows-msvc` toolchain. A smoke defect must be converted to an automated failing regression whenever technically possible; if it cannot be automated, document the concrete limitation and retain a deterministic manual reproduction before fixing.
 3. Implement the minimum product change that makes the regression test pass; do not refactor unrelated code.
-4. Re-run the focused regression test until green, then run the complete Step 2 automated gate again.
-5. Review `git -C .. diff --name-only` and stage only the new regression test plus its minimum product fix using explicit file paths. Verify the staged diff, then create the focused repair commit:
+4. Re-run the focused regression test until green, then run the complete Step 2 automated gate again. For a Step 1 manual failure, rerun the affected manual check. For a Step 4 smoke failure, rerun the affected smoke mode and then stop it and rerun the other smoke mode as well.
+5. Repeat items 1–4 for every remaining or newly exposed failure. Do not proceed while any manual, automated, desktop smoke or browser smoke check is red.
+6. Review `git -C .. diff --name-only`. Replace the two angle-bracket tokens below with the actual explicit repository-root paths for the new regression test and minimum product fix; never run the command with literal tokens and never replace it with a broad directory path. Verify the staged allowlist, then create the focused repair commit:
 
 ```powershell
-git -C .. add -- app
+git -C .. add -- <regression-test-path> <minimal-fix-path>
 git -C .. diff --cached --check
 git -C .. diff --cached --name-only
 git -C .. commit -m "fix(intelligence): resolve foundation acceptance failure"
 ```
 
-Expected: the focused commit contains both the regression test and product fix, and the complete gate passes afterward. Do not include `docs/testing/competitive-intelligence-foundation.md` in this repair commit; it is committed separately in Step 5.
+Expected before commit: `git diff --cached --name-only` exactly matches the resolved regression-test/fix allowlist and contains no documentation or unrelated path. Expected after commit: the focused commit contains the regression test and minimum product fix, the complete automated gate is green, affected manual checks are green, and both smoke modes are green. Do not include `docs/testing/competitive-intelligence-foundation.md` in this repair commit; it is committed separately in Step 5.
 
 - [ ] **Step 4: Run the desktop and browser smoke tests**
 
@@ -796,7 +842,11 @@ npm run dev
 
 Expected browser behavior: app starts without Tauri/keyring, non-secret functions work, secret persistence is clearly unavailable, and no Key is written to localStorage. Do not run desktop and browser smoke servers concurrently on the same configured port.
 
+If either desktop or browser smoke fails, return to Step 3. Convert the defect to an automated RED regression when possible, make the minimum fix, run focused and complete automated gates, then rerun the failed mode and the other mode sequentially. Step 5 is blocked until both smoke modes pass.
+
 - [ ] **Step 5: Commit verification documentation separately**
+
+Precondition: every Step 1 manual check, every Step 2 automated command, and both Step 4 smoke modes pass after any Step 3 repair loop. The acceptance document must not be committed with a known or unresolved failure.
 
 ```powershell
 git -C .. add -- docs/testing/competitive-intelligence-foundation.md
