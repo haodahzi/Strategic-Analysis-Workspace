@@ -94,8 +94,8 @@ function typeNote(kind: string, company?: string): string {
       "```chain\n上游·核心供应 | UPSTREAM\n- 关键芯片（壁垒/利润最高） | 英伟达、华为昇腾、寒武纪\n- 关键部件 | 厂商A、厂商B\n中游·制造/服务 | MIDSTREAM | mid\n- 本环节 ★核心 | 厂商C、厂商D | hot\n下游·应用 | DOWNSTREAM\n- 应用场景 | 客户E、客户F\n~ 上游→下游为产品流，资金自下而上回流\n```\n" +
       "有明显时间演进的用 ```timeline（每行：年份 | 事件 | 一句说明）。判断哪些内容更适合表格 / 结构化，就用表格或这些块，不要堆成大段文字。";
   return "这是一份项目可行性研究：客观评估能不能做、怎么做、值不值得；先做研究、不预设立场，「我方」信息只用给定材料、绝不虚构。" +
-    "交易结构 / 资金流务必用一个 ```flow 代码块表达，每行：`出方 | 收方 | 标的·款项 | solid 或 dashed`（solid＝资金 / 实物往来，dashed＝服务 / 持有关系）。示例：\n" +
-    "```flow\n资金方/投资人 | 卡源/集成商 | 采购款 | solid\n卡源/集成商 | 运营方 | 设备 | solid\n资金方/投资人 | 运营方 | 出资/持有资产 | dashed\n客户/消纳方 | 运营方 | 租金 | solid\n运营方 | 客户/消纳方 | 服务 | dashed\n```";
+    "交易结构务必用一个 ```dealflow 代码块画成中心辐射图：先用 `hub | 中心方 | 一句职能` 定中心（通常是这单的运营 / 主导方），再用 `周边方 | 一句说明 | 槽位` 定各方（槽位取 tl/t/tr/l/r/bl/b/br，把上下游与资金方合理摆放），最后用 `> 出方 | 收方 | 标的·款项 | solid或dashed` 连线（出/收方写节点名或 hub；solid＝资金/实物，dashed＝服务/持有）。示例：\n" +
+    "```dealflow\nhub | 运营方 | 上架·调度·运维\n资金方/投资人 | 自有/融资租赁 | tl\n集成商 | 设备采购 | l\n客户/消纳方 | 大模型·政企 | r\n场地方/IDC | 电力·机柜 | b\n> 资金方/投资人 | 集成商 | 采购款 | solid\n> 集成商 | hub | 设备 | solid\n> 资金方/投资人 | hub | 出资/持有 | dashed\n> 客户/消纳方 | hub | 租金 | solid\n> hub | 客户/消纳方 | 服务 | dashed\n> hub | 场地方/IDC | 机柜·电力费 | solid\n```";
 }
 
 export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model: string): ChatRequest {

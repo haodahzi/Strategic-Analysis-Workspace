@@ -77,6 +77,70 @@ function renderFlow(rows: string[]): string {
   return `<div class="flowdiag"><div class="flow-cap">交易结构 · 资金流与实物流（虚线＝服务 / 持有关系）</div>${items}</div>`;
 }
 
+// 交易结构 2D 中心辐射图——```dealflow：
+//   hub | 中心方名称 | 一句职能
+//   周边方名称 | 一句说明 | 槽位(tl/t/tr/l/r/bl/b/br)
+//   > 出方 | 收方 | 标的·款项 | solid 或 dashed   （出/收方用节点名或 hub）
+interface DealNode { label: string; sub: string; cx: number; cy: number; hw: number; hh: number; hub: boolean; }
+const DEAL_SLOTS: Record<string, [number, number]> = {
+  hub: [410, 235], t: [410, 55], b: [410, 415], tl: [150, 92], tr: [670, 92], l: [150, 235], r: [670, 235], bl: [150, 378], br: [670, 378],
+};
+
+function renderDealflow(rows: string[]): string {
+  const nodes = new Map<string, DealNode>();
+  const edges: { from: string; to: string; label: string; dashed: boolean }[] = [];
+  const free = ["tl", "tr", "l", "r", "bl", "br", "t", "b"];
+  let si = 0;
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith(">")) {
+      const c = line.replace(/^>+\s*/, "").split("|").map((x) => x.trim());
+      edges.push({ from: c[0] ?? "", to: c[1] ?? "", label: c[2] ?? "", dashed: /dash|虚|服务|持有|token/i.test(c[3] ?? "") });
+      continue;
+    }
+    const c = line.split("|").map((x) => x.trim());
+    const isHub = /^(hub|中心|中央|运营方)/i.test(c[0]);
+    const slot = isHub ? "hub" : (DEAL_SLOTS[c[2]] ? c[2] : (free[si++] ?? "b"));
+    const [cx, cy] = DEAL_SLOTS[slot] ?? DEAL_SLOTS.b;
+    const label = isHub ? (c[1] || c[0]) : c[0];
+    const node: DealNode = { label, sub: isHub ? (c[2] || "") : (c[1] || ""), cx, cy, hw: isHub ? 92 : 76, hh: isHub ? 33 : 28, hub: isHub };
+    nodes.set(label, node);
+    if (isHub) nodes.set("hub", node);
+  }
+  if (!nodes.has("hub") && nodes.size) { const f = [...nodes.values()][0]; f.cx = 410; f.cy = 235; f.hw = 92; f.hh = 33; f.hub = true; nodes.set("hub", f); }
+
+  const pt = (n: DealNode, tx: number, ty: number): [number, number] => {
+    const dx = tx - n.cx, dy = ty - n.cy;
+    const t = Math.min(n.hw / (Math.abs(dx) || 1e-6), n.hh / (Math.abs(dy) || 1e-6));
+    return [n.cx + dx * t, n.cy + dy * t];
+  };
+  const n1 = (v: number) => v.toFixed(1);
+
+  const edgeSvg = edges.map((e) => {
+    const a = nodes.get(e.from), b = nodes.get(e.to);
+    if (!a || !b || a === b) return "";
+    const [sx, sy] = pt(a, b.cx, b.cy);
+    const [ex, ey] = pt(b, a.cx, a.cy);
+    const ang = Math.atan2(ey - sy, ex - sx);
+    const ax = ex - 9 * Math.cos(ang), ay = ey - 9 * Math.sin(ang);
+    const arrow = `${n1(ex)},${n1(ey)} ${n1(ex - 10 * Math.cos(ang - 0.42))},${n1(ey - 10 * Math.sin(ang - 0.42))} ${n1(ex - 10 * Math.cos(ang + 0.42))},${n1(ey - 10 * Math.sin(ang + 0.42))}`;
+    const col = e.dashed ? "#8a847c" : "#9a6c00";
+    const mx = (sx + ex) / 2, my = (sy + ey) / 2, w = e.label.length * 11 + 6;
+    const lbl = e.label ? `<rect x="${n1(mx - w / 2)}" y="${n1(my - 9)}" width="${n1(w)}" height="18" fill="#f4f1eb"/><text x="${n1(mx)}" y="${n1(my + 4)}" text-anchor="middle" font-size="11" fill="${e.dashed ? "#484440" : "#7a5600"}">${escapeHtml(e.label)}</text>` : "";
+    return `<line x1="${n1(sx)}" y1="${n1(sy)}" x2="${n1(ax)}" y2="${n1(ay)}" stroke="${col}" stroke-width="1.6"${e.dashed ? ' stroke-dasharray="5 4"' : ""}/><polygon points="${arrow}" fill="${col}"/>${lbl}`;
+  }).join("");
+
+  const nodeSvg = [...new Set([...nodes.values()])].map((n) => {
+    const fill = n.hub ? "#b03020" : "#1a1712";
+    const t1 = `<text x="${n1(n.cx)}" y="${n1(n.cy + (n.sub ? -5 : 4))}" text-anchor="middle" fill="#fff" font-size="${n.hub ? 15 : 12.5}" font-weight="700">${escapeHtml(n.label)}</text>`;
+    const t2 = n.sub ? `<text x="${n1(n.cx)}" y="${n1(n.cy + 13)}" text-anchor="middle" fill="rgba(255,255,255,.62)" font-size="9.5">${escapeHtml(n.sub)}</text>` : "";
+    return `<rect x="${n1(n.cx - n.hw)}" y="${n1(n.cy - n.hh)}" width="${n1(n.hw * 2)}" height="${n1(n.hh * 2)}" rx="2" fill="${fill}"/>${t1}${t2}`;
+  }).join("");
+
+  return `<div class="diagram"><svg viewBox="0 0 820 470" width="100%" xmlns="http://www.w3.org/2000/svg">${edgeSvg}${nodeSvg}</svg><div class="dia-cap">图 · 典型交易结构与资金流（实线＝资金 / 实物，虚线＝服务 / 持有关系）</div></div>`;
+}
+
 // 时间轴——```timeline 每行：年份 | 事件 | 说明
 function renderTimeline(rows: string[]): string {
   const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
@@ -131,6 +195,7 @@ export function mdToHouseHtml(md: string): string {
       if (lang === "chain") out.push(renderChain(body));
       else if (lang === "timeline") out.push(renderTimeline(body));
       else if (lang === "flow") out.push(renderFlow(body));
+      else if (lang === "dealflow") out.push(renderDealflow(body));
       else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
       continue;
     }

@@ -73,6 +73,17 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(h).toContain('class="flow-edge dashed"');   // 服务/持有 → 虚线
   });
 
+  it("```dealflow 渲染 2D 中心辐射图（SVG：中心方红、连线、箭头、虚实线）", () => {
+    const h = mdToHouseHtml("```dealflow\nhub | 运营方 | 上架·运维\n资金方 | 自有资金 | tl\n客户 | 大模型 | r\n> 资金方 | hub | 出资 | dashed\n> 客户 | hub | 租金 | solid\n```");
+    expect(h).toContain('class="diagram"');
+    expect(h).toContain("<svg");
+    expect(h).toContain('fill="#b03020"');         // 中心方红色
+    expect(h).toContain("stroke-dasharray");        // 虚线（服务/持有）
+    expect(h).toContain("<polygon");                // 箭头
+    expect(h).toContain(">运营方</text>");
+    expect(h).toContain(">租金</text>");
+  });
+
   it("```timeline 渲染时间轴", () => {
     const h = mdToHouseHtml("```timeline\n2020 | 起步 | 少量样机\n2023 | 放量 | 整机厂配套\n```");
     expect(h).toContain('class="tl"');
@@ -143,13 +154,18 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
     "> 风险：量产良率与成本下降速度存在不确定性，是决定行业能否放量的关键前提；相关数据多为厂商口径，需独立核实。",
     "",
     "## 交易结构（项目分析示例）",
-    "```flow",
-    "资金方/投资人 | 卡源/集成商 | 采购款 | solid",
-    "卡源/集成商 | 算力租赁运营方 | GPU 服务器 | solid",
-    "资金方/投资人 | 算力租赁运营方 | 出资/持有资产 | dashed",
-    "客户/消纳方 | 算力租赁运营方 | 租金 | solid",
-    "算力租赁运营方 | 客户/消纳方 | 算力/Token 服务 | dashed",
-    "算力租赁运营方 | 场地方/IDC | 机柜·电力·运维费 | solid",
+    "```dealflow",
+    "hub | 算力租赁运营方 | 上架·调度·运维·签约",
+    "资金方/投资人 | 自有资金 / 融资租赁 | tl",
+    "卡源/集成商 | 英伟达渠道·超聚变·浪潮 | l",
+    "客户/消纳方 | 大模型公司·互联网大厂·政企 | r",
+    "场地方/IDC | 土地·电力·能耗·机柜·液冷 | b",
+    "> 资金方/投资人 | 卡源/集成商 | 采购款 | solid",
+    "> 卡源/集成商 | hub | GPU 服务器 | solid",
+    "> 资金方/投资人 | hub | 出资/持有资产 | dashed",
+    "> 客户/消纳方 | hub | 租金 | solid",
+    "> hub | 客户/消纳方 | 算力/Token 服务 | dashed",
+    "> hub | 场地方/IDC | 机柜·电力·运维费 | solid",
     "```",
     "",
     "## 结论",
