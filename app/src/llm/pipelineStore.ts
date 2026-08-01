@@ -4,6 +4,7 @@ import {
   MockReport, PipelineCtx, PipelineInput, REPORT_PIPELINE, StageResult,
   buildStageRequest, mockReport, mockStageOutput,
 } from "./pipeline";
+import { ChatRequest, LLMClient } from "./types";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
@@ -66,6 +67,20 @@ function effectiveMaterials(s: RunState): string {
   return [s.materials.trim(), ...s.attachments.map((a) => `【附件：${a.name}】\n${a.text}`)].filter(Boolean).join("\n\n");
 }
 
+// 长文本生成：命中输出上限就自动续写、拼接，直到写完或达轮数上限（#5 篇幅不再受单次 token 限制）。
+async function sendComplete(client: LLMClient, req: ChatRequest, maxRounds = 5): Promise<string> {
+  const messages = [...req.messages];
+  let full = "";
+  for (let r = 0; r < maxRounds; r++) {
+    const res = await client.send({ ...req, messages });
+    full += res.text;
+    if (!res.truncated || !res.text.trim()) break;
+    messages.push({ role: "assistant", content: res.text });
+    messages.push({ role: "user", content: "接着上文继续写完，从中断处直接续写，不要重复已写内容、不要重开标题或寒暄。" });
+  }
+  return full;
+}
+
 // 启动 / 续跑一份深度分析。异步循环活在 store 里，组件卸载也继续。resume=从已完成的步接着跑（#6）。
 async function runPipeline(id: string, input: PipelineInput, resume: boolean): Promise<void> {
   if (getRun(id).running) return;
@@ -105,9 +120,11 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
     const pick = cfg.agents[s.role];
     const p2 = providerById(cfg, pick.provider);
     try {
-      const res = await makeClient(p2, fetchImpl).send(buildStageRequest(s, ctx, pick.model));
-      ctx.outputs[s.id] = res.text;
-      patch(id, { outputs: [...getRun(id).outputs.filter((o) => o.stageId !== s.id), { stageId: s.id, summary: res.text }], status: { ...getRun(id).status, [s.id]: "完成" } });
+      // 起草 / 定稿是正文，命中上限自动续写把篇幅写足；其余步骤单次即可
+      const rounds = s.id === "draft" || s.id === "final" ? 5 : 1;
+      const text = await sendComplete(makeClient(p2, fetchImpl), buildStageRequest(s, ctx, pick.model), rounds);
+      ctx.outputs[s.id] = text;
+      patch(id, { outputs: [...getRun(id).outputs.filter((o) => o.stageId !== s.id), { stageId: s.id, summary: text }], status: { ...getRun(id).status, [s.id]: "完成" } });
     } catch (e) {
       patch(id, { err: `${p2.label}（${s.role}）：${(e as Error).message.slice(0, 160)}`, status: { ...getRun(id).status, [s.id]: "待执行" }, running: false });
       return;

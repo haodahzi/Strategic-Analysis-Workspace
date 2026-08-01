@@ -31,16 +31,40 @@ function splitRow(line: string): string[] {
   return line.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
 }
 
-// 产业链三列（上游 / 中游 / 下游 + 代表企业）——```chain 每行：环节 | 说明 | 代表企业（、分隔）
+// 产业链三列（上游 / 中游 / 下游），每列多个分组 + 代表企业，中游高亮、可标★核心、底部流向。
+//   ```chain
+//   上游·软硬件供应 | UPSTREAM
+//   - AI 芯片（壁垒/利润最高） | 英伟达、华为昇腾、寒武纪
+//   中游·算力中心服务 | MIDSTREAM | mid
+//   - 算力租赁 / 运营 ★本报告核心 | 利通电子、协创数据 | hot
+//   ~ 算力自上而下流动 → 资金自下而上回流
+interface ChainGroup { title: string; companies: string; hot: boolean; }
+interface ChainCol { title: string; en: string; mid: boolean; extra: string; groups: ChainGroup[]; }
+
 function renderChain(rows: string[]): string {
-  const labels = ["UPSTREAM", "MIDSTREAM", "DOWNSTREAM"];
-  const defTier = ["上游", "中游", "下游"];
-  const cols = rows.map((r) => r.trim()).filter(Boolean).slice(0, 3).map((r, i) => {
-    const c = r.split("|").map((x) => x.trim());
-    const tags = (c[2] ?? "").split(/[、,，;；]/).map((s) => s.trim()).filter(Boolean).map((x) => `<span class="tag">${inline(x)}</span>`).join("");
-    return `<div class="chain-col${i === 1 ? " mid" : ""}"><div class="chain-hd">${inline(c[0] || defTier[i])}<span class="cx">${labels[i] ?? ""}</span></div><div class="chain-body"><div class="cgrp"><div class="cgrp-t">${inline(c[1] ?? "")}</div><div class="tags">${tags}</div></div></div></div>`;
+  const cols: ChainCol[] = [];
+  let flow = "";
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("~")) { flow = line.replace(/^~+\s*/, ""); continue; }
+    if (line.startsWith("-")) {
+      const c = line.replace(/^-+\s*/, "").split("|").map((x) => x.trim());
+      if (cols.length) cols[cols.length - 1].groups.push({ title: c[0] ?? "", companies: c[1] ?? "", hot: /hot|核心|★/.test((c[2] ?? "") + (c[0] ?? "")) });
+      continue;
+    }
+    const c = line.split("|").map((x) => x.trim());
+    cols.push({ title: c[0] ?? "", en: c[1] ?? "", mid: /mid|中游/.test(c[2] ?? "") || (c[0] ?? "").includes("中游"), extra: c[2] ?? "", groups: [] });
+  }
+  const tagsOf = (s: string) => s.split(/[、,，;；]/).map((x) => x.trim()).filter(Boolean).map((x) => `<span class="tag">${inline(x)}</span>`).join("");
+  const colHtml = cols.slice(0, 3).map((col, i) => {
+    // 兜底：只写了一行「标题 | 说明 | 企业」而没有 - 分组时，用第 3 段当作一个分组
+    const groups = col.groups.length ? col.groups
+      : (col.extra && /[、,，]/.test(col.extra) ? [{ title: "", companies: col.extra, hot: false }] : []);
+    const body = groups.map((g) => `<div class="cgrp${g.hot ? " hot" : ""}">${g.title ? `<div class="cgrp-t">${inline(g.title)}</div>` : ""}<div class="tags">${tagsOf(g.companies)}</div></div>`).join("");
+    return `<div class="chain-col${col.mid || i === 1 ? " mid" : ""}"><div class="chain-hd">${inline(col.title)}<span class="cx">${inline(col.en)}</span></div><div class="chain-body">${body}</div></div>`;
   }).join("");
-  return `<div class="chain">${cols}</div>`;
+  return `<div class="chain">${colHtml}</div>${flow ? `<div class="chain-flow">${inline(flow)}</div>` : ""}`;
 }
 
 // 时间轴——```timeline 每行：年份 | 事件 | 说明

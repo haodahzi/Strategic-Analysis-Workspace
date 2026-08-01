@@ -55,6 +55,16 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(h).toContain('class="tag">企业B</span>');
   });
 
+  it("```chain 多分组 + ★核心高亮 + 流向脚注", () => {
+    const h = mdToHouseHtml("```chain\n上游·供应 | UPSTREAM\n- AI 芯片 | 英伟达、寒武纪\n- 光模块 | 中际旭创\n中游·服务 | MIDSTREAM | mid\n- 算力租赁 ★核心 | 利通电子、协创数据 | hot\n下游·应用 | DOWNSTREAM\n- 互联网 | 阿里、腾讯\n~ 算力自上而下、资金自下而上\n```");
+    expect((h.match(/class="chain-col/g) ?? []).length).toBe(3);
+    expect(h).toContain('class="cgrp hot"');
+    expect(h).toContain('class="tag">利通电子</span>');
+    expect(h).toContain('class="chain-flow"');
+    expect(h).toContain("英伟达");
+    expect(h).toContain("光模块");
+  });
+
   it("```timeline 渲染时间轴", () => {
     const h = mdToHouseHtml("```timeline\n2020 | 起步 | 少量样机\n2023 | 放量 | 整机厂配套\n```");
     expect(h).toContain('class="tl"');
@@ -92,9 +102,17 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
     "",
     "## 产业链",
     "```chain",
-    "上游 | 触觉传感、微型电机、减速器、控制芯片 | 汉威科技、鸣志电器、兆威机电",
-    "中游 | 灵巧手本体设计与集成 | 因时机器人、灵心巧手、强脑科技",
-    "下游 | 人形机器人整机与应用场景 | 特斯拉、优必选、宇树科技",
+    "上游·核心零部件 | UPSTREAM",
+    "- 触觉传感（壁垒/利润最高） | 汉威科技、柯力传感、能斯达",
+    "- 微型电机 / 减速器 | 鸣志电器、兆威机电、绿的谐波",
+    "- 控制芯片 | 兆易创新、峰岹科技",
+    "中游·本体集成 | MIDSTREAM | mid",
+    "- 灵巧手本体 ★本报告核心 | 因时机器人、灵心巧手、强脑科技、傲意科技 | hot",
+    "- 关节 / 模组 | 绿的谐波、步科股份",
+    "下游·整机与应用 | DOWNSTREAM",
+    "- 人形机器人整机 | 特斯拉、优必选、宇树科技、智元机器人",
+    "- 工业 / 服务场景 | 工业产线、医疗康复、服务机器人",
+    "~ 上游 → 下游为产品流，价值与议价力集中在上游传感与中游集成",
     "```",
     "> 洞察：上游的触觉传感与微型驱动是价值与壁垒所在，中游集成的差异化相对有限。",
     "",

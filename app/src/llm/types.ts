@@ -22,7 +22,7 @@ export interface ChatRequest {
 }
 
 export interface HttpSpec { url: string; headers: Record<string, string>; body: unknown; }
-export interface LLMResult { text: string; raw?: unknown; }
+export interface LLMResult { text: string; raw?: unknown; truncated?: boolean; }   // truncated=命中输出上限，需续写
 export interface LLMClient { send(req: ChatRequest): Promise<LLMResult>; }
 
 // 多智能体子任务：报告流水线按这些子任务推进，各自可选模型（红队宜换一家/一款互查）。

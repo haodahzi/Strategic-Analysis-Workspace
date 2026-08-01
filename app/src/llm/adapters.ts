@@ -49,6 +49,14 @@ export function parseResponse(style: ProviderStyle, json: unknown): string {
   return choices?.[0]?.message?.content ?? "";
 }
 
+// 是否命中输出上限被截断（需续写）。anthropic: stop_reason=max_tokens；openai: finish_reason=length。
+export function parseTruncated(style: ProviderStyle, json: unknown): boolean {
+  const j = json as Record<string, unknown>;
+  if (style === "anthropic") return j?.stop_reason === "max_tokens";
+  const choices = j?.choices as Array<{ finish_reason?: string }> | undefined;
+  return choices?.[0]?.finish_reason === "length";
+}
+
 function mockClient(): LLMClient {
   return {
     async send(): Promise<LLMResult> {
@@ -73,7 +81,7 @@ export function makeClient(cfg: ProviderConfig, fetchImpl: typeof fetch = fetch)
         throw new Error(`${cfg.label} ${res.status} ${detail.slice(0, 200)}`);
       }
       const json = await res.json();
-      return { text: parseResponse(cfg.style, json), raw: json };
+      return { text: parseResponse(cfg.style, json), raw: json, truncated: parseTruncated(cfg.style, json) };
     },
   };
 }
