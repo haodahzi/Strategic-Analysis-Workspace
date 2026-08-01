@@ -2,8 +2,9 @@ import { AGENT_ROLES, AgentRole, AppConfig, DataSourceCfg, ModelPick, ProviderCo
 import { DEFAULT_PROVIDERS } from "../llm/providers";
 import { DATA_SOURCES } from "../sources/registry";
 
-const KEY = "dw.config.v1";              // 保持同一 key：升级到 step0/agents 结构时 apiKey 不丢
+export const CONFIG_STORAGE_KEY = "dw.config.v1";
 const MOCK: ModelPick = { provider: "mock", model: "mock-1" };
+const runtimeSecrets = new Map<ProviderId, string>();
 
 // 内置数据源默认全部启用（在「从信息源获取」里可见）；API Key 留空、由用户按需填。
 function defaultDataSources(): DataSourceCfg[] {
@@ -11,9 +12,9 @@ function defaultDataSources(): DataSourceCfg[] {
 }
 
 export function defaultConfig(): AppConfig {
-  const providers: ProviderConfig[] = Object.values(DEFAULT_PROVIDERS).map((p) => ({ ...p }));
+  const providers: ProviderConfig[] = Object.values(DEFAULT_PROVIDERS).map((provider) => ({ ...provider }));
   const agents = {} as Record<AgentRole, ModelPick>;
-  for (const a of AGENT_ROLES) agents[a] = { ...MOCK };
+  for (const role of AGENT_ROLES) agents[role] = { ...MOCK };
   return {
     providers, defaultProvider: "mock", step0: { ...MOCK }, agents,
     search: { provider: "none", baseUrl: "https://api.tavily.com/search", maxResults: 10, maxQueries: 10, maxSources: 50, preferDomains: [], freshness: "threeYears" },
@@ -22,34 +23,48 @@ export function defaultConfig(): AppConfig {
   };
 }
 
+function mergeSaved(saved: Partial<AppConfig>, includeLegacySecrets: boolean): AppConfig {
+  const base = defaultConfig();
+  const providers = base.providers.map((baseProvider) => {
+    const savedProvider = saved.providers?.find((provider) => provider.id === baseProvider.id);
+    const cachedSecret = runtimeSecrets.get(baseProvider.id);
+    if (!savedProvider) {
+      return cachedSecret === undefined ? baseProvider : { ...baseProvider, apiKey: cachedSecret };
+    }
+    const models = (savedProvider.models?.length ? savedProvider.models : baseProvider.models)
+      .flatMap((model) => model.split(/[,，、]+/))
+      .map((model) => model.trim())
+      .filter(Boolean);
+    const legacySecret = includeLegacySecrets ? savedProvider.apiKey : undefined;
+    const secret = cachedSecret ?? legacySecret;
+    return {
+      ...baseProvider,
+      ...(secret === undefined ? {} : { apiKey: secret }),
+      baseUrl: savedProvider.baseUrl || baseProvider.baseUrl,
+      models: models.length ? models : baseProvider.models,
+    };
+  });
+  const config: AppConfig = {
+    providers,
+    defaultProvider: saved.defaultProvider ?? base.defaultProvider,
+    step0: saved.step0 ?? base.step0,
+    agents: { ...base.agents, ...(saved.agents ?? {}) },
+    search: migrateSearch(base.search, saved.search),
+    vision: saved.vision ?? base.vision,
+    dataSources: mergeDataSources(saved.dataSources),
+  };
+  if (!saved.agents && config.defaultProvider !== "mock") {
+    return applyMainProvider(config, config.defaultProvider);
+  }
+  return config;
+}
+
 export function loadConfig(): AppConfig {
   try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(KEY) : null;
-    if (!raw) return defaultConfig();
-    const saved = JSON.parse(raw) as Partial<AppConfig>;
-    const base = defaultConfig();
-    // 以默认 provider 定义为准，套用已保存的 key/baseUrl/models；模型名顺手按逗号/顿号拆散自愈
-    const providers = base.providers.map((bp) => {
-      const sp = saved.providers?.find((x) => x.id === bp.id);
-      if (!sp) return bp;
-      const models = (sp.models?.length ? sp.models : bp.models)
-        .flatMap((m) => m.split(/[,，、]+/)).map((s) => s.trim()).filter(Boolean);
-      return { ...bp, apiKey: sp.apiKey, baseUrl: sp.baseUrl || bp.baseUrl, models: models.length ? models : bp.models };
-    });
-    const cfg: AppConfig = {
-      providers,
-      defaultProvider: saved.defaultProvider ?? base.defaultProvider,
-      step0: saved.step0 ?? base.step0,                    // 旧结构（routing）缺这些字段 → 回落默认
-      agents: { ...base.agents, ...(saved.agents ?? {}) },
-      search: migrateSearch(base.search, saved.search),
-      vision: saved.vision ?? base.vision,
-      dataSources: mergeDataSources(saved.dataSources),
-    };
-    // 迁移旧配置：若之前已选过真实主用提供商但还没有子任务路由，自动铺到定框+各子任务（Key 不用重配）
-    if (!saved.agents && cfg.defaultProvider !== "mock") return applyMainProvider(cfg, cfg.defaultProvider);
-    return cfg;
+    const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(CONFIG_STORAGE_KEY);
+    return raw ? mergeSaved(JSON.parse(raw) as Partial<AppConfig>, false) : mergeSaved({}, false);
   } catch {
-    return defaultConfig();
+    return mergeSaved({}, false);
   }
 }
 
@@ -73,22 +88,56 @@ function mergeDataSources(saved?: DataSourceCfg[]): DataSourceCfg[] {
   return merged.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
 }
 
-export function saveConfig(c: AppConfig): void {
+export function redactConfig(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    providers: config.providers.map(({ apiKey: _apiKey, ...provider }) => provider),
+  };
+}
+
+export function saveConfigOrThrow(config: AppConfig): void {
+  if (typeof localStorage === "undefined") throw new Error("configuration storage unavailable");
+  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(redactConfig(config)));
+}
+
+export function saveConfig(config: AppConfig): void {
   try {
-    if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(c));
-  } catch { /* 存储不可用时忽略 */ }
+    saveConfigOrThrow(config);
+  } catch {
+    // Ordinary preference writes remain best effort. Secure callers use saveConfigOrThrow.
+  }
 }
 
-export function providerById(c: AppConfig, id: ProviderId): ProviderConfig {
-  return c.providers.find((p) => p.id === id) ?? c.providers[0];
+export function readLegacyConfig(): { raw: string; config: AppConfig } | null {
+  if (typeof localStorage === "undefined") return null;
+  const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+  return raw ? { raw, config: mergeSaved(JSON.parse(raw) as Partial<AppConfig>, true) } : null;
 }
 
-// 选主用提供商：定框与所有子任务都用它；红队默认换该提供商的第 2 个模型（同一 Key 也能异构互查）。
-export function applyMainProvider(c: AppConfig, id: ProviderId): AppConfig {
-  const models = providerById(c, id).models;
-  const m0 = models[0] ?? "";
+export function getRuntimeSecret(providerId: ProviderId): string | undefined {
+  return runtimeSecrets.get(providerId);
+}
+
+export function replaceRuntimeSecrets(secrets: ReadonlyMap<ProviderId, string>): void {
+  runtimeSecrets.clear();
+  for (const [providerId, secret] of secrets) {
+    if (secret) runtimeSecrets.set(providerId, secret);
+  }
+}
+
+export function resetRuntimeSecretsForTests(): void {
+  runtimeSecrets.clear();
+}
+
+export function providerById(config: AppConfig, id: ProviderId): ProviderConfig {
+  return config.providers.find((provider) => provider.id === id) ?? config.providers[0];
+}
+
+export function applyMainProvider(config: AppConfig, id: ProviderId): AppConfig {
+  const models = providerById(config, id).models;
+  const mainModel = models[0] ?? "";
   const agents = {} as Record<AgentRole, ModelPick>;
-  for (const a of AGENT_ROLES) agents[a] = { provider: id, model: m0 };
-  agents["红队"] = { provider: id, model: models[1] ?? m0 };
-  return { ...c, defaultProvider: id, step0: { provider: id, model: m0 }, agents };
+  for (const role of AGENT_ROLES) agents[role] = { provider: id, model: mainModel };
+  agents["红队"] = { provider: id, model: models[1] ?? mainModel };
+  return { ...config, defaultProvider: id, step0: { provider: id, model: mainModel }, agents };
 }

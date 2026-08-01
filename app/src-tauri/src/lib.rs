@@ -154,7 +154,10 @@ pub fn run() {
             intelligence::fetch_source_snapshot,
             intelligence::list_recoverable_runs,
             intelligence::mark_run_interrupted,
-            intelligence::get_last_successful_sync
+            intelligence::get_last_successful_sync,
+            intelligence::secrets::get_provider_secret,
+            intelligence::secrets::set_provider_secret,
+            intelligence::secrets::delete_provider_secret
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

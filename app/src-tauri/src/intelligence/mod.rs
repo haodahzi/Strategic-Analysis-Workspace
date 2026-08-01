@@ -1,5 +1,6 @@
 pub mod database;
 pub mod fetch;
+pub mod secrets;
 pub mod snapshot;
 
 use tauri::{AppHandle, Manager, State};

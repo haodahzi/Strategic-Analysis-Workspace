@@ -1,18 +1,41 @@
 import { useState } from "react";
 import { AGENT_ROLES, AppConfig, DataSourceCfg, ModelPick, ProviderConfig, ProviderId, SearchConfig } from "../llm/types";
-import { applyMainProvider, loadConfig, providerById, saveConfig } from "../config/store";
+import { applyMainProvider, loadConfig, providerById } from "../config/store";
 import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
 import { SEARCH_ENDPOINTS, webSearch } from "../llm/search";
 import { sourceById } from "../sources/registry";
 import { openExternal, openSource } from "../sources/browser";
+import { saveCurrentConfigSecurely, type SecureSaveResult } from "../features/intelligence/infrastructure/secureConfig";
 
-export default function Settings() {
+interface SettingsProps {
+  saveSecurely?: (draft: AppConfig) => Promise<SecureSaveResult>;
+}
+
+export default function Settings({ saveSecurely = saveCurrentConfigSecurely }: SettingsProps) {
   const [cfg, setCfg] = useState<AppConfig>(() => loadConfig());
   const [check, setCheck] = useState<Record<string, string>>({});   // 每个提供商各自的自检结果
   const [searchChk, setSearchChk] = useState("");
   const [dsMsg, setDsMsg] = useState("");
-  const commit = (next: AppConfig) => { setCfg(next); saveConfig(next); };
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const commit = (next: AppConfig) => { setCfg(next); setSaveMessage(""); };
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    setSaveMessage("");
+    try {
+      const result = await saveSecurely(cfg);
+      setSaveMessage(result.storage === "persistent-native"
+        ? "设置已安全保存"
+        : "当前为浏览器模式：安全持久化需要桌面版，密钥仅保留在本次会话");
+    } catch {
+      setSaveMessage("安全保存失败，请重试");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // 数据源（内置浏览器 + 专用 API）——用户自填，可覆盖默认、可新增自定义源
   const patchDS = (id: string, p: Partial<DataSourceCfg>) => commit({ ...cfg, dataSources: cfg.dataSources.map((x) => (x.id === id ? { ...x, ...p } : x)) });
@@ -67,7 +90,11 @@ export default function Settings() {
     <div className="dash">
       <div className="dash-head">
         <h2>设置</h2>
+        <button type="button" className="app-btn primary" disabled={saving} onClick={() => void save()}>
+          {saving ? "保存中…" : "保存设置"}
+        </button>
       </div>
+      {saveMessage && <div role="status" className="set-hint">{saveMessage}</div>}
 
       <div className="sec-head">模型提供商 · 各家可并存（填了 Key 就能在下面按子任务选用）</div>
       <div className="set-hint" style={{ marginBottom: 12 }}>想让不同子任务用不同大模型：给相应提供商各自填好 Key，再到下方「子任务 · 分模型」分别指定即可。Key 仅存本机、不上传、不入库。</div>
@@ -76,14 +103,14 @@ export default function Settings() {
           <div className="prov-card-hd">
             <span className="prov-card-name">{p.label}</span>
             <span className="prov-style">{p.style === "anthropic" ? "Anthropic" : "OpenAI 兼容"}</span>
-            <span className={"key-status " + (p.apiKey ? "ok" : "none")}>{p.apiKey ? "● Key 已存本机" : "○ 未配置 Key"}</span>
+            <span className={"key-status " + (p.apiKey ? "ok" : "none")}>{p.apiKey ? "● Key 已输入" : "○ 未配置 Key"}</span>
             <div className="spacer" />
             <span className={chkClass(check[p.id])}>{check[p.id] ?? ""}</span>
             <button type="button" className="app-btn ghost dark" disabled={!p.apiKey} onClick={() => void selfCheck(p)}>连通自检</button>
           </div>
           <label className="fld"><span>API Key</span>
             <input className="key-input wide" type="password" placeholder="填入 API Key…" value={p.apiKey ?? ""} onChange={(e) => patchProvider(p.id, { apiKey: e.target.value })} />
-            {p.apiKey && <div className="key-persist">🔒 已存本机、下次自动带出（仅本地）<button type="button" className="key-clear" onClick={() => patchProvider(p.id, { apiKey: "" })}>清除</button></div>}
+            {p.apiKey && <div className="key-persist">点击“保存设置”后生效<button type="button" className="key-clear" onClick={() => patchProvider(p.id, { apiKey: "" })}>清除</button></div>}
           </label>
           <div className="prov-two">
             <label className="fld"><span>Base URL</span>

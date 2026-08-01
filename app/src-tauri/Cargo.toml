@@ -28,6 +28,7 @@ url = "2"
 sha2 = "0.10"
 flate2 = "1"
 hex = "0.4"
+keyring = { version = "3", default-features = false, features = ["windows-native"] }
 
 # 发布体积优化（Windows 安装包更小）
 [profile.release]

@@ -1,36 +1,50 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { loadConfig, saveConfig } from "./store";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  CONFIG_STORAGE_KEY,
+  loadConfig,
+  replaceRuntimeSecrets,
+  resetRuntimeSecretsForTests,
+  saveConfig,
+} from "./store";
 
-// node 环境无 localStorage，注入内存版 mock 以验证「API Key 记忆」这条持久化行为。
-class MemLS {
-  private m = new Map<string, string>();
-  getItem(k: string) { return this.m.has(k) ? this.m.get(k)! : null; }
-  setItem(k: string, v: string) { this.m.set(k, v); }
-  removeItem(k: string) { this.m.delete(k); }
-  clear() { this.m.clear(); }
+class MemoryStorage {
+  private values = new Map<string, string>();
+  getItem(key: string) { return this.values.get(key) ?? null; }
+  setItem(key: string, value: string) { this.values.set(key, value); }
+  removeItem(key: string) { this.values.delete(key); }
+  clear() { this.values.clear(); }
 }
 
-describe("配置持久化 · API Key 记忆", () => {
-  beforeEach(() => { (globalThis as unknown as { localStorage: MemLS }).localStorage = new MemLS(); });
-
-  it("保存含 Key 的配置后，重新 loadConfig 能带出该 Key（不必重填）", () => {
-    const cfg = loadConfig();
-    saveConfig({ ...cfg, defaultProvider: "claude", providers: cfg.providers.map((p) => (p.id === "claude" ? { ...p, apiKey: "sk-test-123" } : p)) });
-    const reloaded = loadConfig();
-    expect(reloaded.providers.find((p) => p.id === "claude")?.apiKey).toBe("sk-test-123");
-    expect(reloaded.defaultProvider).toBe("claude");
+describe("redacted configuration persistence", () => {
+  beforeEach(() => {
+    Object.defineProperty(globalThis, "localStorage", { value: new MemoryStorage(), configurable: true });
+    resetRuntimeSecretsForTests();
   });
 
-  it("清除 Key（置空）后重新 loadConfig 不再带出", () => {
-    const cfg = loadConfig();
-    saveConfig({ ...cfg, providers: cfg.providers.map((p) => (p.id === "claude" ? { ...p, apiKey: "" } : p)) });
-    expect(loadConfig().providers.find((p) => p.id === "claude")?.apiKey).toBe("");
+  it("ordinary save removes every apiKey property and secret sentinel", () => {
+    const config = loadConfig();
+    config.providers[0].apiKey = "secret-sentinel-one";
+    config.providers[1].apiKey = "secret-sentinel-two";
+    saveConfig(config);
+
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY)!;
+    expect(raw).not.toContain("apiKey");
+    expect(raw).not.toContain("secret-sentinel-one");
+    expect(raw).not.toContain("secret-sentinel-two");
+    for (const provider of JSON.parse(raw).providers) {
+      expect(provider).not.toHaveProperty("apiKey");
+    }
   });
 
-  it("保存的自定义模型列表也随之持久化", () => {
-    const cfg = loadConfig();
-    saveConfig({ ...cfg, providers: cfg.providers.map((p) => (p.id === "deepseek" ? { ...p, apiKey: "k", models: ["deepseek-reasoner"] } : p)) });
-    expect(loadConfig().providers.find((p) => p.id === "deepseek")?.models).toContain("deepseek-reasoner");
+  it("synchronous load ignores legacy persisted secrets and merges only runtime cache", () => {
+    const config = loadConfig();
+    config.providers[0].apiKey = "legacy-must-not-load";
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+    replaceRuntimeSecrets(new Map([["claude", "runtime-only"]]));
+
+    const loaded = loadConfig();
+    expect(loaded.providers.find((provider) => provider.id === "claude")?.apiKey).toBe("runtime-only");
+    expect(loaded.providers.some((provider) => provider.apiKey === "legacy-must-not-load")).toBe(false);
   });
 });
 
