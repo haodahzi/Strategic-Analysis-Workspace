@@ -19,7 +19,7 @@ export const REPORT_PIPELINE: PipelineStage[] = [
   { id: "research", role: "资料", title: "资料研判", detail: "读入本单材料（尽调稿 / 公开资料 / 已知数据），抽取关键事实与数据；缺料标「需补」、未公开标「未公开」" },
   { id: "draft", role: "起草", title: "起草初稿", detail: "按骨架 + 资料产出中性客观的研究综述：先事实与逻辑、再有节制的判断，量化必带口径 / 来源" },
   { id: "red", role: "红队", title: "事实与中立性审查", detail: "换一模型审查：有无无来源的断言、疑似编造（尤其编造我方数据 / 筹码）、一边倒的倾向、口径含糊" },
-  { id: "final", role: "定稿", title: "采纳意见 · 定稿", detail: "逐条采纳审查意见，产出中性定稿（正反兼陈、信息不足处如实说明；仍为待审初稿）" },
+  { id: "final", role: "定稿", title: "采纳意见 · 定稿", detail: "逐条采纳审查意见，产出中性定稿（正反兼陈、信息不足处如实说明）" },
   { id: "check", role: "验收", title: "自检验收 5 线", detail: "对照 5 条验收线逐条打钩：事实有据 / 缺口已标 / 中性无编造 / 结构清楚 / 内容齐全" },
 ];
 
@@ -75,7 +75,8 @@ const NEUTRALITY =
 
 // 排版约定：让定稿用这些标记，报告库「房子样式」会渲染成对应的语义模块（结论框/风险框/洞察框/表格）。
 const MARKUP_HINT =
-  "排版约定：重要结论用「> 结论：…」、主要风险用「> 风险：…」、关键洞察用「> 洞察：…」各自成段标注（适度、不滥用）；需要对比的数据用 markdown 表格；层次用 ## / ### 小标题。";
+  "排版约定：尽量少用大段文字——能用表格、要点列表、或结构块（产业链 ```chain / 时间轴 ```timeline / 交易结构 ```dealflow）表达的就优先用它们，大段文字拆成要点、每段控制在几句内。" +
+  "重要结论用「> 结论：…」、主要风险用「> 风险：…」、关键洞察用「> 洞察：…」各自成段标注（适度、不滥用）；对比数据一律用 markdown 表格；层次用 ## / ### 小标题。";
 
 // 有联网检索资料时的引用约定（无检索时这条无害）
 const CITE_HINT =
@@ -118,7 +119,7 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
       user = `对下面这份初稿做事实与中立性审查，逐条指出问题（无来源的断言 / 疑似编造，尤其编造我方数据或筹码 / 一边倒的倾向 / 口径含糊），并列出必须修正处；不要添加新的倾向：\n\n${o.draft ?? ""}`;
       break;
     case "final":
-      user = `初稿：\n${o.draft ?? ""}\n\n审查意见：\n${o.red ?? ""}\n\n逐条采纳并修改，产出定稿（markdown，结构清晰、中性客观、正反兼陈）。信息不足处如实说明、不臆断。仍标注为待审初稿。${note} ${MARKUP_HINT}`;
+      user = `初稿：\n${o.draft ?? ""}\n\n审查意见：\n${o.red ?? ""}\n\n逐条采纳并修改，产出定稿（markdown，结构清晰、中性客观、正反兼陈）。信息不足处如实说明、不臆断。${note} ${MARKUP_HINT}`;
       break;
     case "check":
       user = `对照 5 条验收线逐条打 ✓/✗ 并一句话说明：事实有据（数据带口径 / 来源）｜缺口已标（需补 / 未公开）｜中性无编造（无虚构我方数据 / 筹码、无一边倒倾向）｜结构清楚｜该类型该有的内容齐全。\n\n定稿：\n${o.final ?? ""}`;
@@ -226,7 +227,7 @@ export function mockStageOutput(stage: PipelineStage, input: PipelineInput): Sta
     case "红队":
       return { stageId: stage.id, summary: "事实与中立性审查：指出无来源的断言、疑似编造、一边倒的倾向、口径含糊之处，列出必须修正项。" };
     case "定稿":
-      return { stageId: stage.id, summary: "逐条采纳审查意见：补来源与口径、平衡正反表述、信息不足处如实说明；终稿仍为待审初稿。" };
+      return { stageId: stage.id, summary: "逐条采纳审查意见：补来源与口径、平衡正反表述、信息不足处如实说明。" };
     case "验收":
       return { stageId: stage.id, summary: "5 线自检：事实有据✓ 缺口已标✓ 中性无编造✓ 结构清楚✓ 内容齐全✓" };
   }
@@ -235,7 +236,7 @@ export function mockStageOutput(stage: PipelineStage, input: PipelineInput): Sta
 export function mockReport(input: PipelineInput): MockReport {
   const subj = input.company || input.industry;
   return {
-    title: `${subj} · ${input.focus || "研究"}（示例 · 待审初稿）`,
+    title: `${subj} · ${input.focus || "研究"}（示例）`,
     backbone: `一句话概括：${subj}的核心逻辑与看点——（示例文本；真实生成时会据资料给出中性判断，不带倾向）。`,
     layers: [
       { name: "需求侧", note: "谁在买、为什么买、需求由什么驱动" },

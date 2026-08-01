@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Analysis, QItem } from "../types";
 import QuestionList from "./QuestionList";
 import { extractPdfText } from "../lib/pdf";
+import { generateChecklist } from "../llm/checklist";
+import { getRun } from "../llm/pipelineStore";
 
 // 洽谈中 · 单屏工作台：对照问题逐条记录（查漏补缺）+ 清单外额外信息 + 事后导入解析。
 // 三块合一，不再切 tab。
@@ -12,6 +14,27 @@ export default function NegotiationDesk(
   const [paste, setPaste] = useState("");
   const [parsed, setParsed] = useState<string[] | null>(null);
   const [pdfBusy, setPdfBusy] = useState("");
+  const [genLoading, setGenLoading] = useState(false);
+  const [genErr, setGenErr] = useState("");
+
+  // #9：一键生成尽调 / 洽谈问题（洽谈中随时可用），据本单深度分析成稿接地
+  const genChecklist = async () => {
+    setGenLoading(true); setGenErr("");
+    try {
+      const input = {
+        industry: analysis.industry, ourRole: analysis.ourRole, focus: analysis.focus ?? "行业深度分析",
+        company: analysis.company, counterparty: analysis.counterparty,
+      };
+      const items = await generateChecklist(input, getRun(analysis.id).realReport ?? "");
+      const now = Date.now().toString(36);
+      const add: QItem[] = items.map((it, i) => ({ id: `q-nd-${now}-${i}`, text: it.text, intent: it.intent, dealBreaker: it.dealBreaker }));
+      onQuestions([...questions, ...add]);
+    } catch (e) {
+      setGenErr((e as Error).message.slice(0, 140));
+    } finally {
+      setGenLoading(false);
+    }
+  };
 
   const onUpload = async (f: File | undefined) => {
     if (!f) return;
@@ -44,7 +67,8 @@ export default function NegotiationDesk(
   return (
     <div className="nd">
       <div className="sec-head">① 对照问题逐条记录（查漏补缺）</div>
-      <QuestionList items={questions} onChange={onQuestions} mode="核对" />
+      <QuestionList items={questions} onChange={onQuestions} mode="核对" onGenerate={() => void genChecklist()} generating={genLoading} />
+      {genErr && <div className="set-hint" style={{ color: "#c0392b", marginTop: 6 }}>生成失败：{genErr}（可到设置为「起草」配置真实模型，或手动加条目）</div>}
 
       <div className="sec-head">② 清单外的额外信息（便于整合）</div>
       <textarea

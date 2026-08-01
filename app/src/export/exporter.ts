@@ -46,3 +46,21 @@ export function houseDocFromMarkdown(markdown: string, meta: HouseMeta): string 
 export function downloadHtmlDoc(title: string, doc: string) {
   download(`${title}.html`, doc, "text/html;charset=utf-8");
 }
+
+/** 导出 HTML：优先弹「另存为」窗口让用户自选保存位置（WebView2 / Chromium 支持），不支持则退化为直接下载。 */
+export async function saveHtmlDoc(title: string, doc: string): Promise<void> {
+  const w = window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<{ createWritable: () => Promise<{ write: (d: Blob) => Promise<void>; close: () => Promise<void> }> }> };
+  if (typeof w.showSaveFilePicker === "function") {
+    try {
+      const handle = await w.showSaveFilePicker({ suggestedName: `${title}.html`, types: [{ description: "HTML 文件", accept: { "text/html": [".html"] } }] });
+      const ws = await handle.createWritable();
+      await ws.write(new Blob(["﻿" + doc], { type: "text/html;charset=utf-8" }));
+      await ws.close();
+      return;
+    } catch (e) {
+      if ((e as { name?: string }).name === "AbortError") return;   // 用户取消
+      // 其他错误退化为直接下载
+    }
+  }
+  download(`${title}.html`, doc, "text/html;charset=utf-8");
+}

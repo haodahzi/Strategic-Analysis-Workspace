@@ -28,7 +28,7 @@ export default function IndustryReport({ project, onBack }: { project: Analysis;
         <button type="button" className="app-btn ghost" onClick={onBack}>← 返回工作区</button>
         <div className="report-bar-title">
           行业深度分析 · {project.industry}
-          <span className="report-bar-tag">半耐用 · 待审初稿</span>
+          <span className="report-bar-tag">半耐用</span>
         </div>
         <div className="report-bar-actions">
           <button type="button" className="app-btn" onClick={() => exportReport(reportRef.current, title, "word")}>导出 Word</button>

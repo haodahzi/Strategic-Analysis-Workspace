@@ -59,19 +59,24 @@ export async function webSearch(cfg: AppConfig, query: string): Promise<SearchHi
   return parseHits(s.provider, await res.json());
 }
 
-// 跑多条查询、按 URL 去重、上限约 10 条；单条失败不阻断整体。
+// 跑多条查询、按 URL + 标题双重去重（干掉重复标题）、上限约 20 条；单条失败不阻断整体。
 export async function gatherSources(cfg: AppConfig, input: PipelineInput): Promise<SearchHit[]> {
-  const seen = new Set<string>();
+  const seenUrl = new Set<string>();
+  const seenTitle = new Set<string>();
   const out: SearchHit[] = [];
+  const cap = 20;
   for (const q of queriesFor(input)) {
     try {
       for (const h of await webSearch(cfg, q)) {
-        if (!seen.has(h.url)) { seen.add(h.url); out.push(h); }
+        const t = h.title.replace(/\s+/g, "").toLowerCase();
+        if (seenUrl.has(h.url) || (t && seenTitle.has(t))) continue;   // 同 URL 或同标题只留一条
+        seenUrl.add(h.url); if (t) seenTitle.add(t);
+        out.push(h);
       }
     } catch { /* 跳过失败的查询 */ }
-    if (out.length >= 10) break;
+    if (out.length >= cap) break;
   }
-  return out.slice(0, 10);
+  return out.slice(0, cap);
 }
 
 // 检索资料喂给「资料」步的块（带编号，供正文 [n] 引用）

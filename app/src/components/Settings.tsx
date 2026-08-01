@@ -111,8 +111,8 @@ export default function Settings() {
               <label className="fld"><span>Base URL</span>
                 <input className="key-input wide" value={cfg.search.baseUrl} onChange={(e) => patchSearch({ baseUrl: e.target.value })} />
               </label>
-              <label className="fld"><span>每条查询取回条数</span>
-                <input className="key-input wide" type="number" min={1} max={10} value={cfg.search.maxResults} onChange={(e) => patchSearch({ maxResults: Math.max(1, Math.min(10, Number(e.target.value) || 5)) })} />
+              <label className="fld"><span>每条查询取回条数（博查最高 50）</span>
+                <input className="key-input wide" type="number" min={1} max={50} value={cfg.search.maxResults} onChange={(e) => patchSearch({ maxResults: Math.max(1, Math.min(50, Number(e.target.value) || 10)) })} />
               </label>
             </div>
           </>

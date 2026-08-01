@@ -49,7 +49,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
         {onBack && <button type="button" className="app-btn ghost" onClick={onBack}>← 返回洽谈清单</button>}
         <div className="report-bar-title">
           深度分析 · {subjectLabel} · {input.focus}
-          <span className="report-bar-tag">{!started ? "未生成" : done ? "待审初稿" : `进行中 ${doneCount}/${REPORT_PIPELINE.length}`}</span>
+          <span className="report-bar-tag">{!started ? "未生成" : done ? "已完成" : `进行中 ${doneCount}/${REPORT_PIPELINE.length}`}</span>
         </div>
         <div className="report-bar-actions">
           <span className="rb-meta">{realMode ? `真实 · 起草 ${draftProv.label} · 红队 ${providerById(cfg, cfg.agents["红队"].provider).label}` : "流水线演示 · Mock（无 Key）"}</span>
@@ -88,7 +88,9 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
                     <span className="pipe-status">{st}</span>
                   </div>
                   <div className="pipe-detail">{s.detail}</div>
-                  {outMap.has(s.id) && <div className="pipe-out"><Markdown text={outMap.get(s.id)!} /></div>}
+                  {outMap.has(s.id) && (outMap.get(s.id)!.trim()
+                    ? <div className="pipe-out"><Markdown text={outMap.get(s.id)!} /></div>
+                    : <div className="pipe-out set-hint">（本步无文字返回——该模型可能对这步返回了空内容；可到「设置」为这个子任务换一款模型后重新生成）</div>)}
                 </div>
               </li>
             );
@@ -111,7 +113,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
         {done && realReport !== null && (
           <div className="rp-realwrap">
             <div className="rp-realhead">
-              <div className="pipe-done-tag">✓ 定稿 · 待审初稿（可推翻；到「洽谈后 · 项目报告」可行内编辑 / 驳回 / 重估）</div>
+              <div className="pipe-done-tag">✓ 定稿完成（可到「洽谈后 · 项目报告」行内编辑 / 驳回 / 重估）</div>
               <button type="button" className="app-btn" onClick={openHouse}>一键排版 · 查看并存入报告库</button>
             </div>
             <div className="rp-realbody"><Markdown text={realReport} /></div>
@@ -122,7 +124,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
         {done && report && (
           <div className="report" style={{ marginTop: 22 }}>
             <div className="wrap" style={{ padding: 0 }}>
-              <div className="pipe-done-tag">✓ 流水线完成 · 以下为<strong>待审初稿</strong>（可推翻；下一步接入行内编辑/驳回/重估）</div>
+              <div className="pipe-done-tag">✓ 流水线完成（可推翻；下一步接入行内编辑 / 驳回 / 重估）</div>
 
               <h2 className="rp-title">{report.title}</h2>
 

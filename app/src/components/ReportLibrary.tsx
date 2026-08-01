@@ -17,6 +17,13 @@ export default function ReportLibrary() {
   };
   const del = (id: string) => { removeReport(id); setItems(listReports()); };
 
+  // 跟随电脑系统本地时间显示（此前直接切 ISO 串是 UTC，小时分钟差 8 小时）
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso.slice(0, 16).replace("T", " ");
+    const p = (n: number) => (n < 10 ? "0" + n : "" + n);
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
   const count = (f: (typeof FILTERS)[number]) => (f === "全部" ? items.length : items.filter((r) => r.focus === f).length);
   const shown = tab === "全部" ? items : items.filter((r) => r.focus === tab);
 
@@ -42,7 +49,7 @@ export default function ReportLibrary() {
                 <div key={r.id} className="rl-item">
                   <button type="button" className="rl-open" onClick={() => open(r)}>
                     <span className="rl-title">{r.title}</span>
-                    <span className="rl-meta">{r.focus} · {r.savedAt.slice(0, 16).replace("T", " ")}</span>
+                    <span className="rl-meta">{r.focus} · {fmt(r.savedAt)}</span>
                   </button>
                   <button type="button" className="ql-del" onClick={() => del(r.id)}>删</button>
                 </div>

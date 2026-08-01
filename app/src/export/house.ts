@@ -13,7 +13,6 @@ function inline(s: string): string {
   return t;
 }
 
-const pad2 = (n: number) => (n < 10 ? "0" + n : "" + n);
 
 // 引用块按首词判语义 → 对应彩色批注 / 结论框
 function renderQuote(text: string): string {
@@ -156,7 +155,6 @@ export function mdToHouseHtml(md: string): string {
   let para: string[] = [];
   let list: string[] | null = null;
   let quote: string[] | null = null;
-  let chapter = 0;
 
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
   const flushList = () => { if (list) { out.push(`<ul class="md-list">${list.join("")}</ul>`); list = null; } };
@@ -204,7 +202,7 @@ export function mdToHouseHtml(md: string): string {
     if (h) {
       flushAll();
       const lvl = h[1].length, title = inline(h[2]);
-      if (lvl <= 2) { chapter++; out.push(`<div class="chapter"><div class="ch-hd"><div class="ch-n">${pad2(chapter)}</div><div class="ch-meta"><div class="ch-title">${title}</div></div></div></div>`); }
+      if (lvl <= 2) out.push(`<div class="chapter"><div class="ch-hd"><div class="ch-meta"><div class="ch-title">${title}</div></div></div></div>`);
       else if (lvl === 3) out.push(`<div class="sec-t">${title}</div>`);
       else out.push(`<div class="sub-tag">${title}</div>`);
       continue;
@@ -224,10 +222,10 @@ export function mdToHouseHtml(md: string): string {
 
 export function buildHouseDoc(bodyHtml: string, css: string, meta: HouseMeta): string {
   const date = new Date().toISOString().slice(0, 10);
-  const badges = [...(meta.badges ?? []).filter(Boolean), date, "待审初稿"]
+  const badges = [...(meta.badges ?? []).filter(Boolean), date]
     .map((b) => `<span class="badge">${escapeHtml(b)}</span>`).join("");
   const sub = meta.subtitle ? `<div class="hero-sub">${escapeHtml(meta.subtitle)}</div>` : "";
-  const foot = escapeHtml(meta.foot ?? "本报告由战略发展分析工作台生成，结论为待审初稿；数据以标注的口径与来源为准，请结合尽调与现场核实后再定调。");
+  const foot = escapeHtml(meta.foot ?? "本报告由战略发展分析工作台生成；数据以标注的口径与来源为准，请结合尽调与现场核实后再定调。");
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(meta.title)}</title><style>${css}</style></head>

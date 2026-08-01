@@ -56,9 +56,9 @@ body{font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC","
 <title>${escapeHtml(title)}</title>
 <style>${css}</style></head>
 <body><article class="clean">
-<header class="c-head"><h1 class="c-title">${escapeHtml(title)}</h1>${sub}<div class="c-date">${date} · 待审初稿，可被推翻</div></header>
+<header class="c-head"><h1 class="c-title">${escapeHtml(title)}</h1>${sub}<div class="c-date">${date}</div></header>
 ${innerHtml}
-<footer class="c-foot">本文由战略发展分析工作台生成，结论为待审初稿，请结合尽调与现场核实后定调。</footer>
+<footer class="c-foot">本文由战略发展分析工作台生成，请结合尽调与现场核实后定调。</footer>
 </article></body></html>`;
 }
 

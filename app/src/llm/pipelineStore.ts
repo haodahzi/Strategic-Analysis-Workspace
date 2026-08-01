@@ -10,7 +10,7 @@ import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
 import { saveReport } from "./reportLib";
 import { markUnread } from "./unread";
-import { SearchHit, gatherSources, referencesMd, searchEnabled, sourcesBlock } from "./search";
+import { SearchHit, gatherSources, searchEnabled, sourcesBlock } from "./search";
 
 export type RunStatus = "待执行" | "进行中" | "完成";
 export interface Attachment { name: string; text: string; }   // 上传资料提取出的文本（后台喂模型，不在前台展示原文 #5）
@@ -130,9 +130,15 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
       return;
     }
   }
+  // 文末附真实来源（#E）：联网检索来源 + 用户上传并解析的材料（#6）
   let md = ctx.outputs["final"] ?? "";
-  const src = getRun(id).sources;
-  if (md.trim() && src.length && !md.includes("参考文献")) md += "\n\n" + referencesMd(src);   // 文末附真实来源（#E）
+  const refs = [
+    ...getRun(id).sources.map((h) => `[${h.title || h.url}](${h.url})`),
+    ...getRun(id).attachments.map((a) => `上传材料：${a.name}`),
+  ];
+  if (md.trim() && refs.length && !md.includes("参考文献")) {
+    md += "\n\n## 参考文献\n\n" + refs.map((r, i) => `${i + 1}. ${r}`).join("\n");
+  }
   patch(id, { realReport: md, done: true, running: false });
   // #8：定稿完成即联动进报告库（同一单同类型自动更新，不产生重复）
   if (md.trim()) {

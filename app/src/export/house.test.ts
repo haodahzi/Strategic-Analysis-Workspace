@@ -5,10 +5,10 @@ import { dirname, resolve } from "node:path";
 import { buildHouseDoc, mdToHouseHtml } from "./house";
 
 describe("房子样式渲染（#7/#15）", () => {
-  it("标题分级：# / ## → 章（编号）；### → 小节；#### → 副标签", () => {
+  it("标题分级：# / ## → 章（不自动加序号）；### → 小节；#### → 副标签", () => {
     const h = mdToHouseHtml("## 供给与格局\n### 主要玩家\n#### 备注");
     expect(h).toContain('class="chapter"');
-    expect(h).toContain('class="ch-n">01');
+    expect(h).not.toContain('ch-n');   // 不再自动加 01/02 序号（#2a）
     expect(h).toContain('class="ch-title">供给与格局');
     expect(h).toContain('class="sec-t">主要玩家');
     expect(h).toContain('class="sub-tag">备注');
