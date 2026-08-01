@@ -10,7 +10,7 @@ export function defaultConfig(): AppConfig {
   for (const a of AGENT_ROLES) agents[a] = { ...MOCK };
   return {
     providers, defaultProvider: "mock", step0: { ...MOCK }, agents,
-    search: { provider: "none", baseUrl: "https://api.tavily.com/search", maxResults: 5 },
+    search: { provider: "none", baseUrl: "https://api.tavily.com/search", maxResults: 10, preferDomains: [], freshness: "noLimit" },
   };
 }
 

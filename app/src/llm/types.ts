@@ -34,8 +34,10 @@ export interface ModelPick { provider: ProviderId; model: string; }
 export interface SearchConfig {
   provider: "none" | "tavily" | "bocha";
   apiKey?: string;
-  baseUrl: string;      // tavily: https://api.tavily.com/search；bocha: https://api.bocha.cn/v1/web-search
-  maxResults: number;   // 每条查询取回条数
+  baseUrl: string;         // tavily: https://api.tavily.com/search；bocha: https://api.bocha.cn/v1/web-search
+  maxResults: number;      // 每条查询取回条数
+  preferDomains: string[]; // 优先信息源域名（先在这些站内搜，再搜全网）
+  freshness: string;       // 时间过滤：noLimit / oneYear / oneMonth（博查支持）
 }
 
 export interface AppConfig {

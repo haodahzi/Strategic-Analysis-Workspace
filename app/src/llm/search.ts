@@ -47,9 +47,9 @@ export async function webSearch(cfg: AppConfig, query: string): Promise<SearchHi
   const headers: Record<string, string> = { "content-type": "application/json" };
   let body: string;
   if (s.provider === "bocha") {
-    // 博查：Bearer 鉴权，count 控制条数，summary 取长摘要
+    // 博查：Bearer 鉴权，count 控制条数，summary 取长摘要，freshness 控时间范围
     headers.authorization = `Bearer ${s.apiKey ?? ""}`;
-    body = JSON.stringify({ query, count: s.maxResults, summary: true, freshness: "noLimit" });
+    body = JSON.stringify({ query, count: s.maxResults, summary: true, freshness: s.freshness || "noLimit" });
   } else {
     // tavily：api_key 放 body
     body = JSON.stringify({ api_key: s.apiKey, query, max_results: s.maxResults, search_depth: "basic" });
