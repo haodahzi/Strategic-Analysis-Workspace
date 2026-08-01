@@ -1,0 +1,58 @@
+.intel-feature {
+  max-width: 760px;
+  padding: 32px;
+}
+
+.intel-heading {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+}
+
+.intel-kicker {
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  margin: 0 0 8px;
+}
+
+.intel-heading h1 {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 28px;
+  margin: 0;
+}
+
+.intel-description,
+.intel-state p {
+  color: var(--ink2);
+  line-height: 1.7;
+}
+
+.intel-description {
+  margin: 10px 0 0;
+}
+
+.intel-state {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  padding: 18px;
+}
+
+.intel-state p {
+  margin: 0;
+}
+
+.intel-state-error {
+  border-color: var(--red);
+}
+
+.intel-retry {
+  background: var(--ink);
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 14px;
+  padding: 8px 14px;
+}

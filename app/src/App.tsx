@@ -9,8 +9,9 @@ import ProjectWorkspace from "./components/ProjectWorkspace";
 import ReportLibrary from "./components/ReportLibrary";
 import { deleteRun, hydrateRuns, setMaterials, startRun } from "./llm/pipelineStore";
 import { clearUnread, getUnread, subscribeUnread } from "./llm/unread";
+import { IntelligenceFeature } from "./features/intelligence";
 
-type View = "dashboard" | "project" | "settings" | "new" | "reports";
+type View = "dashboard" | "project" | "settings" | "new" | "reports" | "intelligence";
 
 const STAGE_CLASS: Record<Stage, string> = {
   调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -105,6 +106,7 @@ export default function App() {
           {navItem("dashboard", "▤ 研究分析总览")}
           {navItem("new", "✚ 新建分析")}
           {navItem("reports", "▦ 报告库")}
+          {navItem("intelligence", "◉ 对标企业情报")}
           {navItem("settings", "⚙ 设置")}
 
           <div className="nav-group">在办分析 · {list.length}</div>
@@ -137,6 +139,7 @@ export default function App() {
                 : <ProjectWorkspace key={project.id} analysis={project} onUpdate={updateAnalysis} onDelete={() => deleteAnalysis(project.id)} />
           )}
           {items !== null && view === "reports" && <ReportLibrary />}
+          {items !== null && view === "intelligence" && <IntelligenceFeature status="initializing" onRetry={() => undefined} />}
           {items !== null && view === "settings" && <Settings />}
         </main>
       </div>
