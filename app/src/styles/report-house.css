@@ -37,6 +37,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14p
 p{color:var(--ink2);margin:0 0 11px;font-size:14px}
 strong{color:var(--ink);font-weight:600}
 code{font-family:var(--mono);font-size:.88em;background:var(--surface2);border:1px solid var(--border2);border-radius:3px;padding:1px 5px}
+.md-pre{background:var(--surface2);border:1px solid var(--border2);padding:10px 12px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.6;margin:12px 0;white-space:pre-wrap;word-break:break-word}
 a{color:var(--blue)}
 
 /* LISTS（样张缺，补齐） */
@@ -85,6 +86,26 @@ td:first-child{color:var(--ink);font-weight:500}
 tr:hover td{background:var(--surface2)}
 .tw{overflow-x:auto}
 
+/* TIMELINE（时间轴） */
+.tl{position:relative;padding-left:28px;margin:18px 0}
+.tl::before{content:'';position:absolute;left:6px;top:8px;bottom:8px;width:1px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:18px}
+.tl-item::before{content:'';position:absolute;left:-24px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--ink3)}
+.tl-yr{font-family:var(--mono);font-size:10px;color:var(--gold);font-weight:600;margin-bottom:2px;letter-spacing:1px}
+.tl-t{font-size:13px;font-weight:500;color:var(--ink);margin-bottom:3px}
+.tl-d{font-size:12px;color:var(--ink2);line-height:1.6}
+
+/* CHAIN（产业链三列：上游 / 中游 / 下游） */
+.chain{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;margin:16px 0}
+.chain-col{border:1px solid var(--border);background:var(--surface)}
+.chain-hd{background:var(--ink);color:#fff;padding:9px 12px;font-family:var(--serif);font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.chain-hd .cx{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:rgba(255,255,255,.5)}
+.chain-col.mid .chain-hd{background:var(--red)}
+.chain-body{padding:10px 11px}
+.cgrp-t{font-size:10px;color:var(--ink3);letter-spacing:.5px;margin-bottom:5px;font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:10px;padding:2px 6px;background:var(--surface2);border:1px solid var(--border2);color:var(--ink2);border-radius:2px;line-height:1.3}
+
 /* VERDICT（深色结论区） */
 .verdict{background:var(--ink);padding:32px;margin-top:36px}
 .verdict-t{font-family:var(--serif);font-size:18px;font-weight:700;color:#fff;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.12)}
@@ -96,7 +117,7 @@ hr{border:none;border-top:1px solid var(--border2);margin:26px 0}
 
 @media(max-width:720px){
   .hero-h{font-size:28px}
-  .g2,.g3,.g4{grid-template-columns:1fr}
+  .g2,.g3,.g4,.chain{grid-template-columns:1fr}
   .wrap{padding:0 16px 60px}
 }
 
@@ -119,7 +140,7 @@ hr{border:none;border-top:1px solid var(--border2);margin:26px 0}
   .sub-tag{break-after:avoid;font-size:8pt}
   p{font-size:10.3pt;margin-bottom:7px;orphans:2;widows:2}
   .md-list li{font-size:10.3pt}
-  .card,.anno,.insight,.quote,.foot,.verdict{break-inside:avoid}
+  .card,.anno,.insight,.quote,.foot,.verdict,.chain-col,.tl-item{break-inside:avoid}
   .g2,.g3,.g4{gap:9px;margin:9px 0}
   .card{padding:11px 13px}.card-val{font-size:20pt}
   .anno p,.insight p{font-size:9.3pt;line-height:1.5}

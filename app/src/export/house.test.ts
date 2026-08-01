@@ -45,6 +45,24 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(mdToHouseHtml("这是 **重点** 内容")).toContain("<strong>重点</strong>");
   });
 
+  it("```chain 渲染产业链三列，含环节、代表企业标签", () => {
+    const h = mdToHouseHtml("```chain\n上游 | 核心零部件 | 企业A、企业B\n中游 | 本体集成 | 企业C\n下游 | 应用场景 | 企业D\n```");
+    expect(h).toContain('class="chain"');
+    expect((h.match(/class="chain-col/g) ?? []).length).toBe(3);
+    expect(h).toContain('class="chain-col mid"');   // 中游高亮
+    expect(h).toContain("核心零部件");
+    expect(h).toContain('class="tag">企业A</span>');
+    expect(h).toContain('class="tag">企业B</span>');
+  });
+
+  it("```timeline 渲染时间轴", () => {
+    const h = mdToHouseHtml("```timeline\n2020 | 起步 | 少量样机\n2023 | 放量 | 整机厂配套\n```");
+    expect(h).toContain('class="tl"');
+    expect((h.match(/class="tl-item"/g) ?? []).length).toBe(2);
+    expect(h).toContain('class="tl-yr">2020</div>');
+    expect(h).toContain("整机厂配套");
+  });
+
   it("buildHouseDoc：独立文档含 doctype / 标题 / 封面 / 页脚 / 内联样式 / 正文", () => {
     const doc = buildHouseDoc('<p>正文</p>', ":root{--bg:#f4f1eb}", { title: "算力租赁 · 行业深度分析", subtitle: "客观研究", badges: ["行业深度分析"] });
     expect(doc).toContain("<!doctype html");
@@ -71,6 +89,21 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
     "### 需求侧",
     "- 人形机器人整机厂：配套需求随整机出货放量，目前体量小、确定性有限。",
     "- 工业与服务场景：对可靠性、寿命与成本更敏感，导入节奏偏保守。",
+    "",
+    "## 产业链",
+    "```chain",
+    "上游 | 触觉传感、微型电机、减速器、控制芯片 | 汉威科技、鸣志电器、兆威机电",
+    "中游 | 灵巧手本体设计与集成 | 因时机器人、灵心巧手、强脑科技",
+    "下游 | 人形机器人整机与应用场景 | 特斯拉、优必选、宇树科技",
+    "```",
+    "> 洞察：上游的触觉传感与微型驱动是价值与壁垒所在，中游集成的差异化相对有限。",
+    "",
+    "## 发展脉络",
+    "```timeline",
+    "2021 | 概念验证 | 少量科研样机，自由度与成本都不理想",
+    "2023 | 整机带动 | 人形机器人热度上行，灵巧手作为配套进入视野",
+    "2025 | 小批量导入 | 头部整机厂开始小批量采购，量产良率成为焦点",
+    "```",
     "",
     "## 供给与竞争格局",
     "行业处于早期，技术路线（腱驱动 / 连杆 / 直驱等）尚未收敛，参与者以本体新创公司与部分零部件厂商为主。",

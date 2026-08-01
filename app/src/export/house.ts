@@ -31,6 +31,27 @@ function splitRow(line: string): string[] {
   return line.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
 }
 
+// 产业链三列（上游 / 中游 / 下游 + 代表企业）——```chain 每行：环节 | 说明 | 代表企业（、分隔）
+function renderChain(rows: string[]): string {
+  const labels = ["UPSTREAM", "MIDSTREAM", "DOWNSTREAM"];
+  const defTier = ["上游", "中游", "下游"];
+  const cols = rows.map((r) => r.trim()).filter(Boolean).slice(0, 3).map((r, i) => {
+    const c = r.split("|").map((x) => x.trim());
+    const tags = (c[2] ?? "").split(/[、,，;；]/).map((s) => s.trim()).filter(Boolean).map((x) => `<span class="tag">${inline(x)}</span>`).join("");
+    return `<div class="chain-col${i === 1 ? " mid" : ""}"><div class="chain-hd">${inline(c[0] || defTier[i])}<span class="cx">${labels[i] ?? ""}</span></div><div class="chain-body"><div class="cgrp"><div class="cgrp-t">${inline(c[1] ?? "")}</div><div class="tags">${tags}</div></div></div></div>`;
+  }).join("");
+  return `<div class="chain">${cols}</div>`;
+}
+
+// 时间轴——```timeline 每行：年份 | 事件 | 说明
+function renderTimeline(rows: string[]): string {
+  const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
+    const c = r.split("|").map((x) => x.trim());
+    return `<div class="tl-item"><div class="tl-yr">${inline(c[0] ?? "")}</div><div class="tl-t">${inline(c[1] ?? "")}</div><div class="tl-d">${inline(c[2] ?? "")}</div></div>`;
+  }).join("");
+  return `<div class="tl">${items}</div>`;
+}
+
 export function mdToHouseHtml(md: string): string {
   const lines = md.replace(/\r/g, "").split("\n");
   const out: string[] = [];
@@ -64,6 +85,20 @@ export function mdToHouseHtml(md: string): string {
 
     if (line === "") { flushAll(); continue; }
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) { flushAll(); out.push("<hr>"); continue; }
+
+    // 结构化围栏块：```chain（产业链）/ ```timeline（时间轴）；其余当代码块
+    const fence = /^`{3,}\s*([a-zA-Z]+)?\s*$/.exec(line);
+    if (fence) {
+      flushAll();
+      const lang = (fence[1] ?? "").toLowerCase();
+      const body: string[] = [];
+      i++;
+      while (i < lines.length && !/^`{3,}\s*$/.test(lines[i].trim())) { body.push(lines[i]); i++; }
+      if (lang === "chain") out.push(renderChain(body));
+      else if (lang === "timeline") out.push(renderTimeline(body));
+      else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
+      continue;
+    }
 
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
     if (h) {
