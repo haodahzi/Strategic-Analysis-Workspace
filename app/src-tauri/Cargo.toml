@@ -19,6 +19,9 @@ tauri-plugin-http = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 open = "5"          # 兜底：用系统默认浏览器打开信息源（内置窗口异常时的可靠退路）
+rusqlite = { version = "0.32", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
 
 # 发布体积优化（Windows 安装包更小）
 [profile.release]

@@ -4,6 +4,8 @@
 //   —— 表现为空白页 / 关不掉 / 后续打不开），登录态持久化在本机，凭据不经过助手。
 // - kv_get / kv_set：落盘持久化（app_data_dir/kv/*.json），容量不受 localStorage 5MB 限制，
 //   在办分析与生成结果（材料/附件/报告正文）重启不丢。
+mod intelligence;
+
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 // 注入脚本（工具条 + 站内自动抓取）。单独成文件，运行前由下方预置 window.__ZLGZT_SRC__。
@@ -132,13 +134,24 @@ async fn open_source_browser(app: tauri::AppHandle, url: String, label: String, 
     .map_err(|e| e.to_string())?;
     rx.recv().map_err(|_| "窗口创建无响应".to_string())?
 }
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![open_source_browser, open_external, grab_page, grab_reports, read_download, kv_get, kv_set])
-        .setup(|_app| Ok(()))
+        .setup(|app| {
+            app.manage(intelligence::database::DatabaseState::default());
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            open_source_browser,
+            open_external,
+            grab_page,
+            grab_reports,
+            read_download,
+            kv_get,
+            kv_set,
+            intelligence::intelligence_health,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
