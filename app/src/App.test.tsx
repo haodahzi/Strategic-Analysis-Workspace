@@ -25,7 +25,10 @@ describe("App intelligence navigation", () => {
   it("includes the intelligence navigation item", () => {
     const html = renderToStaticMarkup(<App />);
 
-    expect(html).toContain("对标企业情报");
+    const reportNavigationIndex = html.indexOf("▦ 报告库");
+    const intelligenceNavigationIndex = html.indexOf("◉ 对标企业情报");
+
+    expect(intelligenceNavigationIndex).toBeGreaterThan(reportNavigationIndex);
   });
 
   it("renders the intelligence module from its query view without removing existing navigation", () => {
@@ -33,7 +36,8 @@ describe("App intelligence navigation", () => {
 
     const html = renderToStaticMarkup(<App />);
 
-    expect(html).toContain("对标企业情报");
+    expect(html).toContain('id="intelligence-title"');
+    expect(html).toContain("正在检查本地数据");
     expect(html).toContain("研究分析总览");
     expect(html).toContain("报告库");
     expect(html).toContain("设置");
