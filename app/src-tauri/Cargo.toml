@@ -22,6 +22,12 @@ open = "5"          # 兜底：用系统默认浏览器打开信息源（内置�
 rusqlite = { version = "0.32", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "charset", "stream"] }
+tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros"] }
+url = "2"
+sha2 = "0.10"
+flate2 = "1"
+hex = "0.4"
 
 # 发布体积优化（Windows 安装包更小）
 [profile.release]
