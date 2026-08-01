@@ -1,13 +1,35 @@
 // 联网检索（用户自配的搜索 API，默认 Tavily）：为报告接地、给真实引用来源。
 // 走 getLlmFetch（Tauri 下用 http 插件绕过 CORS）。未配 Key 时全部降级为「不联网」。
-import { AppConfig } from "./types";
+import { AppConfig, SearchConfig } from "./types";
 import { PipelineInput } from "./pipeline";
 import { getLlmFetch } from "./runtime";
 
 export interface SearchHit { title: string; url: string; content: string; }
 
 export function searchEnabled(cfg: AppConfig): boolean {
-  return cfg.search.provider === "tavily" && !!cfg.search.apiKey;
+  return cfg.search.provider !== "none" && !!cfg.search.apiKey;
+}
+
+// 各家搜索 API 的默认 EndPoint（在设置里切换提供商时自动带出）
+export const SEARCH_ENDPOINTS: Record<SearchConfig["provider"], string> = {
+  none: "",
+  tavily: "https://api.tavily.com/search",
+  bocha: "https://api.bocha.cn/v1/web-search",
+};
+
+// 纯解析：各家响应 JSON → 命中列表（可单测）。
+export function parseHits(provider: SearchConfig["provider"], json: unknown): SearchHit[] {
+  const j = json as Record<string, unknown>;
+  if (provider === "bocha") {
+    // 博查（Bing 风格）：data.webPages.value[] { name, url, snippet, summary }
+    const data = (j?.data ?? j) as Record<string, unknown> | undefined;
+    const webPages = data?.webPages as { value?: Array<Record<string, unknown>> } | undefined;
+    const val = webPages?.value ?? [];
+    return val.map((r) => ({ title: String(r.name ?? r.title ?? r.url ?? ""), url: String(r.url ?? ""), content: String(r.summary ?? r.snippet ?? "") })).filter((h) => h.url);
+  }
+  // tavily：results[] { title, url, content }
+  const results = (j?.results as Array<Record<string, unknown>>) ?? [];
+  return results.map((r) => ({ title: String(r.title ?? r.url ?? ""), url: String(r.url ?? ""), content: String(r.content ?? "") })).filter((h) => h.url);
 }
 
 // 按分析类型生成几条检索词（纯函数、可测）
@@ -22,16 +44,19 @@ export function queriesFor(input: PipelineInput): string[] {
 export async function webSearch(cfg: AppConfig, query: string): Promise<SearchHit[]> {
   const s = cfg.search;
   const fetchImpl = await getLlmFetch();
-  const res = await fetchImpl(s.baseUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ api_key: s.apiKey, query, max_results: s.maxResults, search_depth: "basic" }),
-  });
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  let body: string;
+  if (s.provider === "bocha") {
+    // 博查：Bearer 鉴权，count 控制条数，summary 取长摘要
+    headers.authorization = `Bearer ${s.apiKey ?? ""}`;
+    body = JSON.stringify({ query, count: s.maxResults, summary: true, freshness: "noLimit" });
+  } else {
+    // tavily：api_key 放 body
+    body = JSON.stringify({ api_key: s.apiKey, query, max_results: s.maxResults, search_depth: "basic" });
+  }
+  const res = await fetchImpl(s.baseUrl, { method: "POST", headers, body });
   if (!res.ok) throw new Error(`搜索 ${res.status}`);
-  const data = (await res.json()) as { results?: { title?: string; url?: string; content?: string }[] };
-  return (data.results ?? [])
-    .map((r) => ({ title: r.title ?? r.url ?? "", url: r.url ?? "", content: r.content ?? "" }))
-    .filter((h) => h.url);
+  return parseHits(s.provider, await res.json());
 }
 
 // 跑多条查询、按 URL 去重、上限约 10 条；单条失败不阻断整体。

@@ -14,6 +14,7 @@
         { "url": "https://open.bigmodel.cn/*" },
         { "url": "https://api.moonshot.cn/*" },
         { "url": "https://api.tavily.com/*" },
+        { "url": "https://api.bocha.cn/*" },
         { "url": "https://google.serper.dev/*" },
         { "url": "https://api.bing.microsoft.com/*" },
         { "url": "https://api.search.brave.com/*" },

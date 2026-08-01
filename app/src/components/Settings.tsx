@@ -3,7 +3,7 @@ import { AGENT_ROLES, AppConfig, ModelPick, ProviderConfig, ProviderId, SearchCo
 import { applyMainProvider, loadConfig, providerById, saveConfig } from "../config/store";
 import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
-import { webSearch } from "../llm/search";
+import { SEARCH_ENDPOINTS, webSearch } from "../llm/search";
 
 export default function Settings() {
   const [cfg, setCfg] = useState<AppConfig>(() => loadConfig());
@@ -87,11 +87,12 @@ export default function Settings() {
       ))}
 
       <div className="sec-head">联网检索（可选 · 为报告接地、给真实引用来源）</div>
-      <div className="set-hint" style={{ marginBottom: 12 }}>配一个搜索 API（如 Tavily：到 tavily.com 申请，有免费额度）后，生成报告时会自动联网检索、据实写作、文末附参考文献；不配则仅用模型知识 + 你上传的材料。Key 仅存本机。</div>
+      <div className="set-hint" style={{ marginBottom: 12 }}>配一个搜索 API（博查 Bocha：api.bocha.cn；或 Tavily）后，生成报告时会自动联网检索、据实写作、文末附参考文献；不配则仅用模型知识 + 你上传的材料。切换提供商会自动带出对应 EndPoint。Key 仅存本机。</div>
       <div className="prov-card">
         <div className="prov-card-hd">
-          <select className="set-select" value={cfg.search.provider} onChange={(e) => patchSearch({ provider: e.target.value as SearchConfig["provider"] })}>
+          <select className="set-select" value={cfg.search.provider} onChange={(e) => { const provider = e.target.value as SearchConfig["provider"]; patchSearch({ provider, baseUrl: SEARCH_ENDPOINTS[provider] || cfg.search.baseUrl }); }}>
             <option value="none">不联网</option>
+            <option value="bocha">博查 Bocha</option>
             <option value="tavily">Tavily</option>
           </select>
           <span className={"key-status " + (cfg.search.provider === "none" ? "na" : cfg.search.apiKey ? "ok" : "none")}>

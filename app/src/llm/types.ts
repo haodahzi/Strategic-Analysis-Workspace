@@ -32,9 +32,9 @@ export interface ModelPick { provider: ProviderId; model: string; }
 
 // 联网检索（用户自配的搜索 API，如 Tavily）——为报告接地、给真实引用来源。
 export interface SearchConfig {
-  provider: "none" | "tavily";
+  provider: "none" | "tavily" | "bocha";
   apiKey?: string;
-  baseUrl: string;      // 如 https://api.tavily.com/search
+  baseUrl: string;      // tavily: https://api.tavily.com/search；bocha: https://api.bocha.cn/v1/web-search
   maxResults: number;   // 每条查询取回条数
 }
 

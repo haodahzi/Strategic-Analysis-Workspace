@@ -1,7 +1,7 @@
 {
   "name": "docking-workbench",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "description": "战略发展分析工作台 · Web 内核 + Tauri 桌面壳",
   "scripts": {

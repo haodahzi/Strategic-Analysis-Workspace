@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { queriesFor, referencesMd, searchEnabled, sourcesBlock } from "./search";
+import { parseHits, queriesFor, referencesMd, searchEnabled, sourcesBlock } from "./search";
 import { defaultConfig } from "../config/store";
 
 describe("联网检索辅助（纯函数）", () => {
@@ -9,11 +9,20 @@ describe("联网检索辅助（纯函数）", () => {
     expect(queriesFor({ industry: "冷链", ourRole: "", focus: "项目可行性", counterparty: "某方" }).some((q) => q.includes("某方"))).toBe(true);
   });
 
-  it("searchEnabled 需 provider=tavily 且有 key", () => {
+  it("searchEnabled 需选了提供商且有 key", () => {
     const c = defaultConfig();
     expect(searchEnabled(c)).toBe(false);
     expect(searchEnabled({ ...c, search: { ...c.search, provider: "tavily", apiKey: "k" } })).toBe(true);
-    expect(searchEnabled({ ...c, search: { ...c.search, provider: "tavily", apiKey: "" } })).toBe(false);
+    expect(searchEnabled({ ...c, search: { ...c.search, provider: "bocha", apiKey: "k" } })).toBe(true);
+    expect(searchEnabled({ ...c, search: { ...c.search, provider: "bocha", apiKey: "" } })).toBe(false);
+  });
+
+  it("parseHits 适配博查（data.webPages.value）与 Tavily（results）两种返回", () => {
+    const bocha = { code: 200, data: { webPages: { value: [{ name: "标题甲", url: "https://a.com", summary: "长摘要", snippet: "短" }] } } };
+    const hb = parseHits("bocha", bocha);
+    expect(hb).toEqual([{ title: "标题甲", url: "https://a.com", content: "长摘要" }]);
+    const tav = { results: [{ title: "T", url: "https://b.com", content: "C" }] };
+    expect(parseHits("tavily", tav)).toEqual([{ title: "T", url: "https://b.com", content: "C" }]);
   });
 
   it("sourcesBlock 带编号与链接；referencesMd 生成参考文献列表", () => {
