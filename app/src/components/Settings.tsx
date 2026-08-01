@@ -1,13 +1,22 @@
 import { useState } from "react";
-import { AGENT_ROLES, AppConfig, ModelPick, ProviderConfig, ProviderId } from "../llm/types";
+import { AGENT_ROLES, AppConfig, ModelPick, ProviderConfig, ProviderId, SearchConfig } from "../llm/types";
 import { applyMainProvider, loadConfig, providerById, saveConfig } from "../config/store";
 import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
+import { webSearch } from "../llm/search";
 
 export default function Settings() {
   const [cfg, setCfg] = useState<AppConfig>(() => loadConfig());
   const [check, setCheck] = useState<Record<string, string>>({});   // 每个提供商各自的自检结果
+  const [searchChk, setSearchChk] = useState("");
   const commit = (next: AppConfig) => { setCfg(next); saveConfig(next); };
+
+  const patchSearch = (p: Partial<SearchConfig>) => commit({ ...cfg, search: { ...cfg.search, ...p } });
+  const searchSelfCheck = async () => {
+    setSearchChk("检测中…");
+    try { const hits = await webSearch(cfg, "测试 test"); setSearchChk(`✓ 通 · 取回 ${hits.length} 条`); }
+    catch (e) { setSearchChk("✗ " + (e as Error).message.slice(0, 60)); }
+  };
 
   // 改某一个提供商的字段（各家可并存，多 Key #12）
   const patchProvider = (id: ProviderId, p: Partial<Pick<ProviderConfig, "apiKey" | "baseUrl" | "models">>) =>
@@ -76,6 +85,38 @@ export default function Settings() {
           </div>
         </div>
       ))}
+
+      <div className="sec-head">联网检索（可选 · 为报告接地、给真实引用来源）</div>
+      <div className="set-hint" style={{ marginBottom: 12 }}>配一个搜索 API（如 Tavily：到 tavily.com 申请，有免费额度）后，生成报告时会自动联网检索、据实写作、文末附参考文献；不配则仅用模型知识 + 你上传的材料。Key 仅存本机。</div>
+      <div className="prov-card">
+        <div className="prov-card-hd">
+          <select className="set-select" value={cfg.search.provider} onChange={(e) => patchSearch({ provider: e.target.value as SearchConfig["provider"] })}>
+            <option value="none">不联网</option>
+            <option value="tavily">Tavily</option>
+          </select>
+          <span className={"key-status " + (cfg.search.provider === "none" ? "na" : cfg.search.apiKey ? "ok" : "none")}>
+            {cfg.search.provider === "none" ? "已关闭" : cfg.search.apiKey ? "● Key 已存本机" : "○ 未配置 Key"}
+          </span>
+          <div className="spacer" />
+          <span className={chkClass(searchChk)}>{searchChk}</span>
+          <button type="button" className="app-btn ghost dark" disabled={cfg.search.provider === "none" || !cfg.search.apiKey} onClick={() => void searchSelfCheck()}>检索自检</button>
+        </div>
+        {cfg.search.provider !== "none" && (
+          <>
+            <label className="fld"><span>搜索 API Key</span>
+              <input className="key-input wide" type="password" placeholder="填入搜索 API Key…" value={cfg.search.apiKey ?? ""} onChange={(e) => patchSearch({ apiKey: e.target.value })} />
+            </label>
+            <div className="prov-two">
+              <label className="fld"><span>Base URL</span>
+                <input className="key-input wide" value={cfg.search.baseUrl} onChange={(e) => patchSearch({ baseUrl: e.target.value })} />
+              </label>
+              <label className="fld"><span>每条查询取回条数</span>
+                <input className="key-input wide" type="number" min={1} max={10} value={cfg.search.maxResults} onChange={(e) => patchSearch({ maxResults: Math.max(1, Math.min(10, Number(e.target.value) || 5)) })} />
+              </label>
+            </div>
+          </>
+        )}
+      </div>
 
       <div className="sec-head">子任务 · 分模型（红队宜换一款 / 一家，互查更狠）</div>
       <div className="set-row" style={{ marginBottom: 8 }}>

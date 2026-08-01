@@ -12,7 +12,12 @@
         { "url": "https://api.openai.com/*" },
         { "url": "https://api.deepseek.com/*" },
         { "url": "https://open.bigmodel.cn/*" },
-        { "url": "https://api.moonshot.cn/*" }
+        { "url": "https://api.moonshot.cn/*" },
+        { "url": "https://api.tavily.com/*" },
+        { "url": "https://google.serper.dev/*" },
+        { "url": "https://api.bing.microsoft.com/*" },
+        { "url": "https://api.search.brave.com/*" },
+        { "url": "https://api.exa.ai/*" }
       ]
     }
   ]

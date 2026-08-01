@@ -77,6 +77,10 @@ const NEUTRALITY =
 const MARKUP_HINT =
   "排版约定：重要结论用「> 结论：…」、主要风险用「> 风险：…」、关键洞察用「> 洞察：…」各自成段标注（适度、不滥用）；需要对比的数据用 markdown 表格；层次用 ## / ### 小标题。";
 
+// 有联网检索资料时的引用约定（无检索时这条无害）
+const CITE_HINT =
+  "若「资料研判」中含带编号 [n] 与链接的检索资料，引用其事实 / 数据时在句末标注对应 [n]；不要自行罗列参考文献，系统会在文末统一附上。";
+
 function typeNote(kind: string, company?: string): string {
   if (kind === "公司介绍")
     return `这是一份公司介绍（面向不了解这家公司的读者）：标题就写「${company || "该公司"} 公司介绍」，文风朴素、不用噱头；不做投资建议，不写做空 / 空头逻辑，不写决策链 / 筹码。`;
@@ -99,7 +103,7 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
       user = `${head}\n内容骨架：\n${o.plan ?? "（无）"}\n\n本单材料：\n${ctx.materials.trim() || "（未提供外部材料）"}\n\n抽取与本单相关的关键事实、数据与口径；材料没覆盖的关键点标「需补」、公开渠道查不到的标「未公开」。不要编造。`;
       break;
     case "draft":
-      user = `${head}\n内容骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草正文，像一份严谨的研究综述：每部分先讲清事实与逻辑、再给有节制的判断；量化数据必带口径与来源，无来源标「需补 / 未公开」。紧扣上面框架各要点，不要出现框架名或教科书标签，不要清单感。用 markdown。${note} ${NEUTRALITY} ${MARKUP_HINT}`;
+      user = `${head}\n内容骨架：\n${o.plan ?? ""}\n\n资料研判：\n${o.research ?? ""}\n\n据此起草正文，像一份严谨的研究综述：每部分先讲清事实与逻辑、再给有节制的判断；量化数据必带口径与来源，无来源标「需补 / 未公开」。紧扣上面框架各要点，不要出现框架名或教科书标签，不要清单感。用 markdown。${note} ${NEUTRALITY} ${MARKUP_HINT} ${CITE_HINT}`;
       break;
     case "red":
       user = `对下面这份初稿做事实与中立性审查，逐条指出问题（无来源的断言 / 疑似编造，尤其编造我方数据或筹码 / 一边倒的倾向 / 口径含糊），并列出必须修正处；不要添加新的倾向：\n\n${o.draft ?? ""}`;

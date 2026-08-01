@@ -8,7 +8,10 @@ export function defaultConfig(): AppConfig {
   const providers: ProviderConfig[] = Object.values(DEFAULT_PROVIDERS).map((p) => ({ ...p }));
   const agents = {} as Record<AgentRole, ModelPick>;
   for (const a of AGENT_ROLES) agents[a] = { ...MOCK };
-  return { providers, defaultProvider: "mock", step0: { ...MOCK }, agents };
+  return {
+    providers, defaultProvider: "mock", step0: { ...MOCK }, agents,
+    search: { provider: "none", baseUrl: "https://api.tavily.com/search", maxResults: 5 },
+  };
 }
 
 export function loadConfig(): AppConfig {
@@ -30,6 +33,7 @@ export function loadConfig(): AppConfig {
       defaultProvider: saved.defaultProvider ?? base.defaultProvider,
       step0: saved.step0 ?? base.step0,                    // 旧结构（routing）缺这些字段 → 回落默认
       agents: { ...base.agents, ...(saved.agents ?? {}) },
+      search: { ...base.search, ...(saved.search ?? {}) },
     };
     // 迁移旧配置：若之前已选过真实主用提供商但还没有子任务路由，自动铺到定框+各子任务（Key 不用重配）
     if (!saved.agents && cfg.defaultProvider !== "mock") return applyMainProvider(cfg, cfg.defaultProvider);
