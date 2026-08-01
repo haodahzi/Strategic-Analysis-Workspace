@@ -99,6 +99,8 @@
 
 ### Task 1: Establish the isolated worktree and capture the clean baseline
 
+**Working directory:** repository root of the prepared `feature/competitive-intelligence` worktree. Do not change directory during this task.
+
 **Files:**
 
 - Create: `docs/superpowers/specs/2026-08-01-competitive-intelligence-module-design.md`
@@ -110,61 +112,38 @@
 - Consumes: approved base and amendments.
 - Produces: isolated `feature/competitive-intelligence` worktree, clean baseline evidence, and one documentation-only commit.
 
-- [ ] **Step 1: Clone the approved repository baseline when executing from scratch**
-
-Run from `D:\工作文档\AI相关\对标企业情报功能`:
-
-```powershell
-git clone --filter=blob:none --branch "claude/business-project-docking-workbench-ccies1" https://github.com/haodahzi/Strategic-Analysis-Workspace.git Strategic-Analysis-Workspace
-git -C Strategic-Analysis-Workspace fetch origin
-git -C Strategic-Analysis-Workspace remote show origin
-```
-
-Expected: clone completes with normal HTTPS/TLS validation, origin is `haodahzi/Strategic-Analysis-Workspace`, the remote default branch has been inspected, and the approved base branch still exists. If HTTPS validation fails or the remote default/base changed, stop for review; do not weaken certificate or revocation checks.
-
-- [ ] **Step 2: Create and verify the isolated feature worktree**
-
-```powershell
-git -C Strategic-Analysis-Workspace worktree add ..\Strategic-Analysis-Workspace-intelligence -b feature/competitive-intelligence "origin/claude/business-project-docking-workbench-ccies1"
-git -C ..\Strategic-Analysis-Workspace-intelligence branch --show-current
-git -C ..\Strategic-Analysis-Workspace-intelligence rev-parse HEAD
-git -C ..\Strategic-Analysis-Workspace-intelligence status --short
-```
-
-Expected: branch is `feature/competitive-intelligence`, starting commit is the approved base `79d2612...`, and the new worktree is clean.
-
-For an already prepared controller-owned worktree, do not clone or add another worktree; verify the same facts in place:
+- [ ] **Step 1: Verify the prepared repository, remote and feature worktree**
 
 ```powershell
 git remote -v
+git fetch origin
+git remote show origin
 git branch --show-current
 git rev-parse HEAD
 git status --short
 ```
 
-Expected: repository is `haodahzi/Strategic-Analysis-Workspace`, branch is `feature/competitive-intelligence`, the starting base is `79d2612...`, and only controller-owned task metadata may be untracked.
+Expected: repository is `haodahzi/Strategic-Analysis-Workspace`, branch is `feature/competitive-intelligence`, the approved base exists, and only controller-owned task metadata may be untracked. Fetch uses normal HTTPS/TLS validation; if it fails, stop and do not weaken certificate or revocation checks. Repository cloning and worktree creation are controller preconditions, not commands run inside this task.
 
-- [ ] **Step 3: Record the untouched baseline**
-
-Run from `app`:
+- [ ] **Step 2: Record the untouched baseline from repository root**
 
 ```powershell
-npm ci
-npm test
-npm run typecheck
-npm run build
+npm --prefix app ci
+npm --prefix app test
+npm --prefix app run typecheck
+npm --prefix app run build
 rustc +1.77.2-x86_64-pc-windows-msvc --version
 cargo +1.77.2-x86_64-pc-windows-msvc --version
-cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
+cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path app/src-tauri/Cargo.toml
 ```
 
 Expected: existing tests pass, typecheck/build exit 0, and Cargo check passes under Rust 1.77.2/MSVC.
 
-- [ ] **Step 4: Add the approved design and plan with apply_patch**
+- [ ] **Step 3: Add the approved design and plan with apply_patch**
 
 Create exactly the two docs named above. Confirm the plan contains all eight tasks and this approved-amendments section. Do not create product files in this task.
 
-- [ ] **Step 5: Commit only the documents**
+- [ ] **Step 4: Commit only the documents**
 
 ```powershell
 git add docs/superpowers/specs/2026-08-01-competitive-intelligence-module-design.md docs/superpowers/plans/2026-08-01-competitive-intelligence-foundation.md
@@ -178,6 +157,8 @@ Expected: exactly two Markdown files in one documentation-only commit.
 ---
 
 ### Task 2: Add the isolated navigation shell
+
+**Working directory:** `app`. Every command in this task runs from `app`; Git commands use `git -C ..` to address repository-root paths.
 
 **Files:**
 
@@ -216,7 +197,7 @@ Expected: FAIL because the App `View` union, navigation item and render branch d
 
 - [ ] **Step 3: Implement the minimal isolated shell**
 
-Define `IntelligenceBootStatus = "initializing" | "ready" | "error"`; render initialization, retryable Chinese error, and ready copy `本地情报库已就绪，尚未执行首次同步。` Use only `.intel-*` CSS classes. Export through `index.ts`.
+Define the single status union `IntelligenceBootStatus = "initializing" | "ready" | "error" | "unavailable"`; render initialization, retryable Chinese error, ready copy `本地情报库已就绪，尚未执行首次同步。`, and a desktop-required message for `unavailable`. The unavailable branch is reserved for browser mode without Tauri and is wired in Task 6. Use only `.intel-*` CSS classes. Export through `index.ts`.
 
 - [ ] **Step 4: Register navigation without touching existing persistence**
 
@@ -229,8 +210,8 @@ npx vitest run src/features/intelligence/IntelligenceFeature.test.tsx
 npx vitest run src/App.test.tsx
 npm test
 npm run typecheck
-git add app/src/App.tsx app/src/main.tsx app/src/features/intelligence
-git commit -m "feat(intelligence): add isolated workspace shell"
+git -C .. add -- app/src/App.tsx app/src/App.test.tsx app/src/main.tsx app/src/features/intelligence
+git -C .. commit -m "feat(intelligence): add isolated workspace shell"
 ```
 
 Expected: focused and regression tests pass; existing views retain behavior.
@@ -238,6 +219,8 @@ Expected: focused and regression tests pass; existing views retain behavior.
 ---
 
 ### Task 3: Create the independent SQLite schema and retryable health command
+
+**Working directory:** `app`. Every command in this task runs from `app`; Git commands use `git -C ..` to address repository-root paths.
 
 **Files:**
 
@@ -261,7 +244,7 @@ Add `rusqlite = { version = "0.32", features = ["bundled"] }`, `chrono = { versi
 rustc +1.77.2-x86_64-pc-windows-msvc --version
 cargo +1.77.2-x86_64-pc-windows-msvc --version
 cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
-git status --short src-tauri/Cargo.toml src-tauri/Cargo.lock
+git -C .. status --short -- app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock
 ```
 
 Expected: both manifest and lock are tracked changes; dependency selection honors MSRV.
@@ -312,8 +295,8 @@ Expected: PASS; initialization failure test succeeds on its second attempt; conc
 - [ ] **Step 6: Commit database, registration and lock together**
 
 ```powershell
-git add app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/migrations/intelligence app/src-tauri/src/intelligence app/src-tauri/src/lib.rs
-git commit -m "feat(intelligence): add isolated SQLite foundation"
+git -C .. add -- app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/migrations/intelligence app/src-tauri/src/intelligence app/src-tauri/src/lib.rs
+git -C .. commit -m "feat(intelligence): add isolated SQLite foundation"
 ```
 
 - [ ] **Step 7: Verify the committed capability boundary against the approved baseline**
@@ -327,6 +310,8 @@ Expected: exit 0, proving no committed capability change from the approved basel
 ---
 
 ### Task 4: Add DNS-pinned HTTPS fetching and immutable snapshots
+
+**Working directory:** `app`. Every command in this task runs from `app`; Git commands use `git -C ..` to address repository-root paths.
 
 **Files:**
 
@@ -417,14 +402,16 @@ Expected: all PASS, including DNS-pin and chunked-over-limit tests; capability d
 - [ ] **Step 8: Commit and verify the committed capability boundary**
 
 ```powershell
-git add app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/src/intelligence app/src-tauri/src/lib.rs
-git commit -m "feat(intelligence): add secure source snapshots"
+git -C .. add -- app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/src/intelligence app/src-tauri/src/lib.rs
+git -C .. commit -m "feat(intelligence): add secure source snapshots"
 git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
 ---
 
 ### Task 5: Add typed TypeScript platform adapters
+
+**Working directory:** `app`. Every command in this task runs from `app`; Git commands use `git -C ..` to address repository-root paths.
 
 **Files:**
 
@@ -465,8 +452,8 @@ Default to `@tauri-apps/api/core.invoke`, but keep the invoke function injectabl
 ```powershell
 npx vitest run src/features/intelligence/infrastructure/tauriPlatform.test.ts
 npm run typecheck
-git add app/src/features/intelligence
-git commit -m "feat(intelligence): add typed Tauri platform bridge"
+git -C .. add -- app/src/features/intelligence
+git -C .. commit -m "feat(intelligence): add typed Tauri platform bridge"
 ```
 
 Expected: PASS and one focused commit.
@@ -474,6 +461,8 @@ Expected: PASS and one focused commit.
 ---
 
 ### Task 6: Persist recovery checkpoints and prepare the catch-up window
+
+**Working directory:** `app`. Every command in this task runs from `app`; Git commands use `git -C ..` to address repository-root paths.
 
 **Files:**
 
@@ -523,7 +512,7 @@ In `intelligenceBoot.test.ts`, use an injected `recoverOnStartup` spy and verify
 - two concurrent/repeated `start()` calls return the same in-flight promise and invoke recovery once;
 - a completed start remains one-shot when the same coordinator is reused across simulated StrictMode unmount/remount;
 - an error snapshot can call `retry()`, which performs a new health/recovery attempt and publishes ready;
-- subscribers see the same `initializing/error/ready` snapshot that the feature receives.
+- subscribers see the same `initializing | ready | error | unavailable` snapshot that the feature receives; `unavailable` is emitted only by the no-Tauri browser coordinator.
 - a browser coordinator's single `start()` publishes `unavailable` without invoking any Tauri recovery/fetch command.
 
 In `bootstrap.test.tsx`, inject coordinator and render callbacks; assert bootstrap calls `coordinator.start()` before rendering `<React.StrictMode><App intelligenceBoot={coordinator} /></React.StrictMode>`, even when the initial view is dashboard. StrictMode render must not own or repeat the start side effect.
@@ -579,7 +568,7 @@ It does not call `fetchSnapshot`, does not create a run, and does not start time
 
 - [ ] **Step 5: Implement application-scoped startup coordination**
 
-Create a coordinator outside React component lifecycle with `start()`, `retry()`, `subscribe()` and `getSnapshot()`. `start()` deduplicates its promise and is one-shot after success; `retry()` is allowed from error and calls recovery again. `bootstrapApplication` invokes `start()` once before `ReactDOM.createRoot(...).render(<React.StrictMode>...)`; therefore StrictMode cannot duplicate recovery. `App` uses `useSyncExternalStore` on the injected application singleton and passes its snapshot/retry to `IntelligenceFeature` regardless of current view. The desktop feature displays shared `initializing | ready | error`; retry reruns health/lazy init. Extend the status with `unavailable` for browser mode; its coordinator starts once, performs zero Tauri calls and displays the desktop-required message.
+Create a coordinator outside React component lifecycle with `start()`, `retry()`, `subscribe()` and `getSnapshot()`. `start()` deduplicates its promise and is one-shot after success; `retry()` is allowed from error and calls recovery again. `bootstrapApplication` invokes `start()` once before `ReactDOM.createRoot(...).render(<React.StrictMode>...)`; therefore StrictMode cannot duplicate recovery. `App` uses `useSyncExternalStore` on the injected application singleton and passes its snapshot/retry to `IntelligenceFeature` regardless of current view. All consumers use `initializing | ready | error | unavailable`; desktop recovery emits the first three and retry reruns health/lazy init, while only the no-Tauri browser coordinator emits `unavailable`, performs zero Tauri calls and displays the desktop-required message.
 
 - [ ] **Step 6: Verify top-level once-only recovery, no collection, Rust MSRV and commit**
 
@@ -593,9 +582,9 @@ cargo +1.77.2-x86_64-pc-windows-msvc --version
 cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml intelligence
 cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
 git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
-git add app/src/features/intelligence app/src-tauri
-git add app/src/bootstrap.tsx app/src/bootstrap.test.tsx app/src/App.tsx app/src/App.test.tsx app/src/main.tsx
-git commit -m "feat(intelligence): prepare interrupted work recovery"
+git -C .. add -- app/src/features/intelligence app/src-tauri
+git -C .. add -- app/src/bootstrap.tsx app/src/bootstrap.test.tsx app/src/App.tsx app/src/App.test.tsx app/src/main.tsx
+git -C .. commit -m "feat(intelligence): prepare interrupted work recovery"
 git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
@@ -604,6 +593,8 @@ Expected: all PASS under the printed 1.77.2 MSVC toolchain; tests prove applicat
 ---
 
 ### Task 7: Move provider API keys to Windows native credential storage
+
+**Working directory:** `app`. Every command in this task runs from `app`; Git commands use `git -C ..` to address repository-root paths.
 
 **Files:**
 
@@ -709,15 +700,17 @@ git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app
 Expected: tests/checks pass; grep finds no intentional Key persistence; capabilities remain unchanged.
 
 ```powershell
-git add app/src app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/src
-git add app/package.json app/package-lock.json
-git commit -m "security: move model keys to OS credential storage"
+git -C .. add -- app/src app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock app/src-tauri/src
+git -C .. add -- app/package.json app/package-lock.json
+git -C .. commit -m "security: move model keys to OS credential storage"
 git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
 ---
 
 ### Task 8: Run the foundation acceptance gate
+
+**Working directory:** `app`. Every command in this task runs from `app`; Git commands use `git -C ..` to address repository-root paths.
 
 **Files:**
 
@@ -758,13 +751,34 @@ cargo +1.77.2-x86_64-pc-windows-msvc --version
 cargo +1.77.2-x86_64-pc-windows-msvc test --manifest-path src-tauri/Cargo.toml
 cargo +1.77.2-x86_64-pc-windows-msvc check --manifest-path src-tauri/Cargo.toml
 rg -n "招聘|岗位|recruitment" src src-tauri
-git ls-files src-tauri/Cargo.lock
+git -C .. ls-files -- app/src-tauri/Cargo.lock
 git -C .. diff --exit-code 79d26128baae4c43ac08b7c62948fc986e62a941..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
 Expected: printed `rustc`/`cargo` are exactly 1.77.2 MSVC; automated commands exit 0; Cargo.lock is printed as tracked; committed capability diff from the approved baseline is empty. Review grep matches by path: the new module must have none, and pre-existing matches outside it are documented rather than deleted mechanically.
 
-- [ ] **Step 3: Run the desktop and browser smoke tests**
+- [ ] **Step 3: Close any gate failure with a RED-to-green focused fix**
+
+If every Step 2 command passes, explicitly record “no gate failure” in the acceptance document and skip the repair commit in this step.
+
+If any command fails, do not edit production code immediately. Complete this loop in order:
+
+1. Re-run the exact failing Step 2 command and record its output, exit code and smallest reproducible input.
+2. Add the narrowest regression test adjacent to the affected TypeScript/Rust module. Run only that exact test first and confirm RED for the observed defect (not for a missing import, module registration or fixture mistake). Rust RED uses the printed `+1.77.2-x86_64-pc-windows-msvc` toolchain.
+3. Implement the minimum product change that makes the regression test pass; do not refactor unrelated code.
+4. Re-run the focused regression test until green, then run the complete Step 2 automated gate again.
+5. Review `git -C .. diff --name-only` and stage only the new regression test plus its minimum product fix using explicit file paths. Verify the staged diff, then create the focused repair commit:
+
+```powershell
+git -C .. add -- app
+git -C .. diff --cached --check
+git -C .. diff --cached --name-only
+git -C .. commit -m "fix(intelligence): resolve foundation acceptance failure"
+```
+
+Expected: the focused commit contains both the regression test and product fix, and the complete gate passes afterward. Do not include `docs/testing/competitive-intelligence-foundation.md` in this repair commit; it is committed separately in Step 5.
+
+- [ ] **Step 4: Run the desktop and browser smoke tests**
 
 In terminal A, run desktop mode:
 
@@ -782,32 +796,33 @@ npm run dev
 
 Expected browser behavior: app starts without Tauri/keyring, non-secret functions work, secret persistence is clearly unavailable, and no Key is written to localStorage. Do not run desktop and browser smoke servers concurrently on the same configured port.
 
-- [ ] **Step 4: Commit verification documentation**
+- [ ] **Step 5: Commit verification documentation separately**
 
 ```powershell
-git add docs/testing/competitive-intelligence-foundation.md
-git commit -m "test: document intelligence foundation acceptance"
+git -C .. add -- docs/testing/competitive-intelligence-foundation.md
+git -C .. commit -m "test: document intelligence foundation acceptance"
 ```
 
-- [ ] **Step 5: Synchronize and repeat the gate after conflicts**
+- [ ] **Step 6: Require a clean tree, synchronize and repeat the gate after conflicts**
 
 ```powershell
-git fetch origin
-git rebase "origin/claude/business-project-docking-workbench-ccies1"
+git -C .. status --short
+git -C .. fetch origin
+git -C .. rebase "origin/claude/business-project-docking-workbench-ccies1"
 git -C .. diff --exit-code "origin/claude/business-project-docking-workbench-ccies1"..HEAD -- app/src-tauri/capabilities/default.json
 ```
 
-Resolve only genuine conflicts. The final command must exit 0, proving the committed capability boundary against the newly fetched remote base. If the rebase changes the tree, rerun Step 2 with the remote-base capability command substituted for the fixed approved hash, then rerun both smoke modes sequentially.
+Expected before fetch/rebase: `git status --short` prints nothing. If it is not empty, stop and finish or deliberately discard only the known task changes before rebasing. Resolve only genuine conflicts. The final command must exit 0, proving the committed capability boundary against the newly fetched remote base. If the rebase changes the tree, rerun Step 2 with the remote-base capability command substituted for the fixed approved hash, then rerun both smoke modes sequentially; any newly exposed gate failure returns to Step 3's RED-to-green loop.
 
-- [ ] **Step 6: Push when repository write permission is available**
+- [ ] **Step 7: Push when repository write permission is available**
 
 ```powershell
-git push -u origin feature/competitive-intelligence
+git -C .. push -u origin feature/competitive-intelligence
 ```
 
 Expected: remote feature branch is created without changing the default branch.
 
-- [ ] **Step 7: Open a draft PR**
+- [ ] **Step 8: Open a draft PR**
 
 Title: `feat: add competitive intelligence foundation`
 
@@ -826,4 +841,6 @@ The body lists delivered scope, explicit recruitment exclusion, database locatio
 - [ ] Native secrets use only `windows-native`; browser behavior never persists Key.
 - [ ] Settings writes secrets only on explicit save.
 - [ ] `capabilities/default.json` is absent from modification lists and verified by committed diffs from the approved and synchronized remote baselines.
+- [ ] A Task 8 gate failure follows reproduce → regression RED → minimum fix → focused green → full gate → focused fix commit; no failure explicitly skips that commit.
+- [ ] The acceptance document is committed separately, and the worktree is clean before rebase.
 - [ ] Full frontend, build, Rust, desktop and browser gates are specified.

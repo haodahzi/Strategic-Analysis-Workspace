@@ -79,7 +79,7 @@ tauriPlatform / secureConfig（适配器与内存秘密缓存）
         +--> SecretStore（Windows Credential Manager）
 ```
 
-前端通过 `initializing | ready | error` 呈现模块启动状态。数据库健康检查、恢复准备和安全设置保存都返回结构化结果；错误以稳定的用户消息展示，日志不得包含秘密或响应正文。
+前端统一使用 `initializing | ready | error | unavailable` 四态呈现模块启动状态。`unavailable` 仅用于没有 Tauri IPC 的浏览器开发模式；桌面端不得用它掩盖初始化或恢复错误。数据库健康检查、恢复准备和安全设置保存都返回结构化结果；错误以稳定的用户消息展示，日志不得包含秘密或响应正文。
 
 ## 5. 数据设计
 
