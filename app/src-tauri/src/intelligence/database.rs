@@ -4,7 +4,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use thiserror::Error;
 
@@ -47,6 +47,37 @@ pub struct DatabaseState {
 pub fn migrate(connection: &Connection) -> Result<(), DatabaseError> {
     connection.execute_batch(MIGRATION_001)?;
     Ok(())
+}
+
+pub fn list_recoverable_runs(connection: &Connection) -> Result<Vec<String>, DatabaseError> {
+    let mut statement = connection
+        .prepare("SELECT id FROM collection_runs WHERE status = 'running' ORDER BY id ASC")?;
+    let run_ids = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(run_ids)
+}
+
+pub fn mark_run_interrupted(connection: &Connection, run_id: &str) -> Result<usize, DatabaseError> {
+    Ok(connection.execute(
+        "UPDATE collection_runs
+         SET status = 'interrupted',
+             finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+             error_code = 'APP_EXIT'
+         WHERE id = ?1 AND status = 'running'",
+        [run_id],
+    )?)
+}
+
+pub fn get_last_successful_sync(connection: &Connection) -> Result<Option<String>, DatabaseError> {
+    Ok(connection
+        .query_row(
+            "SELECT checkpoint_value FROM app_checkpoints
+             WHERE checkpoint_key = 'last_successful_sync'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?)
 }
 
 fn recover_lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -463,5 +494,123 @@ mod tests {
         assert_eq!(initialize_count.load(Ordering::SeqCst), 1);
         assert_eq!(first_health, second_health);
         assert!(first_health.ready);
+    }
+
+    mod recovery {
+        use rusqlite::Connection;
+
+        use super::super::{
+            get_last_successful_sync, list_recoverable_runs, mark_run_interrupted, migrate,
+        };
+
+        fn migrated_connection() -> Connection {
+            let connection = Connection::open_in_memory().unwrap();
+            migrate(&connection).unwrap();
+            connection
+        }
+
+        #[test]
+        fn list_returns_only_running_ids_in_deterministic_order() {
+            let connection = migrated_connection();
+            connection
+                .execute_batch(
+                    "INSERT INTO collection_runs (id, status) VALUES
+                     ('run-z', 'running'),
+                     ('run-done', 'completed'),
+                     ('run-a', 'running'),
+                     ('run-stopped', 'interrupted');",
+                )
+                .unwrap();
+
+            assert_eq!(
+                list_recoverable_runs(&connection).unwrap(),
+                vec!["run-a".to_string(), "run-z".to_string()]
+            );
+        }
+
+        #[test]
+        fn mark_updates_only_running_row_and_is_idempotent() {
+            let connection = migrated_connection();
+            connection
+                .execute_batch(
+                    "INSERT INTO collection_runs (id, status) VALUES
+                     ('running-run', 'running'),
+                     ('completed-run', 'completed');",
+                )
+                .unwrap();
+
+            assert_eq!(mark_run_interrupted(&connection, "running-run").unwrap(), 1);
+
+            let running = connection
+                .query_row(
+                    "SELECT status, finished_at, error_code FROM collection_runs WHERE id = 'running-run'",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, Option<String>>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                        ))
+                    },
+                )
+                .unwrap();
+            assert_eq!(running.0, "interrupted");
+            assert!(running.1.is_some());
+            assert_eq!(running.2.as_deref(), Some("APP_EXIT"));
+
+            assert_eq!(mark_run_interrupted(&connection, "running-run").unwrap(), 0);
+            assert_eq!(
+                mark_run_interrupted(&connection, "completed-run").unwrap(),
+                0
+            );
+            assert_eq!(mark_run_interrupted(&connection, "missing-run").unwrap(), 0);
+            let after_second_mark = connection
+                .query_row(
+                    "SELECT status, finished_at, error_code FROM collection_runs WHERE id = 'running-run'",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, Option<String>>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                        ))
+                    },
+                )
+                .unwrap();
+            assert_eq!(after_second_mark, running);
+
+            let completed = connection
+                .query_row(
+                    "SELECT status, finished_at, error_code FROM collection_runs WHERE id = 'completed-run'",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, Option<String>>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                        ))
+                    },
+                )
+                .unwrap();
+            assert_eq!(completed, ("completed".to_string(), None, None));
+        }
+
+        #[test]
+        fn checkpoint_returns_exact_value_or_null() {
+            let connection = migrated_connection();
+            assert_eq!(get_last_successful_sync(&connection).unwrap(), None);
+
+            connection
+                .execute(
+                    "INSERT INTO app_checkpoints (checkpoint_key, checkpoint_value) VALUES (?1, ?2)",
+                    ["last_successful_sync", "2026-07-31T23:00:00.123Z"],
+                )
+                .unwrap();
+
+            assert_eq!(
+                get_last_successful_sync(&connection).unwrap().as_deref(),
+                Some("2026-07-31T23:00:00.123Z")
+            );
+        }
     }
 }

@@ -10,6 +10,7 @@ import ReportLibrary from "./components/ReportLibrary";
 import { deleteRun, hydrateRuns, setMaterials, startRun } from "./llm/pipelineStore";
 import { clearUnread, getUnread, subscribeUnread } from "./llm/unread";
 import { IntelligenceFeature } from "./features/intelligence";
+import type { IntelligenceBootCoordinator } from "./features/intelligence/application/intelligenceBoot";
 
 type View = "dashboard" | "project" | "settings" | "new" | "reports" | "intelligence";
 
@@ -17,13 +18,30 @@ const STAGE_CLASS: Record<Stage, string> = {
   调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
 };
 
-export default function App() {
+interface AppProps {
+  intelligenceBoot?: IntelligenceBootCoordinator;
+}
+
+const fallbackIntelligenceSnapshot = { status: "initializing" } as const;
+const fallbackIntelligenceBoot: IntelligenceBootCoordinator = {
+  start: () => Promise.resolve(),
+  retry: () => Promise.resolve(),
+  subscribe: () => () => undefined,
+  getSnapshot: () => fallbackIntelligenceSnapshot,
+};
+
+export default function App({ intelligenceBoot = fallbackIntelligenceBoot }: AppProps) {
   const params = new URLSearchParams(window.location.search);
   const [view, setView] = useState<View>((params.get("view") as View) || "dashboard");
   const [pid, setPid] = useState(params.get("pid") || "");
   const [sampleOn, setSampleOn] = useState(params.get("report") === "1");
   const [items, setItems] = useState<Analysis[] | null>(null);   // null = 加载中（先回灌落盘数据再渲染）
   const unread = useSyncExternalStore(subscribeUnread, getUnread);
+  const intelligenceSnapshot = useSyncExternalStore(
+    intelligenceBoot.subscribe,
+    intelligenceBoot.getSnapshot,
+    intelligenceBoot.getSnapshot,
+  );
 
   // #9：启动时回灌落盘数据——先把生成状态（材料/附件/报告正文）填回内存，再加载在办分析列表
   useEffect(() => {
@@ -139,7 +157,12 @@ export default function App() {
                 : <ProjectWorkspace key={project.id} analysis={project} onUpdate={updateAnalysis} onDelete={() => deleteAnalysis(project.id)} />
           )}
           {items !== null && view === "reports" && <ReportLibrary />}
-          {items !== null && view === "intelligence" && <IntelligenceFeature status="initializing" onRetry={() => undefined} />}
+          {items !== null && view === "intelligence" && (
+            <IntelligenceFeature
+              boot={intelligenceSnapshot}
+              onRetry={() => { void intelligenceBoot.retry(); }}
+            />
+          )}
           {items !== null && view === "settings" && <Settings />}
         </main>
       </div>

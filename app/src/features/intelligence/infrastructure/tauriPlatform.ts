@@ -19,7 +19,10 @@ export function createTauriPlatform(
       invoke<FetchSnapshotResult>("fetch_source_snapshot", {
         request: { sourceId },
       }),
+    listRecoverableRuns: () => invoke<string[]>("list_recoverable_runs"),
+    markRunInterrupted: (runId) =>
+      invoke<void>("mark_run_interrupted", { runId }),
+    getLastSuccessfulSync: () =>
+      invoke<string | null>("get_last_successful_sync"),
   };
 }
-
-export const tauriPlatform = createTauriPlatform();

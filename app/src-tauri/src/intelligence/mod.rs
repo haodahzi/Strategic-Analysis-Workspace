@@ -27,6 +27,53 @@ pub fn intelligence_health(
         .map_err(|error| database_error_to_public(&error))
 }
 
+fn initialize_database(app: &AppHandle, state: &DatabaseState) -> Result<(), String> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| "database_unavailable".to_string())?
+        .join("intelligence");
+    state
+        .initialize(&data_dir)
+        .map(|_| ())
+        .map_err(|error| database_error_to_public(&error))
+}
+
+#[tauri::command]
+pub fn list_recoverable_runs(
+    app: AppHandle,
+    state: State<'_, DatabaseState>,
+) -> Result<Vec<String>, String> {
+    initialize_database(&app, &state)?;
+    state
+        .with_connection(database::list_recoverable_runs)
+        .map_err(|error| database_error_to_public(&error))
+}
+
+#[tauri::command]
+pub fn mark_run_interrupted(
+    app: AppHandle,
+    state: State<'_, DatabaseState>,
+    run_id: String,
+) -> Result<(), String> {
+    initialize_database(&app, &state)?;
+    state
+        .with_connection(|connection| database::mark_run_interrupted(connection, &run_id))
+        .map(|_| ())
+        .map_err(|error| database_error_to_public(&error))
+}
+
+#[tauri::command]
+pub fn get_last_successful_sync(
+    app: AppHandle,
+    state: State<'_, DatabaseState>,
+) -> Result<Option<String>, String> {
+    initialize_database(&app, &state)?;
+    state
+        .with_connection(database::get_last_successful_sync)
+        .map_err(|error| database_error_to_public(&error))
+}
+
 #[tauri::command]
 pub async fn fetch_source_snapshot(
     app: AppHandle,

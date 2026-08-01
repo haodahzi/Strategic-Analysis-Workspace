@@ -20,4 +20,7 @@ export interface FetchSnapshotResult {
 export interface IntelligencePlatform {
   health(): Promise<IntelligenceHealth>;
   fetchSnapshot(request: FetchSnapshotRequest): Promise<FetchSnapshotResult>;
+  listRecoverableRuns(): Promise<string[]>;
+  markRunInterrupted(runId: string): Promise<void>;
+  getLastSuccessfulSync(): Promise<string | null>;
 }

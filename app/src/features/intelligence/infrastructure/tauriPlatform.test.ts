@@ -68,4 +68,24 @@ describe("createTauriPlatform", () => {
       ["fetch_source_snapshot", { request: { sourceId: "source-1" } }],
     ]);
   });
+
+  it("maps recovery commands with exact names and arguments", async () => {
+    const calls: Array<[string, Record<string, unknown> | undefined]> = [];
+    const invoke: Invoke = async <T>(command: string, args?: Record<string, unknown>) => {
+      calls.push([command, args]);
+      if (command === "list_recoverable_runs") return ["run-1"] as T;
+      if (command === "get_last_successful_sync") return "2026-08-01T00:00:00Z" as T;
+      return undefined as T;
+    };
+    const platform = createTauriPlatform(invoke);
+
+    await expect(platform.listRecoverableRuns()).resolves.toEqual(["run-1"]);
+    await expect(platform.markRunInterrupted("run-1")).resolves.toBeUndefined();
+    await expect(platform.getLastSuccessfulSync()).resolves.toBe("2026-08-01T00:00:00Z");
+    expect(calls).toEqual([
+      ["list_recoverable_runs", undefined],
+      ["mark_run_interrupted", { runId: "run-1" }],
+      ["get_last_successful_sync", undefined],
+    ]);
+  });
 });

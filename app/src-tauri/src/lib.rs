@@ -151,7 +151,10 @@ pub fn run() {
             kv_get,
             kv_set,
             intelligence::intelligence_health,
-            intelligence::fetch_source_snapshot
+            intelligence::fetch_source_snapshot,
+            intelligence::list_recoverable_runs,
+            intelligence::mark_run_interrupted,
+            intelligence::get_last_successful_sync
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

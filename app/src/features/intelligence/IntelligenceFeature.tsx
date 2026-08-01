@@ -1,11 +1,13 @@
-export type IntelligenceBootStatus = "initializing" | "ready" | "error" | "unavailable";
+import type { IntelligenceBootSnapshot } from "./application/intelligenceBoot";
+export type IntelligenceBootStatus = IntelligenceBootSnapshot["status"];
 
 interface IntelligenceFeatureProps {
-  status: IntelligenceBootStatus;
+  boot: IntelligenceBootSnapshot;
   onRetry: () => void;
 }
 
-export function IntelligenceFeature({ status, onRetry }: IntelligenceFeatureProps) {
+export function IntelligenceFeature({ boot, onRetry }: IntelligenceFeatureProps) {
+  const { status } = boot;
   return (
     <section className="intel-feature" aria-labelledby="intelligence-title">
       <div className="intel-heading">
