@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, MutexGuard},
 };
 
 use rusqlite::Connection;
@@ -19,8 +19,7 @@ pub enum DatabaseError {
     #[cfg(test)]
     #[error("initialization failed: {0}")]
     Initialization(String),
-    #[error("database state lock poisoned")]
-    StatePoisoned,
+    #[allow(dead_code)] // Reserved for the next intelligence commands that use the ready connection.
     #[error("intelligence database is not ready")]
     NotReady,
 }
@@ -34,6 +33,7 @@ pub struct IntelligenceHealth {
 }
 
 struct ReadyDatabase {
+    #[allow(dead_code)] // Accessed through with_connection by subsequent intelligence commands.
     connection: Connection,
     health: IntelligenceHealth,
 }
@@ -49,12 +49,17 @@ pub fn migrate(connection: &Connection) -> Result<(), DatabaseError> {
     Ok(())
 }
 
+fn recover_lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 impl DatabaseState {
-    fn current_health(&self) -> Result<Option<IntelligenceHealth>, DatabaseError> {
-        self.ready
-            .lock()
-            .map(|ready| ready.as_ref().map(|database| database.health.clone()))
-            .map_err(|_| DatabaseError::StatePoisoned)
+    fn current_health(&self) -> Option<IntelligenceHealth> {
+        recover_lock(&self.ready)
+            .as_ref()
+            .map(|database| database.health.clone())
     }
 
     fn initialize_with<F>(
@@ -78,17 +83,14 @@ impl DatabaseState {
         F: Fn(&Path) -> Result<Connection, DatabaseError>,
         O: Fn(),
     {
-        if let Some(health) = self.current_health()? {
+        if let Some(health) = self.current_health() {
             return Ok(health);
         }
 
         before_initialization_lock();
-        let _initialization = self
-            .initialization
-            .lock()
-            .map_err(|_| DatabaseError::StatePoisoned)?;
+        let _initialization = recover_lock(&self.initialization);
 
-        if let Some(health) = self.current_health()? {
+        if let Some(health) = self.current_health() {
             return Ok(health);
         }
 
@@ -104,29 +106,24 @@ impl DatabaseState {
             data_dir: data_dir.to_path_buf(),
         };
 
-        *self
-            .ready
-            .lock()
-            .map_err(|_| DatabaseError::StatePoisoned)? = Some(ReadyDatabase {
+        *recover_lock(&self.ready) = Some(ReadyDatabase {
             connection,
             health: health.clone(),
         });
 
-        self.with_connection(|_| Ok(health))
+        Ok(health)
     }
 
     pub(crate) fn initialize(&self, data_dir: &Path) -> Result<IntelligenceHealth, DatabaseError> {
         self.initialize_with(data_dir, &open_and_migrate)
     }
 
+    #[allow(dead_code)] // Used by subsequent intelligence commands, kept locked for the closure.
     pub(crate) fn with_connection<T>(
         &self,
         operation: impl FnOnce(&Connection) -> Result<T, DatabaseError>,
     ) -> Result<T, DatabaseError> {
-        let ready = self
-            .ready
-            .lock()
-            .map_err(|_| DatabaseError::StatePoisoned)?;
+        let ready = recover_lock(&self.ready);
         let database = ready.as_ref().ok_or(DatabaseError::NotReady)?;
         operation(&database.connection)
     }
@@ -144,7 +141,10 @@ fn open_and_migrate(data_dir: &Path) -> Result<Connection, DatabaseError> {
 mod tests {
     use std::{
         collections::HashSet,
-        path::Path,
+        env, fs,
+        panic::{catch_unwind, AssertUnwindSafe},
+        path::{Path, PathBuf},
+        process,
         sync::{
             atomic::{AtomicUsize, Ordering},
             mpsc, Arc, Barrier,
@@ -155,6 +155,35 @@ mod tests {
     use rusqlite::Connection;
 
     use super::{migrate, DatabaseError, DatabaseState};
+
+    static NEXT_TEMP_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
+
+    fn unique_temp_directory() -> PathBuf {
+        let temp_root = fs::canonicalize(env::temp_dir()).unwrap();
+        let name = format!(
+            "strategic-analysis-task3-{}-{}",
+            process::id(),
+            NEXT_TEMP_DIRECTORY.fetch_add(1, Ordering::SeqCst)
+        );
+        let path = temp_root.join(name);
+        assert_eq!(path.parent(), Some(temp_root.as_path()));
+        assert!(!path.exists(), "test directory already exists: {path:?}");
+        path
+    }
+
+    fn remove_temp_directory(path: &Path) {
+        let temp_root = fs::canonicalize(env::temp_dir()).unwrap();
+        let resolved = fs::canonicalize(path).unwrap();
+        assert_eq!(resolved.parent(), Some(temp_root.as_path()));
+        assert!(
+            resolved
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("strategic-analysis-task3-")),
+            "refusing to remove unexpected path: {resolved:?}"
+        );
+        fs::remove_dir_all(resolved).unwrap();
+    }
 
     #[test]
     fn migration_creates_core_tables() {
@@ -255,6 +284,31 @@ mod tests {
     }
 
     #[test]
+    fn initialization_panic_does_not_prevent_retry() {
+        let state = DatabaseState::default();
+        let panicking_initializer = |_data_dir: &Path| -> Result<Connection, DatabaseError> {
+            panic!("planned initializer panic")
+        };
+
+        let panic = catch_unwind(AssertUnwindSafe(|| {
+            let _ = state.initialize_with(Path::new("panic-retry-data"), &panicking_initializer);
+        }));
+        assert!(panic.is_err());
+
+        let successful_initializer = |_data_dir: &Path| {
+            let connection = Connection::open_in_memory()?;
+            migrate(&connection)?;
+            Ok(connection)
+        };
+        let health = state
+            .initialize_with(Path::new("panic-retry-data"), &successful_initializer)
+            .unwrap();
+
+        assert!(health.ready);
+        assert_eq!(health.schema_version, 1);
+    }
+
+    #[test]
     fn health_reports_schema_version_and_data_directory() {
         let state = DatabaseState::default();
         let initializer = |_data_dir: &Path| {
@@ -299,6 +353,65 @@ mod tests {
             .unwrap();
 
         assert_eq!(version, 1);
+    }
+
+    #[test]
+    fn connection_operation_panic_does_not_poison_ready_state() {
+        let state = DatabaseState::default();
+        let initializer = |_data_dir: &Path| {
+            let connection = Connection::open_in_memory()?;
+            migrate(&connection)?;
+            Ok(connection)
+        };
+        let expected_health = state
+            .initialize_with(Path::new("connection-panic-data"), &initializer)
+            .unwrap();
+
+        let panic = catch_unwind(AssertUnwindSafe(|| {
+            let _: Result<(), DatabaseError> =
+                state.with_connection(|_| panic!("planned connection operation panic"));
+        }));
+        assert!(panic.is_err());
+
+        let health = state
+            .initialize_with(Path::new("connection-panic-data"), &initializer)
+            .unwrap();
+        let version = state
+            .with_connection(|connection| {
+                Ok(connection.query_row(
+                    "SELECT MAX(version) FROM schema_migrations",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )?)
+            })
+            .unwrap();
+
+        assert_eq!(health, expected_health);
+        assert_eq!(version, 1);
+    }
+
+    #[test]
+    fn production_initialization_creates_disk_layout_and_wal_database() {
+        let data_dir = unique_temp_directory();
+        let state = DatabaseState::default();
+
+        let health = state.initialize(&data_dir).unwrap();
+
+        assert_eq!(health.schema_version, 1);
+        assert_eq!(health.data_dir, data_dir);
+        assert!(data_dir.join("snapshots").is_dir());
+        assert!(data_dir.join("backups").is_dir());
+        assert!(data_dir.join("competitive-intelligence.db").is_file());
+        let journal_mode = state
+            .with_connection(|connection| {
+                Ok(connection
+                    .query_row("PRAGMA journal_mode", [], |row| row.get::<_, String>(0))?)
+            })
+            .unwrap();
+        assert_eq!(journal_mode, "wal");
+
+        drop(state);
+        remove_temp_directory(&data_dir);
     }
 
     #[test]
