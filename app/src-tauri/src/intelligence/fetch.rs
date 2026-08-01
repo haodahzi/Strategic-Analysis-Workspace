@@ -133,6 +133,23 @@ pub enum FetchError {
     Snapshot(String),
 }
 
+impl FetchError {
+    pub(crate) fn public_message(&self) -> String {
+        match self {
+            Self::TargetNotAllowed => "target_not_allowed".into(),
+            Self::EmptyDns => "dns_empty".into(),
+            Self::BlockedAddress => "dns_blocked".into(),
+            Self::ContentTypeNotAllowed => "content_type_not_allowed".into(),
+            Self::SourceNotFound => "source_not_found".into(),
+            Self::BodyTooLarge => "body_too_large".into(),
+            Self::HttpStatus(status) => format!("http_status:{status}"),
+            Self::Network(_) => "network_failure".into(),
+            Self::Database(_) => "database_unavailable".into(),
+            Self::Snapshot(_) => "snapshot_write_failed".into(),
+        }
+    }
+}
+
 pub fn lookup_source(state: &DatabaseState, source_id: &str) -> Result<SourceTarget, FetchError> {
     if source_id.trim().is_empty() {
         return Err(FetchError::SourceNotFound);
@@ -916,6 +933,60 @@ mod tests {
         );
         assert!(value.get("body").is_none());
         assert!(value.get("absolutePath").is_none());
+    }
+
+    #[test]
+    fn public_errors_are_stable_and_redact_internal_network_database_and_snapshot_details() {
+        let sensitive = [
+            FetchError::Network(
+                "request https://example.com/feed?token=TOP_SECRET_QUERY failed with RAW_RESPONSE_SECRET"
+                    .into(),
+            ),
+            FetchError::Database(
+                r"unable to open C:\private\intelligence\competitive-intelligence.db".into(),
+            ),
+            FetchError::Snapshot(
+                r"write C:\private\intelligence\snapshots\TOP_SECRET_QUERY.html.gz failed"
+                    .into(),
+            ),
+        ];
+        let expected = [
+            "network_failure",
+            "database_unavailable",
+            "snapshot_write_failed",
+        ];
+
+        for (error, expected) in sensitive.into_iter().zip(expected) {
+            let public = error.public_message();
+            assert_eq!(public, expected);
+            for secret in [
+                "TOP_SECRET_QUERY",
+                r"C:\private\intelligence",
+                "RAW_RESPONSE_SECRET",
+                "https://example.com/feed",
+            ] {
+                assert!(!public.contains(secret), "leaked {secret} in {public}");
+            }
+        }
+    }
+
+    #[test]
+    fn public_errors_have_exact_stable_categories() {
+        let cases = [
+            (FetchError::TargetNotAllowed, "target_not_allowed"),
+            (FetchError::EmptyDns, "dns_empty"),
+            (FetchError::BlockedAddress, "dns_blocked"),
+            (
+                FetchError::ContentTypeNotAllowed,
+                "content_type_not_allowed",
+            ),
+            (FetchError::SourceNotFound, "source_not_found"),
+            (FetchError::BodyTooLarge, "body_too_large"),
+            (FetchError::HttpStatus(302), "http_status:302"),
+        ];
+        for (error, expected) in cases {
+            assert_eq!(error.public_message(), expected);
+        }
     }
 
     #[tokio::test]
