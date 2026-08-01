@@ -112,7 +112,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
           <div className="rp-realwrap">
             <div className="rp-realhead">
               <div className="pipe-done-tag">✓ 定稿 · 待审初稿（可推翻；到「洽谈后 · 项目报告」可行内编辑 / 驳回 / 重估）</div>
-              <button type="button" className="app-btn" onClick={openHouse}>一键排版 · 房子样式查看（存入报告库）</button>
+              <button type="button" className="app-btn" onClick={openHouse}>一键排版 · 查看并存入报告库</button>
             </div>
             <div className="rp-realbody"><Markdown text={realReport} /></div>
           </div>

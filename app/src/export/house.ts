@@ -67,6 +67,16 @@ function renderChain(rows: string[]): string {
   return `<div class="chain">${colHtml}</div>${flow ? `<div class="chain-flow">${inline(flow)}</div>` : ""}`;
 }
 
+// 交易结构 / 资金流——```flow 每行：出方 | 收方 | 标的·款项 | solid(资金/实物) 或 dashed(服务/持有)
+function renderFlow(rows: string[]): string {
+  const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
+    const c = r.split("|").map((x) => x.trim());
+    const dashed = /dash|虚|服务|持有|token/i.test(c[3] ?? "");
+    return `<div class="flowrow"><span class="flow-node">${inline(c[0] ?? "")}</span><span class="flow-edge${dashed ? " dashed" : ""}"><span class="flow-lbl">${inline(c[2] ?? "")}</span><span class="flow-line"></span></span><span class="flow-node">${inline(c[1] ?? "")}</span></div>`;
+  }).join("");
+  return `<div class="flowdiag"><div class="flow-cap">交易结构 · 资金流与实物流（虚线＝服务 / 持有关系）</div>${items}</div>`;
+}
+
 // 时间轴——```timeline 每行：年份 | 事件 | 说明
 function renderTimeline(rows: string[]): string {
   const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
@@ -120,6 +130,7 @@ export function mdToHouseHtml(md: string): string {
       while (i < lines.length && !/^`{3,}\s*$/.test(lines[i].trim())) { body.push(lines[i]); i++; }
       if (lang === "chain") out.push(renderChain(body));
       else if (lang === "timeline") out.push(renderTimeline(body));
+      else if (lang === "flow") out.push(renderFlow(body));
       else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
       continue;
     }

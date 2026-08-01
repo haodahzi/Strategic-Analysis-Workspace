@@ -93,7 +93,9 @@ function typeNote(kind: string, company?: string): string {
       "产业链务必用一个 ```chain 代码块给出：先写三列表头（上游 / 中游 / 下游），每列下再用「- 分组 | 代表企业A、代表企业B」列出多个细分环节与代表性企业（尽量列全、可给多组），核心 / 高利润环节在该行末尾加 hot 或 ★，末尾可用「~ 流向说明」。示例：\n" +
       "```chain\n上游·核心供应 | UPSTREAM\n- 关键芯片（壁垒/利润最高） | 英伟达、华为昇腾、寒武纪\n- 关键部件 | 厂商A、厂商B\n中游·制造/服务 | MIDSTREAM | mid\n- 本环节 ★核心 | 厂商C、厂商D | hot\n下游·应用 | DOWNSTREAM\n- 应用场景 | 客户E、客户F\n~ 上游→下游为产品流，资金自下而上回流\n```\n" +
       "有明显时间演进的用 ```timeline（每行：年份 | 事件 | 一句说明）。判断哪些内容更适合表格 / 结构化，就用表格或这些块，不要堆成大段文字。";
-  return "这是一份项目可行性研究：客观评估能不能做、怎么做、值不值得；先做研究、不预设立场，「我方」信息只用给定材料、绝不虚构。";
+  return "这是一份项目可行性研究：客观评估能不能做、怎么做、值不值得；先做研究、不预设立场，「我方」信息只用给定材料、绝不虚构。" +
+    "交易结构 / 资金流务必用一个 ```flow 代码块表达，每行：`出方 | 收方 | 标的·款项 | solid 或 dashed`（solid＝资金 / 实物往来，dashed＝服务 / 持有关系）。示例：\n" +
+    "```flow\n资金方/投资人 | 卡源/集成商 | 采购款 | solid\n卡源/集成商 | 运营方 | 设备 | solid\n资金方/投资人 | 运营方 | 出资/持有资产 | dashed\n客户/消纳方 | 运营方 | 租金 | solid\n运营方 | 客户/消纳方 | 服务 | dashed\n```";
 }
 
 export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model: string): ChatRequest {

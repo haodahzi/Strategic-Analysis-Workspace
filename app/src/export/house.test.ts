@@ -65,6 +65,14 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(h).toContain("光模块");
   });
 
+  it("```flow 渲染交易结构：节点 + 标签 + 虚实线", () => {
+    const h = mdToHouseHtml("```flow\n资金方 | 集成商 | 采购款 | solid\n资金方 | 运营方 | 出资/持有 | dashed\n```");
+    expect(h).toContain('class="flowdiag"');
+    expect((h.match(/class="flow-node"/g) ?? []).length).toBe(4);
+    expect(h).toContain('class="flow-lbl">采购款</span>');
+    expect(h).toContain('class="flow-edge dashed"');   // 服务/持有 → 虚线
+  });
+
   it("```timeline 渲染时间轴", () => {
     const h = mdToHouseHtml("```timeline\n2020 | 起步 | 少量样机\n2023 | 放量 | 整机厂配套\n```");
     expect(h).toContain('class="tl"');
@@ -133,6 +141,16 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
     "| 微型驱动 / 减速 | 跨界的传统精密部件厂 | 中等 |",
     "",
     "> 风险：量产良率与成本下降速度存在不确定性，是决定行业能否放量的关键前提；相关数据多为厂商口径，需独立核实。",
+    "",
+    "## 交易结构（项目分析示例）",
+    "```flow",
+    "资金方/投资人 | 卡源/集成商 | 采购款 | solid",
+    "卡源/集成商 | 算力租赁运营方 | GPU 服务器 | solid",
+    "资金方/投资人 | 算力租赁运营方 | 出资/持有资产 | dashed",
+    "客户/消纳方 | 算力租赁运营方 | 租金 | solid",
+    "算力租赁运营方 | 客户/消纳方 | 算力/Token 服务 | dashed",
+    "算力租赁运营方 | 场地方/IDC | 机柜·电力·运维费 | solid",
+    "```",
     "",
     "## 结论",
     "> 结论：这是一门处于早期、技术路线尚未收敛的部件生意。是否值得进入或合作，主要取决于人形机器人整机的放量节奏与关键传感 / 驱动环节的国产化进度。以上判断基于公开信息，关键量化仍需以标注来源的数据进一步验证。",
