@@ -111,7 +111,9 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
       user = `对照 5 条验收线逐条打 ✓/✗ 并一句话说明：事实有据（数据带口径 / 来源）｜缺口已标（需补 / 未公开）｜中性无编造（无虚构我方数据 / 筹码、无一边倒倾向）｜结构清楚｜该类型该有的内容齐全。\n\n定稿：\n${o.final ?? ""}`;
       break;
   }
-  return { model, system: AGENT_SYS[stage.role], messages: [{ role: "user", content: user }], maxTokens: 4000 };
+  // 起草 / 定稿是正文所在，放宽到 8000，避免报告写到一半被截断（#5）；其余步骤 4000 足够。
+  const maxTokens = stage.id === "draft" || stage.id === "final" ? 8000 : 4000;
+  return { model, system: AGENT_SYS[stage.role], messages: [{ role: "user", content: user }], maxTokens };
 }
 
 // ——洽谈清单一键生成（#5）：聚焦「能不能进 / 能不能做 / 值不值得 / 合规风险」这些能改变决策的问题。——

@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { analyses } from "./data/seed";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Analysis, Stage } from "./types";
+import { loadAnalyses, saveAnalyses } from "./data/analysesStore";
 import Dashboard from "./components/Dashboard";
-import KnowledgeBase from "./components/KnowledgeBase";
 import IndustryReport from "./components/IndustryReport";
 import Settings from "./components/Settings";
 import NewAnalysis from "./components/NewAnalysis";
 import ProjectWorkspace from "./components/ProjectWorkspace";
 import ReportLibrary from "./components/ReportLibrary";
 import { setMaterials, startRun } from "./llm/pipelineStore";
+import { clearUnread, getUnread, subscribeUnread } from "./llm/unread";
 
-type View = "dashboard" | "project" | "kb" | "settings" | "new" | "reports";
+type View = "dashboard" | "project" | "settings" | "new" | "reports";
 
 const STAGE_CLASS: Record<Stage, string> = {
   调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -18,10 +18,15 @@ const STAGE_CLASS: Record<Stage, string> = {
 
 export default function App() {
   const params = new URLSearchParams(window.location.search);
+  const initial = loadAnalyses();
   const [view, setView] = useState<View>((params.get("view") as View) || "dashboard");
-  const [pid, setPid] = useState(params.get("pid") || analyses[0].id);
+  const [pid, setPid] = useState(params.get("pid") || initial[0]?.id || "");
   const [sampleOn, setSampleOn] = useState(params.get("report") === "1");
-  const [items, setItems] = useState<Analysis[]>(analyses);
+  const [items, setItems] = useState<Analysis[]>(initial);
+  const unread = useSyncExternalStore(subscribeUnread, getUnread);
+
+  // #9：在办分析持久化——任何变化即写本机，重启不丢
+  useEffect(() => { saveAnalyses(items); }, [items]);
 
   const project = items.find((p) => p.id === pid) ?? items[0];
   const suanli = items.find((p) => p.hasIndustryReport) ?? items[0];
@@ -30,6 +35,7 @@ export default function App() {
     setPid(id);
     setSampleOn(rep);
     setView("project");
+    clearUnread(id);   // #7：点开即消绿点
   };
 
   const createAnalysis = (a: Analysis, materials: string) => {
@@ -72,7 +78,6 @@ export default function App() {
           {navItem("dashboard", "▤ 研究分析总览")}
           {navItem("new", "✚ 新建分析")}
           {navItem("reports", "▦ 报告库")}
-          {navItem("kb", "▧ 交付物库")}
           {navItem("settings", "⚙ 设置")}
 
           <div className="nav-group">在办分析 · {items.length}</div>
@@ -83,6 +88,7 @@ export default function App() {
               className={"nav-proj" + (view === "project" && pid === p.id ? " active" : "")}
               onClick={() => openProject(p.id, false)}
             >
+              {unread.has(p.id) && <span className="nav-dot" title="已完成 · 未读" />}
               <span className="nav-proj-name">{p.name}</span>
               <span className={"st-chip mini " + STAGE_CLASS[p.stage]}>{p.stage}</span>
             </button>
@@ -95,7 +101,6 @@ export default function App() {
           {view === "project" && (sampleOn
             ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
             : <ProjectWorkspace analysis={project} />)}
-          {view === "kb" && <KnowledgeBase onOpenSample={() => openProject(suanli.id, true)} />}
           {view === "reports" && <ReportLibrary />}
           {view === "settings" && <Settings />}
         </main>

@@ -8,6 +8,7 @@ import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
 import { saveReport } from "./reportLib";
+import { markUnread } from "./unread";
 
 export type RunStatus = "待执行" | "进行中" | "完成";
 export interface Attachment { name: string; text: string; }   // 上传资料提取出的文本（后台喂模型，不在前台展示原文 #5）
@@ -109,6 +110,7 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
   if (md.trim()) {
     const subject = input.company || input.industry;
     saveReport({ analysisId: id, title: `${subject} · ${input.focus}`, subject, focus: input.focus, markdown: md });
+    markUnread(id);   // #7：完成打绿点，点开即消
   }
 }
 
