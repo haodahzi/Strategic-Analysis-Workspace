@@ -1,15 +1,24 @@
 import { useState } from "react";
-import { AGENT_ROLES, AppConfig, ModelPick, ProviderConfig, ProviderId, SearchConfig } from "../llm/types";
+import { AGENT_ROLES, AppConfig, DataSourceCfg, ModelPick, ProviderConfig, ProviderId, SearchConfig } from "../llm/types";
 import { applyMainProvider, loadConfig, providerById, saveConfig } from "../config/store";
 import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
 import { SEARCH_ENDPOINTS, webSearch } from "../llm/search";
+import { sourceById } from "../sources/registry";
+import { openSource } from "../sources/browser";
 
 export default function Settings() {
   const [cfg, setCfg] = useState<AppConfig>(() => loadConfig());
   const [check, setCheck] = useState<Record<string, string>>({});   // 每个提供商各自的自检结果
   const [searchChk, setSearchChk] = useState("");
+  const [dsMsg, setDsMsg] = useState("");
   const commit = (next: AppConfig) => { setCfg(next); saveConfig(next); };
+
+  // 数据源（内置浏览器 + 专用 API）——用户自填，可覆盖默认、可新增自定义源
+  const patchDS = (id: string, p: Partial<DataSourceCfg>) => commit({ ...cfg, dataSources: cfg.dataSources.map((x) => (x.id === id ? { ...x, ...p } : x)) });
+  const addCustomDS = () => commit({ ...cfg, dataSources: [...cfg.dataSources, { id: `custom-${Date.now().toString(36)}`, name: "自定义源", url: "", enabled: true }] });
+  const removeDS = (id: string) => commit({ ...cfg, dataSources: cfg.dataSources.filter((x) => x.id !== id) });
+  const openDS = async (id: string, url: string, name: string) => { setDsMsg(await openSource(id, url, name) || `已打开「${name}」`); };
 
   const patchSearch = (p: Partial<SearchConfig>) => commit({ ...cfg, search: { ...cfg.search, ...p } });
   const searchSelfCheck = async () => {
@@ -143,6 +152,52 @@ export default function Settings() {
           <tbody>{modelRow("文档视觉", cfg.vision, (v) => commit({ ...cfg, vision: v }))}</tbody>
         </table>
       </div>
+
+      <div className="sec-head">数据源（会员站点 · 专用 API）——自填、可覆盖默认、可新增</div>
+      <div className="set-hint" style={{ marginBottom: 12 }}>
+        登录墙内的高质量研报（报告查一查 / 荣大二郎神等）公共检索看不到：在「新建 / 编辑分析」的本单资料区点数据源，用内置浏览器登录（微信扫码 / 手机号+密码，登录态与凭据只留在本机），下载研报回来上传即可。
+        企查查等有专用 API 的，填 Key 后可直接取结构化数据。网址 / 登录方式为默认建议，可自行修改。{dsMsg && <span className={dsMsg.startsWith("已") ? "chk-res ok" : "chk-res bad"} style={{ marginLeft: 8 }}>{dsMsg}</span>}
+      </div>
+      {cfg.dataSources.map((d) => {
+        const base = sourceById(d.id);
+        const name = base?.name ?? d.name ?? "自定义源";
+        const login = base?.login ?? "站点原生登录";
+        const kind = base?.kind ?? "browser";
+        const showBrowser = base ? base.kind !== "api" : true;
+        const hasApi = base ? base.kind === "api" || base.kind === "both" : true;
+        const defUrl = base?.url ?? "";
+        return (
+          <div className="prov-card" key={d.id}>
+            <div className="prov-card-hd">
+              <label className="mi-check"><input type="checkbox" checked={d.enabled} onChange={(e) => patchDS(d.id, { enabled: e.target.checked })} /> 启用</label>
+              {base
+                ? <span className="prov-card-name">{name}</span>
+                : <input className="key-input" style={{ width: 150 }} value={d.name ?? ""} placeholder="源名称" onChange={(e) => patchDS(d.id, { name: e.target.value })} />}
+              <span className="prov-style">{kind === "api" ? "专用 API" : kind === "both" ? "浏览器 + API" : "内置浏览器"}</span>
+              <span className="set-hint">登录：{login}</span>
+              <div className="spacer" />
+              {showBrowser && <button type="button" className="app-btn ghost dark" onClick={() => void openDS(d.id, (d.url || defUrl).trim(), name)}>打开</button>}
+              {d.id.startsWith("custom-") && <button type="button" className="key-clear" onClick={() => removeDS(d.id)}>删除</button>}
+            </div>
+            {showBrowser && (
+              <label className="fld"><span>打开网址{defUrl ? `（默认 ${defUrl}）` : ""}</span>
+                <input className="key-input wide" value={d.url ?? ""} placeholder={defUrl || "https://…"} onChange={(e) => patchDS(d.id, { url: e.target.value })} />
+              </label>
+            )}
+            {hasApi && (
+              <div className="prov-two">
+                <label className="fld"><span>{name} API Key（可选 · 仅存本机）</span>
+                  <input className="key-input wide" type="password" placeholder="填入专用数据源 API Key…" value={d.apiKey ?? ""} onChange={(e) => patchDS(d.id, { apiKey: e.target.value })} />
+                </label>
+                <label className="fld"><span>API Base（可选）</span>
+                  <input className="key-input wide" value={d.apiBase ?? ""} placeholder={base?.apiBase || "https://…"} onChange={(e) => patchDS(d.id, { apiBase: e.target.value })} />
+                </label>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div className="set-row"><button type="button" className="app-btn ghost" onClick={addCustomDS}>＋ 新增自定义数据源</button></div>
     </div>
   );
 }

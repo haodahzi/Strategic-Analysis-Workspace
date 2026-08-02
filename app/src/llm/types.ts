@@ -41,6 +41,16 @@ export interface SearchConfig {
   freshness: string;       // 时间过滤：noLimit / oneYear / oneMonth（博查支持）
 }
 
+// 数据源配置（内置浏览器登录取数 / 专用 API）——用户自填、可覆盖默认、可新增（企查查等高质量源 Key 都放这）。
+export interface DataSourceCfg {
+  id: string;          // 对应内置登记册 id，或自定义源 custom-*
+  name?: string;       // 自定义源名称（内置源留空用登记册名）
+  url?: string;        // 覆盖默认打开地址（内置浏览器）
+  apiKey?: string;     // 专用数据源 API Key（如企查查）——仅存本机
+  apiBase?: string;    // 覆盖默认 API 基址
+  enabled: boolean;    // 是否在「从信息源获取」里显示 / 启用
+}
+
 export interface AppConfig {
   providers: ProviderConfig[];
   defaultProvider: ProviderId;
@@ -48,4 +58,5 @@ export interface AppConfig {
   agents: Record<AgentRole, ModelPick>;     // 多智能体子任务
   search: SearchConfig;                     // 联网检索
   vision: ModelPick;                        // 文档视觉模型（扫描件 / 复杂表格用；可选）
+  dataSources: DataSourceCfg[];             // 数据源（内置浏览器 + 专用 API），用户自填
 }

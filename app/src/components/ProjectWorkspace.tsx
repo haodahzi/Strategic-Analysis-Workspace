@@ -131,7 +131,7 @@ export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Ana
               <input className="key-input wide" value={eCounterparty} onChange={(e) => setECounterparty(e.target.value)} />
             </label>
           )}
-          <div className="fld"><span>本单资料（信息补充 · 报告查一查等抓取内容也在这里）</span>
+          <div className="fld"><span>本单资料（信息补充 · 从信息源获取的研报 / 正文也在这里）</span>
             <MaterialsInput
               materials={run.materials} onMaterials={(v) => setMaterials(analysis.id, v)}
               attachments={run.attachments}

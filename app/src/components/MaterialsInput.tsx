@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { extractPdfPages } from "../lib/pdf";
 import { visionEnabled, visionReadPdf } from "../llm/visionExtract";
 import { loadConfig } from "../config/store";
 import { Attachment } from "../llm/pipelineStore";
+import { effectiveSources } from "../sources/registry";
+import { listenGrab, openSource } from "../sources/browser";
 
 // 本单资料录入（#5）：手写备注 + 上传多份 PDF / 文本。附件后台提取正文喂模型，前台只显示文件名与字数。
 // 文字版 PDF 走文本提取；扫描件 / 图片版自动、或勾「视觉精读」强制走文档视觉模型（看图转 markdown）。
@@ -12,6 +14,22 @@ export default function MaterialsInput(
 ) {
   const [busy, setBusy] = useState("");
   const [visionForce, setVisionForce] = useState(false);
+  const sources = effectiveSources(loadConfig().dataSources).filter((s) => s.enabled && s.kind !== "api");
+
+  // 「抓取此页正文」回传（试验路径）→ 加入本单资料，带来源链接。用 ref 始终调最新 onAdd。
+  const addRef = useRef(onAdd);
+  addRef.current = onAdd;
+  useEffect(() => {
+    let un = () => {};
+    void listenGrab((it) => { addRef.current({ name: it.name, text: it.text, url: it.url }); setBusy(`已抓取「${it.name}」加入本单`); }).then((f) => { un = f; });
+    return () => un();
+  }, []);
+
+  const openSrc = async (id: string, url: string, name: string) => {
+    setBusy(`打开「${name}」…`);
+    const msg = await openSource(id, url, name);
+    setBusy(msg || `已在内置浏览器打开「${name}」：登录后下载研报回来上传，或用页内「抓取此页」按钮取正文`);
+  };
 
   const pick = async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -49,6 +67,16 @@ export default function MaterialsInput(
       <textarea className="key-input wide" rows={compact ? 3 : 4} value={materials}
         placeholder="你的备注 / 已知要点（选填）：想让分析盯住什么、已知的关键事实…"
         onChange={(e) => onMaterials(e.target.value)} />
+      {sources.length > 0 && (
+        <div className="mi-src">
+          <span className="mi-src-lb">从信息源获取</span>
+          {sources.map((s) => (
+            <button key={s.id} type="button" className="src-chip" title={`登录方式：${s.login}｜可在「设置 → 数据源」改网址`}
+              onClick={() => void openSrc(s.id, s.url, s.name)}>{s.name}</button>
+          ))}
+          <span className="mi-src-tip">登录后下载研报回来上传（质量最高），或用页内「抓取此页」取正文</span>
+        </div>
+      )}
       <div className="mi-row">
         <label className="mn-upload">＋ 上传 PDF / 文本（可多选）
           <input type="file" multiple accept=".pdf,.txt,.md,application/pdf,text/plain"

@@ -1,8 +1,14 @@
-import { AGENT_ROLES, AgentRole, AppConfig, ModelPick, ProviderConfig, ProviderId } from "../llm/types";
+import { AGENT_ROLES, AgentRole, AppConfig, DataSourceCfg, ModelPick, ProviderConfig, ProviderId } from "../llm/types";
 import { DEFAULT_PROVIDERS } from "../llm/providers";
+import { DATA_SOURCES } from "../sources/registry";
 
 const KEY = "dw.config.v1";              // 保持同一 key：升级到 step0/agents 结构时 apiKey 不丢
 const MOCK: ModelPick = { provider: "mock", model: "mock-1" };
+
+// 内置数据源默认全部启用（在「从信息源获取」里可见）；API Key 留空、由用户按需填。
+function defaultDataSources(): DataSourceCfg[] {
+  return DATA_SOURCES.map((s) => ({ id: s.id, enabled: true }));
+}
 
 export function defaultConfig(): AppConfig {
   const providers: ProviderConfig[] = Object.values(DEFAULT_PROVIDERS).map((p) => ({ ...p }));
@@ -12,6 +18,7 @@ export function defaultConfig(): AppConfig {
     providers, defaultProvider: "mock", step0: { ...MOCK }, agents,
     search: { provider: "none", baseUrl: "https://api.tavily.com/search", maxResults: 10, preferDomains: [], freshness: "noLimit" },
     vision: { ...MOCK },
+    dataSources: defaultDataSources(),
   };
 }
 
@@ -36,6 +43,7 @@ export function loadConfig(): AppConfig {
       agents: { ...base.agents, ...(saved.agents ?? {}) },
       search: { ...base.search, ...(saved.search ?? {}) },
       vision: saved.vision ?? base.vision,
+      dataSources: mergeDataSources(saved.dataSources),
     };
     // 迁移旧配置：若之前已选过真实主用提供商但还没有子任务路由，自动铺到定框+各子任务（Key 不用重配）
     if (!saved.agents && cfg.defaultProvider !== "mock") return applyMainProvider(cfg, cfg.defaultProvider);
@@ -43,6 +51,17 @@ export function loadConfig(): AppConfig {
   } catch {
     return defaultConfig();
   }
+}
+
+// 合并数据源配置：保留用户已存的（含 Key / 自定义源），并补齐尚未出现过的内置源，顺序内置在前。
+function mergeDataSources(saved?: DataSourceCfg[]): DataSourceCfg[] {
+  const list = Array.isArray(saved) ? saved.filter((x) => x && typeof x.id === "string") : [];
+  const seen = new Set(list.map((x) => x.id));
+  const merged = [...list];
+  for (const s of DATA_SOURCES) if (!seen.has(s.id)) merged.push({ id: s.id, enabled: true });
+  // 内置源按登记册顺序排前，自定义源按原顺序排后
+  const order = new Map(DATA_SOURCES.map((s, i) => [s.id, i]));
+  return merged.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
 }
 
 export function saveConfig(c: AppConfig): void {

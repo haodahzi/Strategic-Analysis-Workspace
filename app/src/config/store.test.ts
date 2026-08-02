@@ -33,3 +33,30 @@ describe("配置持久化 · API Key 记忆", () => {
     expect(loadConfig().providers.find((p) => p.id === "deepseek")?.models).toContain("deepseek-reasoner");
   });
 });
+
+describe("配置持久化 · 数据源", () => {
+  beforeEach(() => { (globalThis as unknown as { localStorage: MemLS }).localStorage = new MemLS(); });
+
+  it("默认带出全部内置数据源且默认启用", () => {
+    const ds = loadConfig().dataSources;
+    expect(ds.find((x) => x.id === "baogaocha")?.enabled).toBe(true);
+    expect(ds.find((x) => x.id === "qcc")).toBeTruthy();
+  });
+
+  it("保存的数据源 Key / 自定义源持久化，且内置源不丢", () => {
+    const cfg = loadConfig();
+    saveConfig({ ...cfg, dataSources: [
+      ...cfg.dataSources.map((x) => (x.id === "qcc" ? { ...x, apiKey: "qcc-key" } : x)),
+      { id: "custom-x", name: "我的源", url: "https://ex.com", enabled: true },
+    ] });
+    const re = loadConfig().dataSources;
+    expect(re.find((x) => x.id === "qcc")?.apiKey).toBe("qcc-key");
+    expect(re.find((x) => x.id === "custom-x")?.name).toBe("我的源");
+    expect(re.find((x) => x.id === "baogaocha")).toBeTruthy();       // 内置源补齐不丢
+  });
+
+  it("旧配置（无 dataSources 字段）加载后自动补齐内置源", () => {
+    (globalThis as unknown as { localStorage: MemLS }).localStorage.setItem("dw.config.v1", JSON.stringify({ defaultProvider: "mock" }));
+    expect(loadConfig().dataSources.length).toBeGreaterThanOrEqual(4);
+  });
+});

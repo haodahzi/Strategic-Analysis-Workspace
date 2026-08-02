@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "source-browser",
+  "description": "信息源内置浏览器窗口（label 前缀 source-）：允许在受信任的数据源站点内使用页内工具条「抓取此页」经远程 IPC 回传正文。研报下载与登录不依赖此权限。",
+  "windows": ["source-*"],
+  "remote": {
+    "urls": [
+      "http://*.baogaocha.com",
+      "https://*.baogaocha.com",
+      "http://*.rongdatech.com",
+      "https://*.rongdatech.com",
+      "http://*.rongda.com",
+      "https://*.rongda.com",
+      "http://*.qcc.com",
+      "https://*.qcc.com",
+      "http://*.cninfo.com.cn",
+      "https://*.cninfo.com.cn"
+    ]
+  },
+  "permissions": ["core:event:default"]
+}

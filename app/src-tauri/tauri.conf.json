@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "StrategicAnalysisWorkbench",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "identifier": "com.zhanlue.workbench",
   "build": {
     "frontendDist": "../dist",
@@ -10,6 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "战略发展分析工作台",
