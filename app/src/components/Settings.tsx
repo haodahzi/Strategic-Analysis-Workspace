@@ -5,7 +5,7 @@ import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
 import { SEARCH_ENDPOINTS, webSearch } from "../llm/search";
 import { sourceById } from "../sources/registry";
-import { openSource } from "../sources/browser";
+import { openExternal, openSource } from "../sources/browser";
 
 export default function Settings() {
   const [cfg, setCfg] = useState<AppConfig>(() => loadConfig());
@@ -19,6 +19,7 @@ export default function Settings() {
   const addCustomDS = () => commit({ ...cfg, dataSources: [...cfg.dataSources, { id: `custom-${Date.now().toString(36)}`, name: "自定义源", url: "", enabled: true }] });
   const removeDS = (id: string) => commit({ ...cfg, dataSources: cfg.dataSources.filter((x) => x.id !== id) });
   const openDS = async (id: string, url: string, name: string) => { setDsMsg(await openSource(id, url, name) || `已打开「${name}」`); };
+  const openDSExt = async (url: string, name: string) => { setDsMsg(await openExternal(url, name) || `已在系统浏览器打开「${name}」`); };
 
   const patchSearch = (p: Partial<SearchConfig>) => commit({ ...cfg, search: { ...cfg.search, ...p } });
   const searchSelfCheck = async () => {
@@ -176,7 +177,8 @@ export default function Settings() {
               <span className="prov-style">{kind === "api" ? "专用 API" : kind === "both" ? "浏览器 + API" : "内置浏览器"}</span>
               <span className="set-hint">登录：{login}</span>
               <div className="spacer" />
-              {showBrowser && <button type="button" className="app-btn ghost dark" onClick={() => void openDS(d.id, (d.url || defUrl).trim(), name)}>打开</button>}
+              {showBrowser && <button type="button" className="app-btn ghost dark" onClick={() => void openDS(d.id, (d.url || defUrl).trim(), name)}>内置打开</button>}
+              {showBrowser && <button type="button" className="app-btn ghost" onClick={() => void openDSExt((d.url || defUrl).trim(), name)}>系统浏览器</button>}
               {d.id.startsWith("custom-") && <button type="button" className="key-clear" onClick={() => removeDS(d.id)}>删除</button>}
             </div>
             {showBrowser && (

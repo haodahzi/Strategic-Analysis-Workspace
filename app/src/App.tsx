@@ -1,13 +1,13 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Analysis, Stage } from "./types";
-import { loadAnalyses, saveAnalyses } from "./data/analysesStore";
+import { loadAnalysesAsync, saveAnalysesAsync } from "./data/analysesStore";
 import Dashboard from "./components/Dashboard";
 import IndustryReport from "./components/IndustryReport";
 import Settings from "./components/Settings";
 import NewAnalysis from "./components/NewAnalysis";
 import ProjectWorkspace from "./components/ProjectWorkspace";
 import ReportLibrary from "./components/ReportLibrary";
-import { setMaterials, startRun } from "./llm/pipelineStore";
+import { hydrateRuns, setMaterials, startRun } from "./llm/pipelineStore";
 import { clearUnread, getUnread, subscribeUnread } from "./llm/unread";
 
 type View = "dashboard" | "project" | "settings" | "new" | "reports";
@@ -18,18 +18,31 @@ const STAGE_CLASS: Record<Stage, string> = {
 
 export default function App() {
   const params = new URLSearchParams(window.location.search);
-  const initial = loadAnalyses();
   const [view, setView] = useState<View>((params.get("view") as View) || "dashboard");
-  const [pid, setPid] = useState(params.get("pid") || initial[0]?.id || "");
+  const [pid, setPid] = useState(params.get("pid") || "");
   const [sampleOn, setSampleOn] = useState(params.get("report") === "1");
-  const [items, setItems] = useState<Analysis[]>(initial);
+  const [items, setItems] = useState<Analysis[] | null>(null);   // null = 加载中（先回灌落盘数据再渲染）
   const unread = useSyncExternalStore(subscribeUnread, getUnread);
 
-  // #9：在办分析持久化——任何变化即写本机，重启不丢
-  useEffect(() => { saveAnalyses(items); }, [items]);
+  // #9：启动时回灌落盘数据——先把生成状态（材料/附件/报告正文）填回内存，再加载在办分析列表
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      await hydrateRuns();
+      const a = await loadAnalysesAsync();
+      if (!alive) return;
+      setItems(a);
+      setPid((cur) => cur || a[0]?.id || "");
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  const project = items.find((p) => p.id === pid) ?? items[0];
-  const suanli = items.find((p) => p.hasIndustryReport) ?? items[0];
+  // 在办分析变化即落盘（桌面 app_data_dir，网页 localStorage），重启不丢
+  useEffect(() => { if (items) void saveAnalysesAsync(items); }, [items]);
+
+  const list = items ?? [];
+  const project = list.find((p) => p.id === pid) ?? list[0];
+  const suanli = list.find((p) => p.hasIndustryReport) ?? list[0];
 
   const openProject = (id: string, rep = false) => {
     setPid(id);
@@ -39,10 +52,10 @@ export default function App() {
   };
 
   // #2：编辑分析基础信息后更新并持久化（useEffect 会把 items 存本机）
-  const updateAnalysis = (a: Analysis) => setItems((xs) => xs.map((x) => (x.id === a.id ? a : x)));
+  const updateAnalysis = (a: Analysis) => setItems((xs) => (xs ?? []).map((x) => (x.id === a.id ? a : x)));
 
   const createAnalysis = (a: Analysis, materials: string) => {
-    setItems((xs) => [a, ...xs]);
+    setItems((xs) => [a, ...(xs ?? [])]);
     setPid(a.id);
     setSampleOn(false);
     setView("project");
@@ -83,8 +96,8 @@ export default function App() {
           {navItem("reports", "▦ 报告库")}
           {navItem("settings", "⚙ 设置")}
 
-          <div className="nav-group">在办分析 · {items.length}</div>
-          {items.map((p) => (
+          <div className="nav-group">在办分析 · {list.length}</div>
+          {list.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -99,13 +112,18 @@ export default function App() {
         </aside>
 
         <main className="app-main">
-          {view === "dashboard" && <Dashboard items={items} onOpen={openProject} />}
-          {view === "new" && <NewAnalysis onCreate={createAnalysis} onCancel={() => setView("dashboard")} />}
-          {view === "project" && (sampleOn
-            ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
-            : <ProjectWorkspace analysis={project} onUpdate={updateAnalysis} />)}
-          {view === "reports" && <ReportLibrary />}
-          {view === "settings" && <Settings />}
+          {items === null && <div className="dash"><div className="set-hint">正在载入本机数据…</div></div>}
+          {items !== null && view === "dashboard" && <Dashboard items={list} onOpen={openProject} />}
+          {items !== null && view === "new" && <NewAnalysis onCreate={createAnalysis} onCancel={() => setView("dashboard")} />}
+          {items !== null && view === "project" && (
+            !project
+              ? <div className="dash"><div className="set-hint">还没有在办分析，点左侧「✚ 新建分析」开始。</div></div>
+              : sampleOn
+                ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
+                : <ProjectWorkspace analysis={project} onUpdate={updateAnalysis} />
+          )}
+          {items !== null && view === "reports" && <ReportLibrary />}
+          {items !== null && view === "settings" && <Settings />}
         </main>
       </div>
     </div>

@@ -11,6 +11,7 @@ import { getLlmFetch } from "./runtime";
 import { saveReport } from "./reportLib";
 import { markUnread } from "./unread";
 import { SearchHit, gatherSources, searchEnabled, sourcesBlock } from "./search";
+import { kvGet, kvSet } from "../data/persist";
 
 export type RunStatus = "待执行" | "进行中" | "完成";
 export interface Attachment { name: string; text: string; url?: string; }   // 上传/抓取的资料正文（后台喂模型，不在前台展示原文 #5）；url 为抓取网页时的来源链接
@@ -52,7 +53,47 @@ export function subscribe(id: string, fn: () => void): () => void {
 }
 
 function notify(id: string) { listeners.get(id)?.forEach((fn) => fn()); }
-function patch(id: string, p: Partial<RunState>) { runs.set(id, { ...getRun(id), ...p }); notify(id); }
+function patch(id: string, p: Partial<RunState>) { runs.set(id, { ...getRun(id), ...p }); notify(id); persistSoon(); }
+
+// —— 运行状态落盘（重启不丢 #9）：材料 / 附件 / 各步产物 / 定稿正文都存下来，只是不存瞬时的 running/progress。
+const RUNS_KEY = "dw.runs.v1";
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function persistSoon() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { void persistRuns(); }, 700);   // 合并高频更新，落一次盘
+}
+function serializeRuns(): string {
+  const obj: Record<string, unknown> = {};
+  for (const [id, s] of runs) {
+    if (!s.started && !s.materials && !s.attachments.length) continue;   // 空壳不落
+    obj[id] = { started: s.started, done: s.done, status: s.status, outputs: s.outputs, realReport: s.realReport, materials: s.materials, attachments: s.attachments, sources: s.sources };
+  }
+  return JSON.stringify(obj);
+}
+async function persistRuns() { try { await kvSet(RUNS_KEY, serializeRuns()); } catch { /* 忽略 */ } }
+
+// 启动时回灌（App 挂载时调用一次）：把落盘的运行状态填回内存 Map，running 复位为 false。
+let hydrated = false;
+export async function hydrateRuns(): Promise<void> {
+  if (hydrated) return;
+  hydrated = true;
+  const raw = await kvGet(RUNS_KEY);
+  if (!raw) return;
+  try {
+    const obj = JSON.parse(raw) as Record<string, Partial<RunState>>;
+    for (const id of Object.keys(obj)) {
+      const s = obj[id];
+      runs.set(id, {
+        ...empty(),
+        started: !!s.started, done: !!s.done,
+        status: s.status ?? {}, outputs: s.outputs ?? [],
+        realReport: s.realReport ?? null,
+        materials: s.materials ?? "", attachments: s.attachments ?? [], sources: s.sources ?? [],
+      });
+      notify(id);
+    }
+  } catch { /* 损坏则忽略 */ }
+}
 
 export function setMaterials(id: string, materials: string) { patch(id, { materials }); }
 export function addAttachment(id: string, a: Attachment) {

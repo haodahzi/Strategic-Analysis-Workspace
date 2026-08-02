@@ -4,7 +4,7 @@ import { visionEnabled, visionReadPdf } from "../llm/visionExtract";
 import { loadConfig } from "../config/store";
 import { Attachment } from "../llm/pipelineStore";
 import { effectiveSources } from "../sources/registry";
-import { listenGrab, listenReports, openSource } from "../sources/browser";
+import { listenGrab, listenReports, openExternal, openSource } from "../sources/browser";
 import { buildReportClipping } from "../sources/scrape";
 
 // 本单资料录入（#5）：手写备注 + 上传多份 PDF / 文本。附件后台提取正文喂模型，前台只显示文件名与字数。
@@ -36,7 +36,12 @@ export default function MaterialsInput(
   const openSrc = async (id: string, url: string, name: string) => {
     setBusy(`打开「${name}」…`);
     const msg = await openSource(id, url, name);
-    setBusy(msg || `已在内置浏览器打开「${name}」：登录后下载研报回来上传，或用页内「抓取此页」按钮取正文`);
+    setBusy(msg || `已在内置浏览器打开「${name}」：登录后下载研报回来上传，或用页内「抓取本页研报清单 / 正文」`);
+  };
+  const openExt = async (url: string, name: string) => {
+    setBusy(`用系统浏览器打开「${name}」…`);
+    const msg = await openExternal(url, name);
+    if (msg) setBusy(msg); else setBusy(`已在系统浏览器打开「${name}」：登录后下载研报回工作台上传`);
   };
 
   const pick = async (files: FileList | null) => {
@@ -79,10 +84,14 @@ export default function MaterialsInput(
         <div className="mi-src">
           <span className="mi-src-lb">从信息源获取</span>
           {sources.map((s) => (
-            <button key={s.id} type="button" className="src-chip" title={`登录方式：${s.login}｜可在「设置 → 数据源」改网址`}
-              onClick={() => void openSrc(s.id, s.url, s.name)}>{s.name}</button>
+            <span key={s.id} className="src-chip-wrap">
+              <button type="button" className="src-chip" title={`内置浏览器打开（登录态留本机）｜登录方式：${s.login}｜网址可在「设置 → 数据源」改`}
+                onClick={() => void openSrc(s.id, s.url, s.name)}>{s.name}</button>
+              <button type="button" className="src-ext" title="内置打不开时用它：系统默认浏览器打开"
+                onClick={() => void openExt(s.url, s.name)}>↗</button>
+            </span>
           ))}
-          <span className="mi-src-tip">登录后下载研报回来上传（质量最高），或用页内「抓取本页研报清单 / 正文」</span>
+          <span className="mi-src-tip">登录后下载研报回来上传（质量最高），或用页内「抓取本页研报清单 / 正文」；内置打不开点 ↗ 走系统浏览器</span>
         </div>
       )}
       <div className="mi-row">

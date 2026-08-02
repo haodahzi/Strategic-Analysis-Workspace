@@ -19,6 +19,19 @@ export async function openSource(id: string, url: string, name: string): Promise
   }
 }
 
+// 兜底：用系统默认浏览器打开（内置窗口异常时的可靠退路）。网页环境用 window.open。
+export async function openExternal(url: string, name = "该信息源"): Promise<string> {
+  if (!url.trim()) return `「${name}」未配置网址，请到「设置 → 数据源」填写`;
+  if (!isTauri()) { try { window.open(url, "_blank", "noopener"); return ""; } catch { return "无法打开"; } }
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("open_external", { url });
+    return "";
+  } catch (e) {
+    return `打开失败：${(e as Error).message.slice(0, 120)}`;
+  }
+}
+
 // 订阅「抓取此页正文」回传。返回取消订阅函数；非桌面环境返回空函数。
 export async function listenGrab(cb: (item: GrabItem) => void): Promise<() => void> {
   if (!isTauri()) return () => {};
