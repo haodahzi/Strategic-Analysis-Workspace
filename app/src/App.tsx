@@ -38,6 +38,9 @@ export default function App() {
     clearUnread(id);   // #7：点开即消绿点
   };
 
+  // #2：编辑分析基础信息后更新并持久化（useEffect 会把 items 存本机）
+  const updateAnalysis = (a: Analysis) => setItems((xs) => xs.map((x) => (x.id === a.id ? a : x)));
+
   const createAnalysis = (a: Analysis, materials: string) => {
     setItems((xs) => [a, ...xs]);
     setPid(a.id);
@@ -100,7 +103,7 @@ export default function App() {
           {view === "new" && <NewAnalysis onCreate={createAnalysis} onCancel={() => setView("dashboard")} />}
           {view === "project" && (sampleOn
             ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
-            : <ProjectWorkspace analysis={project} />)}
+            : <ProjectWorkspace analysis={project} onUpdate={updateAnalysis} />)}
           {view === "reports" && <ReportLibrary />}
           {view === "settings" && <Settings />}
         </main>

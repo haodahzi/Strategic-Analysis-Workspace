@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { Analysis, QItem, Stage } from "../types";
 import PhaseRail from "./PhaseRail";
 import ReportProgress from "./ReportProgress";
 import QuestionList from "./QuestionList";
 import NegotiationDesk from "./NegotiationDesk";
 import ProjectReport from "./ProjectReport";
+import MaterialsInput from "./MaterialsInput";
 import { generateChecklist } from "../llm/checklist";
-import { getRun } from "../llm/pipelineStore";
+import { addAttachment, getRun, removeAttachment, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
 
 const STAGE_CLASS: Record<Stage, string> = { 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
 
@@ -19,8 +20,9 @@ function seedQuestions(a: Analysis): QItem[] {
   }));
 }
 
-export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
+export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Analysis; onUpdate: (a: Analysis) => void }) {
   const isDeal = (analysis.focus ?? "").includes("项目");
+  const isCompany = (analysis.focus ?? "").includes("企业");
   // 洽谈清单只对项目分析有意义（#11）；两轴总览已删（#4）
   const PHASE_TABS: Record<Stage, { key: string; label: string }[]> = {
     调研前: isDeal
@@ -38,6 +40,39 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
   const [notes, setNotes] = useState("");
   const [genLoading, setGenLoading] = useState(false);
   const [genErr, setGenErr] = useState("");
+
+  // #2 可编辑分析：订阅 run 拿本单资料（materials/attachments），编辑基础信息 + 资料后可仅保存或重跑
+  const run = useSyncExternalStore(
+    useCallback((cb: () => void) => subscribe(analysis.id, cb), [analysis.id]),
+    useCallback(() => getRun(analysis.id), [analysis.id]),
+  );
+  const [editing, setEditing] = useState(false);
+  const [eName, setEName] = useState(analysis.name);
+  const [eIndustry, setEIndustry] = useState(analysis.industry);
+  const [eCompany, setECompany] = useState(analysis.company ?? "");
+  const [eCounterparty, setECounterparty] = useState(analysis.counterparty ?? "");
+
+  const openEdit = () => {
+    setEName(analysis.name); setEIndustry(analysis.industry);
+    setECompany(analysis.company ?? ""); setECounterparty(analysis.counterparty ?? "");
+    setEditing(true);
+  };
+  const saveEdit = (rerun: boolean) => {
+    const updated: Analysis = {
+      ...analysis,
+      name: eName.trim() || analysis.name,
+      industry: eIndustry.trim(),
+      company: isCompany ? (eCompany.trim() || undefined) : analysis.company,
+      counterparty: isDeal ? (eCounterparty.trim() || undefined) : analysis.counterparty,
+      updatedAt: new Date().toISOString().slice(0, 10),
+    };
+    onUpdate(updated);
+    setEditing(false);
+    if (rerun) {
+      void startRun(analysis.id, { industry: updated.industry, ourRole: updated.ourRole, focus: updated.focus ?? "行业深度分析", company: updated.company, counterparty: updated.counterparty });
+      setPhase("调研前"); setTab("deep");
+    }
+  };
 
   const pickPhase = (s: Stage) => { setPhase(s); setTab(PHASE_TABS[s][0].key); };
   const tabs = PHASE_TABS[phase];
@@ -74,7 +109,43 @@ export default function ProjectWorkspace({ analysis }: { analysis: Analysis }) {
             <span className={"st-chip " + STAGE_CLASS[analysis.stage]}>当前：{analysis.stage}</span>
           </div>
         </div>
+        {!editing && <button type="button" className="app-btn ghost dark" onClick={openEdit}>编辑基础信息 / 资料</button>}
       </div>
+
+      {editing && (
+        <div className="dash pw-edit">
+          <div className="sec-head">编辑分析（类型「{analysis.focus}」不可改；改完可仅保存，或保存并重新生成）</div>
+          <label className="fld"><span>分析名称</span>
+            <input className="key-input wide" value={eName} onChange={(e) => setEName(e.target.value)} />
+          </label>
+          {isCompany && (
+            <label className="fld"><span>企业名称</span>
+              <input className="key-input wide" value={eCompany} onChange={(e) => setECompany(e.target.value)} />
+            </label>
+          )}
+          <label className="fld"><span>行业{isCompany ? "（选填）" : ""}</span>
+            <input className="key-input wide" value={eIndustry} onChange={(e) => setEIndustry(e.target.value)} />
+          </label>
+          {isDeal && (
+            <label className="fld"><span>对方 / 对手方</span>
+              <input className="key-input wide" value={eCounterparty} onChange={(e) => setECounterparty(e.target.value)} />
+            </label>
+          )}
+          <div className="fld"><span>本单资料（信息补充 · 报告查一查等抓取内容也在这里）</span>
+            <MaterialsInput
+              materials={run.materials} onMaterials={(v) => setMaterials(analysis.id, v)}
+              attachments={run.attachments}
+              onAdd={(a) => addAttachment(analysis.id, a)}
+              onRemove={(n) => removeAttachment(analysis.id, n)}
+            />
+          </div>
+          <div className="na-actions">
+            <button type="button" className="app-btn" onClick={() => saveEdit(true)}>保存并重新生成 →</button>
+            <button type="button" className="app-btn ghost" onClick={() => saveEdit(false)}>仅保存</button>
+            <button type="button" className="app-btn ghost dark" onClick={() => setEditing(false)}>取消</button>
+          </div>
+        </div>
+      )}
 
       <PhaseRail current={phase} onPick={pickPhase} />
 

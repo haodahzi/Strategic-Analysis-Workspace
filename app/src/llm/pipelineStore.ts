@@ -13,7 +13,7 @@ import { markUnread } from "./unread";
 import { SearchHit, gatherSources, searchEnabled, sourcesBlock } from "./search";
 
 export type RunStatus = "待执行" | "进行中" | "完成";
-export interface Attachment { name: string; text: string; }   // 上传资料提取出的文本（后台喂模型，不在前台展示原文 #5）
+export interface Attachment { name: string; text: string; url?: string; }   // 上传/抓取的资料正文（后台喂模型，不在前台展示原文 #5）；url 为抓取网页时的来源链接
 export interface RunState {
   started: boolean;
   running: boolean;
@@ -149,11 +149,11 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
       return;
     }
   }
-  // 文末附真实来源（#E）：联网检索来源 + 用户上传并解析的材料（#6）
+  // 文末附真实来源（#E）：你上传/抓取的研报靠前（代表你认可质量 #4），联网检索来源在后
   let md = ctx.outputs["final"] ?? "";
   const refs = [
+    ...getRun(id).attachments.map((a) => (a.url ? `[${a.name}](${a.url})（上传 / 抓取）` : `${a.name}（上传材料）`)),
     ...getRun(id).sources.map((h) => `[${h.title || h.url}](${h.url})`),
-    ...getRun(id).attachments.map((a) => `上传材料：${a.name}`),
   ];
   if (md.trim() && refs.length && !md.includes("参考文献")) {
     md += "\n\n## 参考文献\n\n" + refs.map((r, i) => `${i + 1}. ${r}`).join("\n");
