@@ -92,6 +92,63 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(h).toContain("整机厂配套");
   });
 
+  it("```kpi 关键数字快览：按条数选栅格 + 语义色（仅认 teal/gold/red/blue）", () => {
+    const h = mdToHouseHtml("```kpi\n年收入 | 197亿 | | 2年CAGR 32%\n净利率 | 21.4% | teal | 持续改善\n在手订单 | 594 | gold | 单位:个\n```");
+    expect(h).toContain('class="g3"');                          // 3 条 → g3
+    expect(h).toContain('class="card-tag">年收入</div>');
+    expect(h).toContain('class="card-val">197亿</div>');         // 无色
+    expect(h).toContain('class="card-val teal">21.4%</div>');    // teal
+    expect(h).toContain('class="card-val gold">594</div>');
+    expect(h).toContain('class="card-sub">2年CAGR 32%</div>');
+  });
+
+  it("```what 要点块（★拆段主力）：* 开头 / key 标记 → 重点项（金色左边）", () => {
+    const h = mdToHouseHtml("```what\n* 关键要点 | 一句话说清 **重点**\n普通要点 | 一句话说清\n```");
+    expect(h).toContain('class="what-grid"');
+    expect(h).toContain('class="what-item key"');               // * → 重点
+    expect(h).toContain('class="what-item"><div class="what-label">普通要点');
+    expect(h).toContain('class="what-label">关键要点</div>');
+    expect(h).toContain("<strong>重点</strong>");
+  });
+
+  it("```verdict 综合研判：利好→bull / 需冷静→bear / 核心结论→note，可自定标题", () => {
+    const h = mdToHouseHtml("```verdict\n# 综合研判\n利好 | 需求向上\n需冷静 | 数据待核\n核心结论 | 早期部件生意\n```");
+    expect(h).toContain('class="verdict"');
+    expect(h).toContain('class="verdict-t">综合研判</div>');
+    expect(h).toContain('class="v-tag bull">利好</span>');
+    expect(h).toContain('class="v-tag bear">需冷静</span>');
+    expect(h).toContain('class="v-tag note">核心结论</span>');
+  });
+
+  it("```mrow 指标条：百分比夹到 0–100、语义色（缺省 gold）、显示值", () => {
+    const h = mdToHouseHtml("```mrow\n2024现金流 | 45 | 44.9亿 | teal\n2025现金流 | 160 | 96亿+ |\n```");
+    expect((h.match(/class="mrow"/g) ?? []).length).toBe(2);
+    expect(h).toContain("width:45%;background:var(--teal)");
+    expect(h).toContain("width:100%;background:var(--gold)");    // 160 夹到 100、无色回退 gold
+    expect(h).toContain('class="mrow-val">44.9亿</span>');
+  });
+
+  it("```chk 核查清单：自动编号 01/02 + 危险信号", () => {
+    const h = mdToHouseHtml("```chk\n资质是否齐全？ | 缺牌照即红线\n数据能否复核？ | 只有厂商口径\n```");
+    expect(h).toContain('class="chk"');
+    expect(h).toContain('class="chk-box">01</div>');
+    expect(h).toContain('class="chk-box">02</div>');
+    expect(h).toContain('class="chk-q">资质是否齐全？</div>');
+    expect(h).toContain('class="chk-r">缺牌照即红线</div>');
+  });
+
+  it("表格合计行：首列 **加粗** → tr-bold；普通行仍是 <tr>", () => {
+    const h = mdToHouseHtml("| 项 | 值 |\n| --- | --- |\n| 收入 | 100 |\n| **合计** | 130 |");
+    expect(h).toContain('<tr class="tr-bold">');
+    expect(h).toContain("<strong>合计</strong>");
+    expect((h.match(/<tr>/g) ?? []).length).toBe(2);   // 表头 + 收入行；合计行带 class 不计入
+  });
+
+  it("未知围栏语言仍回退为代码块（不误伤）", () => {
+    const h = mdToHouseHtml("```python\nprint(1)\n```");
+    expect(h).toContain('class="md-pre"');
+  });
+
   it("buildHouseDoc：独立文档含 doctype / 标题 / 封面 / 页脚 / 内联样式 / 正文", () => {
     const doc = buildHouseDoc('<p>正文</p>', ":root{--bg:#f4f1eb}", { title: "算力租赁 · 行业深度分析", subtitle: "客观研究", badges: ["行业深度分析"] });
     expect(doc).toContain("<!doctype html");
@@ -113,11 +170,19 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
   const md = [
     "## 行业本质",
     "灵巧手是人形机器人完成精细操作的核心部件，其价值来自把感知、驱动与控制在有限空间内一体化集成。行业当前的收入主要来自整机厂配套与少量科研/演示订单，尚未形成规模化的终端商用。",
+    "```kpi",
+    "当前商用阶段 | 早期 | red | 配套 + 科研为主",
+    "价值高地 | 上游传感 | gold | 触觉 / 微型驱动",
+    "量产焦点 | 良率×成本 | | 决定能否放量",
+    "国产化 | 进行中 | teal | 传感 / 减速器替代",
+    "```",
     "> 洞察：价值更多沉在触觉传感与微型驱动的一体化环节，而非结构件本身。",
     "",
     "### 需求侧",
-    "- 人形机器人整机厂：配套需求随整机出货放量，目前体量小、确定性有限。",
-    "- 工业与服务场景：对可靠性、寿命与成本更敏感，导入节奏偏保守。",
+    "```what",
+    "* 人形机器人整机厂 | 配套需求随整机出货放量，目前**体量小、确定性有限** | key",
+    "工业 / 服务场景 | 对可靠性、寿命与成本更敏感，导入节奏偏**保守**",
+    "```",
     "",
     "## 产业链",
     "```chain",
@@ -151,6 +216,11 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
     "| 触觉传感 | 少数专业厂商 | 较集中 |",
     "| 微型驱动 / 减速 | 跨界的传统精密部件厂 | 中等 |",
     "",
+    "```mrow",
+    "触觉传感 · 国产化率 | 35 | ~35% | red",
+    "微型驱动 / 减速 · 国产化率 | 55 | ~55% | gold",
+    "控制芯片 · 国产化率 | 25 | ~25% | red",
+    "```",
     "> 风险：量产良率与成本下降速度存在不确定性，是决定行业能否放量的关键前提；相关数据多为厂商口径，需独立核实。",
     "",
     "## 交易结构（项目分析示例）",
@@ -169,7 +239,11 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
     "```",
     "",
     "## 结论",
-    "> 结论：这是一门处于早期、技术路线尚未收敛的部件生意。是否值得进入或合作，主要取决于人形机器人整机的放量节奏与关键传感 / 驱动环节的国产化进度。以上判断基于公开信息，关键量化仍需以标注来源的数据进一步验证。",
+    "```verdict",
+    "利好 | 人形机器人整机放量将直接带动灵巧手配套需求，上游触觉传感与微型驱动是价值与壁垒高地。",
+    "需冷静 | 量产良率与成本下降速度尚不确定，相关数据多为厂商口径、需独立核实。",
+    "核心结论 | 这是一门处于早期、技术路线尚未收敛的部件生意；是否值得进入或合作，主要取决于整机放量节奏与关键环节国产化进度。以上判断基于公开信息，关键量化仍需以标注来源的数据进一步验证。",
+    "```",
   ].join("\n");
   const doc = buildHouseDoc(mdToHouseHtml(md), css, {
     title: "灵巧手 · 行业深度分析", subtitle: "中性研究样例：客观讲清这个部件行业是什么样、如何运转、关键不确定性在哪。", badges: ["行业深度分析", "样例"],

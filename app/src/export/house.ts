@@ -149,6 +149,85 @@ function renderTimeline(rows: string[]): string {
   return `<div class="tl">${items}</div>`;
 }
 
+// ——编辑体组件（editorial-report skill 全集）：关键数字快览 / 要点块 / 综合研判 / 指标条 / 核查清单——
+// 语义色只认这 4 个（对应 report-house.css 的 card-val / mrow 变量），杜绝任意值注入。
+const CARD_COLORS = new Set(["teal", "gold", "red", "blue"]);
+const colorName = (s: string | undefined): string => {
+  const c = (s ?? "").trim().toLowerCase();
+  return CARD_COLORS.has(c) ? c : "";
+};
+
+// 关键数字快览——```kpi（或 cards）每行：标签 | 数值 | 语义色(可选) | 一句说明(可选)。2→g2 / 3→g3 / 其余 g4。
+function renderKpi(rows: string[]): string {
+  const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
+    const c = r.split("|").map((x) => x.trim());
+    const cv = colorName(c[2]);
+    const sub = c[3] ? `<div class="card-sub">${inline(c[3])}</div>` : "";
+    return `<div class="card"><div class="card-tag">${inline(c[0] ?? "")}</div><div class="card-val${cv ? " " + cv : ""}">${inline(c[1] ?? "")}</div>${sub}</div>`;
+  });
+  const g = items.length === 2 ? "g2" : items.length === 3 ? "g3" : "g4";
+  return `<div class="${g}">${items.join("")}</div>`;
+}
+
+// 要点块（★最常用的「拆段」组件）——```what 每行：小标签 | 一句话 | key(可选)；行首 * 或第 3 段含 key/★/重点 → 重点项（金色左边）。
+function renderWhat(rows: string[]): string {
+  const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
+    let key = /^\*\s+/.test(r);
+    const c = r.replace(/^\*\s+/, "").split("|").map((x) => x.trim());
+    if (/key|★|重点/.test(c[2] ?? "")) key = true;
+    const hasLabel = c.length >= 2;
+    const label = hasLabel && c[0] ? `<div class="what-label">${inline(c[0])}</div>` : "";
+    const text = hasLabel ? c[1] : c[0];
+    return `<div class="what-item${key ? " key" : ""}">${label}<div class="what-text">${inline(text ?? "")}</div></div>`;
+  });
+  return `<div class="what-grid">${items.join("")}</div>`;
+}
+
+// 综合研判——```verdict：可选首行「# 标题」；其余每行：标签 | 一句话。标签判多空色：利好→bull / 需冷静·风险→bear / 其余→note。
+function verdictTag(kw: string): string {
+  if (/利好|看好|正面|机会|bull/i.test(kw)) return "bull";
+  if (/冷静|风险|负面|警示|担忧|bear/i.test(kw)) return "bear";
+  return "note";
+}
+function renderVerdict(rows: string[]): string {
+  let title = "综合研判";
+  const items: string[] = [];
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = /^#\s+(.*)$/.exec(line);
+    if (h) { title = h[1]; continue; }
+    const c = line.split("|").map((x) => x.trim());
+    const kw = c.length >= 2 ? c[0] : "核心结论";
+    const body = c.length >= 2 ? c.slice(1).join(" | ") : c[0];
+    items.push(`<div class="v-item"><span class="v-tag ${verdictTag(kw)}">${inline(kw)}</span><p class="v-text">${inline(body)}</p></div>`);
+  }
+  return `<div class="verdict"><div class="verdict-t">${inline(title)}</div>${items.join("")}</div>`;
+}
+
+// 指标条（迷你条形图）——```mrow 每行：名称 | 百分比数字(0–100) | 显示值 | 语义色(可选,默认 gold)。
+function renderMrow(rows: string[]): string {
+  return rows.map((r) => r.trim()).filter(Boolean).map((r) => {
+    const c = r.split("|").map((x) => x.trim());
+    const pct = Math.max(0, Math.min(100, parseFloat(c[1] ?? "") || 0));
+    const col = colorName(c[3]);
+    const bg = col ? `var(--${col})` : "var(--gold)";
+    return `<div class="mrow"><span class="mrow-name">${inline(c[0] ?? "")}</span><div class="mrow-bar"><div class="mrow-fill" style="width:${pct}%;background:${bg}"></div></div><span class="mrow-val">${inline(c[2] ?? "")}</span></div>`;
+  }).join("");
+}
+
+// 核查清单——```chk 每行：要核实的问题 | 危险信号(可选)。自动编号 01/02…，危险信号自带红旗前缀。
+function renderChk(rows: string[]): string {
+  let n = 0;
+  const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
+    const c = r.split("|").map((x) => x.trim());
+    const box = String(++n).padStart(2, "0");
+    const risk = c[1] ? `<div class="chk-r">${inline(c[1])}</div>` : "";
+    return `<div class="chk-row"><div class="chk-box">${box}</div><div class="chk-c"><div class="chk-q">${inline(c[0] ?? "")}</div>${risk}</div></div>`;
+  });
+  return `<div class="chk">${items.join("")}</div>`;
+}
+
 export function mdToHouseHtml(md: string): string {
   const lines = md.replace(/\r/g, "").split("\n");
   const out: string[] = [];
@@ -174,7 +253,11 @@ export function mdToHouseHtml(md: string): string {
       while (i < lines.length && lines[i].includes("|") && lines[i].trim()) { rows.push(splitRow(lines[i].trim())); i++; }
       i--; // 回退一行给 for
       const thead = `<thead><tr>${header.map((h) => `<th>${inline(h)}</th>`).join("")}</tr></thead>`;
-      const tbody = `<tbody>${rows.map((r) => `<tr>${header.map((_, k) => `<td>${inline(r[k] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      // 首列整体加粗（**合计** / **总计**）→ 合计行语义（tr-bold）；其余行保持无 class。
+      const tbody = `<tbody>${rows.map((r) => {
+        const total = /^\*\*.+\*\*$/.test((r[0] ?? "").trim());
+        return `<tr${total ? ' class="tr-bold"' : ""}>${header.map((_, k) => `<td>${inline(r[k] ?? "")}</td>`).join("")}</tr>`;
+      }).join("")}</tbody>`;
       out.push(`<div class="tw"><table>${thead}${tbody}</table></div>`);
       continue;
     }
@@ -194,6 +277,11 @@ export function mdToHouseHtml(md: string): string {
       else if (lang === "timeline") out.push(renderTimeline(body));
       else if (lang === "flow") out.push(renderFlow(body));
       else if (lang === "dealflow") out.push(renderDealflow(body));
+      else if (lang === "kpi" || lang === "cards") out.push(renderKpi(body));
+      else if (lang === "what") out.push(renderWhat(body));
+      else if (lang === "verdict") out.push(renderVerdict(body));
+      else if (lang === "mrow" || lang === "bars") out.push(renderMrow(body));
+      else if (lang === "chk") out.push(renderChk(body));
       else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
       continue;
     }
