@@ -4,7 +4,8 @@ import { visionEnabled, visionReadPdf } from "../llm/visionExtract";
 import { loadConfig } from "../config/store";
 import { Attachment } from "../llm/pipelineStore";
 import { effectiveSources } from "../sources/registry";
-import { listenGrab, openSource } from "../sources/browser";
+import { listenGrab, listenReports, openSource } from "../sources/browser";
+import { buildReportClipping } from "../sources/scrape";
 
 // 本单资料录入（#5）：手写备注 + 上传多份 PDF / 文本。附件后台提取正文喂模型，前台只显示文件名与字数。
 // 文字版 PDF 走文本提取；扫描件 / 图片版自动、或勾「视觉精读」强制走文档视觉模型（看图转 markdown）。
@@ -16,13 +17,20 @@ export default function MaterialsInput(
   const [visionForce, setVisionForce] = useState(false);
   const sources = effectiveSources(loadConfig().dataSources).filter((s) => s.enabled && s.kind !== "api");
 
-  // 「抓取此页正文」回传（试验路径）→ 加入本单资料，带来源链接。用 ref 始终调最新 onAdd。
+  // 抓取回传 → 加入本单资料，带来源链接。用 ref 始终调最新 onAdd。
   const addRef = useRef(onAdd);
   addRef.current = onAdd;
   useEffect(() => {
-    let un = () => {};
-    void listenGrab((it) => { addRef.current({ name: it.name, text: it.text, url: it.url }); setBusy(`已抓取「${it.name}」加入本单`); }).then((f) => { un = f; });
-    return () => un();
+    let unG = () => {}, unR = () => {};
+    // ① 单页正文
+    void listenGrab((it) => { addRef.current({ name: it.name, text: it.text, url: it.url }); setBusy(`已抓取「${it.name}」加入本单`); }).then((f) => { unG = f; });
+    // ② 研报清单（站内自动抓取）：原始候选 → scrape.ts 打分成清单
+    void listenReports((p) => {
+      const clip = buildReportClipping(p.source, p.pageUrl, p.items);
+      if (clip) { addRef.current({ name: clip.name, text: clip.text, url: clip.url }); setBusy(`已抓取${clip.name}`); }
+      else setBusy("本页没识别到研报条目，可改用「下载研报→上传」");
+    }).then((f) => { unR = f; });
+    return () => { unG(); unR(); };
   }, []);
 
   const openSrc = async (id: string, url: string, name: string) => {
@@ -74,7 +82,7 @@ export default function MaterialsInput(
             <button key={s.id} type="button" className="src-chip" title={`登录方式：${s.login}｜可在「设置 → 数据源」改网址`}
               onClick={() => void openSrc(s.id, s.url, s.name)}>{s.name}</button>
           ))}
-          <span className="mi-src-tip">登录后下载研报回来上传（质量最高），或用页内「抓取此页」取正文</span>
+          <span className="mi-src-tip">登录后下载研报回来上传（质量最高），或用页内「抓取本页研报清单 / 正文」</span>
         </div>
       )}
       <div className="mi-row">
