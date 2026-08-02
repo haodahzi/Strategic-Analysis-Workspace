@@ -21,12 +21,17 @@ export const DEFAULT_PROVIDERS: Record<ProviderId, Omit<ProviderConfig, "apiKey"
   zhipu: {
     id: "zhipu", label: "智谱 GLM", style: "openai",
     baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    models: ["glm-4-plus", "glm-4", "glm-4-air"],
+    models: ["glm-4-plus", "glm-4", "glm-4-air", "glm-4v-plus", "glm-4v"],
   },
   kimi: {
     id: "kimi", label: "KIMI (Moonshot)", style: "openai",
     baseUrl: "https://api.moonshot.cn/v1",
-    models: ["moonshot-v1-32k", "moonshot-v1-128k"],
+    models: ["moonshot-v1-32k", "moonshot-v1-128k", "moonshot-v1-32k-vision-preview"],
+  },
+  ali: {
+    id: "ali", label: "阿里 · 通义千问", style: "openai",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    models: ["qwen-vl-max", "qwen-vl-plus", "qwen-max", "qwen-plus"],
   },
   mock: {
     id: "mock", label: "Mock（无 Key 演示）", style: "openai",

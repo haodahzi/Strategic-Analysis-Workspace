@@ -134,6 +134,15 @@ export default function Settings() {
           </tbody>
         </table>
       </div>
+
+      <div className="sec-head">文档视觉模型（可选 · 扫描件 / 复杂表格用）</div>
+      <div className="set-hint" style={{ marginBottom: 8 }}>选一个带视觉的模型（通义 Qwen-VL、智谱 GLM-4V、GPT-4o、Claude 等）。上传扫描件 / 图片版 PDF 会自动「看图读」，数字版仍走便宜的文本提取。发图较慢较贵，只对需要的页用。</div>
+      <div className="tw">
+        <table className="matrix">
+          <thead><tr><th className="mx-dim">用途</th><th>提供商</th><th>模型</th></tr></thead>
+          <tbody>{modelRow("文档视觉", cfg.vision, (v) => commit({ ...cfg, vision: v }))}</tbody>
+        </table>
+      </div>
     </div>
   );
 }

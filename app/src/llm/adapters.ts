@@ -4,27 +4,43 @@ import { ChatRequest, HttpSpec, LLMClient, LLMResult, ProviderConfig, ProviderSt
 export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
   // 容错：模型名若误含逗号/顿号（历史配置把多个模型粘一起），只取第一个。
   const model = (req.model || "").split(/[,，、]+/)[0].trim();
+  const imgs = req.images ?? [];
+  // 把图片挂到最后一条 user 消息上（多模态）
+  const isLastUser = (arr: { role: string }[], i: number, role: string) => role === "user" && i === arr.length - 1;
+
   if (cfg.style === "anthropic") {
+    const msgs = req.messages.filter((m) => m.role !== "system");
+    const messages = msgs.map((m, i) => ({
+      role: m.role,
+      content: imgs.length && isLastUser(msgs, i, m.role)
+        ? [{ type: "text", text: m.content }, ...imgs.map((u) => ({ type: "image", source: { type: "base64", media_type: "image/png", data: u.replace(/^data:[^,]+,/, "") } }))]
+        : m.content,
+    }));
     return {
       url: `${cfg.baseUrl}/v1/messages`,
       headers: {
         "content-type": "application/json",
         "x-api-key": cfg.apiKey ?? "",
         "anthropic-version": "2023-06-01",
-        // Tauri 第二段改走 tauri-http；浏览器直连需此头
         "anthropic-dangerous-direct-browser-access": "true",
       },
       body: {
         model,
         max_tokens: req.maxTokens ?? 8000,
         ...(req.system ? { system: req.system } : {}),
-        messages: req.messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
+        messages,
         ...(req.jsonSchema ? { output_config: { format: { type: "json_schema", schema: req.jsonSchema } } } : {}),
       },
     };
   }
-  // OpenAI 兼容（GPT / DeepSeek / 智谱 / KIMI）
-  const messages = req.system ? [{ role: "system", content: req.system }, ...req.messages] : req.messages;
+  // OpenAI 兼容（GPT / DeepSeek / 智谱 / KIMI / 通义）
+  const base = req.system ? [{ role: "system", content: req.system }, ...req.messages] : req.messages;
+  const messages = base.map((m, i) => ({
+    role: m.role,
+    content: imgs.length && isLastUser(base, i, m.role)
+      ? [{ type: "text", text: m.content }, ...imgs.map((u) => ({ type: "image_url", image_url: { url: u } }))]
+      : m.content,
+  }));
   return {
     url: `${cfg.baseUrl}/chat/completions`,
     headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey ?? ""}` },
@@ -32,7 +48,6 @@ export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
       model,
       max_tokens: req.maxTokens ?? 8000,
       messages,
-      // 传入 jsonSchema 时的通用退化：走 JSON mode（非 Anthropic 系模型）
       ...(req.jsonSchema ? { response_format: { type: "json_object" } } : {}),
     },
   };

@@ -18,6 +18,18 @@ describe("多模型适配 · 请求整形", () => {
     expect((b.messages as unknown[]).length).toBe(1);
   });
 
+  it("多模态：带 images 时，最后一条 user 消息 content 变成 文本+图片 数组（两种风格）", () => {
+    const vreq: ChatRequest = { model: "m", messages: [{ role: "user", content: "读这页" }], images: ["data:image/png;base64,AAAA"] };
+    const a = buildHttp(claude, vreq).body as { messages: { content: unknown }[] };
+    const ac = a.messages[0].content as Array<Record<string, unknown>>;
+    expect(Array.isArray(ac)).toBe(true);
+    expect(ac[0]).toMatchObject({ type: "text", text: "读这页" });
+    expect(ac[1]).toMatchObject({ type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } });   // 去掉 data: 前缀
+    const o = buildHttp(deepseek, vreq).body as { messages: { content: unknown }[] };
+    const oc = o.messages[o.messages.length - 1].content as Array<Record<string, unknown>>;
+    expect(oc[1]).toMatchObject({ type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } });
+  });
+
   it("Anthropic：jsonSchema → output_config.format", () => {
     const s = buildHttp(claude, { ...req, jsonSchema: { type: "object" } });
     const b = s.body as Record<string, unknown>;

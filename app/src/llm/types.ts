@@ -1,6 +1,6 @@
 // 多模型适配层类型。详见 docs/详细设计-多模型适配与导出模板.md。
 export type ProviderStyle = "anthropic" | "openai";
-export type ProviderId = "claude" | "openai" | "deepseek" | "zhipu" | "kimi" | "mock";
+export type ProviderId = "claude" | "openai" | "deepseek" | "zhipu" | "kimi" | "ali" | "mock";
 
 export interface ProviderConfig {
   id: ProviderId;
@@ -19,6 +19,7 @@ export interface ChatRequest {
   messages: ChatMessage[];
   maxTokens?: number;
   jsonSchema?: object; // 传入则要求结构化输出（Claude: output_config.format；OpenAI: json_object）
+  images?: string[];   // 传入则走多模态：把这些图片（base64 data URL）随最后一条 user 消息一起发（视觉解析）
 }
 
 export interface HttpSpec { url: string; headers: Record<string, string>; body: unknown; }
@@ -46,4 +47,5 @@ export interface AppConfig {
   step0: ModelPick;                         // 定框（Step 0）
   agents: Record<AgentRole, ModelPick>;     // 多智能体子任务
   search: SearchConfig;                     // 联网检索
+  vision: ModelPick;                        // 文档视觉模型（扫描件 / 复杂表格用；可选）
 }
