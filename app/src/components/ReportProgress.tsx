@@ -24,7 +24,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
   const sub = useCallback((cb: () => void) => subscribe(analysis.id, cb), [analysis.id]);
   const snap = useCallback(() => getRun(analysis.id), [analysis.id]);
   const run = useSyncExternalStore(sub, snap);
-  const { started, running, done, status, outputs, report, realReport, err, materials, attachments } = run;
+  const { started, running, done, status, outputs, report, realReport, err, materials, attachments, progress } = run;
 
   const cfg = loadConfig();
   const draftProv = providerById(cfg, cfg.agents["起草"].provider);
@@ -74,7 +74,7 @@ export default function ReportProgress({ analysis, onBack }: { analysis: Analysi
             <button type="button" className="app-btn" onClick={() => void startRun(analysis.id, input)}>生成深度分析 →</button>
           </div>
         )}
-        {started && <div className="sec-head">生成进度{running ? "（后台运行中，可切走）" : ""}</div>}
+        {started && <div className="sec-head">生成进度{running ? "（后台运行中，可切走）" : ""}{progress ? ` · ${progress}` : ""}</div>}
         {started && <ol className="pipe">
           {REPORT_PIPELINE.map((s, i) => {
             const st = status[s.id] ?? "待执行";

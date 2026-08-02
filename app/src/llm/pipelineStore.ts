@@ -2,7 +2,7 @@
 // 结果留着（#2）。组件只订阅、不拥有生成状态。按 analysisId 分桶。
 import {
   MockReport, PipelineCtx, PipelineInput, REPORT_PIPELINE, StageResult,
-  buildStageRequest, mockReport, mockStageOutput,
+  buildDigestRequest, buildStageRequest, chunkText, mockReport, mockStageOutput,
 } from "./pipeline";
 import { ChatRequest, LLMClient } from "./types";
 import { loadConfig, providerById } from "../config/store";
@@ -26,6 +26,7 @@ export interface RunState {
   materials: string;           // 用户手写的备注 / 已知要点
   attachments: Attachment[];   // 上传的 PDF / 文本提取出的正文
   sources: SearchHit[];        // 联网检索到的来源（供正文引用 + 文末参考文献）
+  progress: string;            // 当前步的细粒度进度（如分块精读 3/8 段）
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -33,7 +34,7 @@ const runs = new Map<string, RunState>();
 const listeners = new Map<string, Set<() => void>>();
 
 function empty(): RunState {
-  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "", attachments: [], sources: [] };
+  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "", attachments: [], sources: [], progress: "" };
 }
 
 // 惰性初始化并返回稳定引用（配合 useSyncExternalStore）
@@ -120,13 +121,31 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
     const pick = cfg.agents[s.role];
     const p2 = providerById(cfg, pick.provider);
     try {
-      // 起草 / 定稿是正文，命中上限自动续写把篇幅写足；其余步骤单次即可
-      const rounds = s.id === "draft" || s.id === "final" ? 5 : 1;
-      const text = await sendComplete(makeClient(p2, fetchImpl), buildStageRequest(s, ctx, pick.model), rounds);
+      let text: string;
+      if (s.id === "research") {
+        // 分块精读：长材料切块逐块抽取，逐页读完而非略读；短材料则单次即可
+        const chunks = chunkText(ctx.materials, 6000);
+        if (chunks.length > 1) {
+          const digests: string[] = [];
+          for (let ci = 0; ci < chunks.length; ci++) {
+            patch(id, { progress: `精读材料 ${ci + 1}/${chunks.length} 段…` });
+            const r = await makeClient(p2, fetchImpl).send(buildDigestRequest(input, chunks[ci], ci + 1, chunks.length, pick.model));
+            if (r.text.trim() && !/本段无相关内容/.test(r.text)) digests.push(`【材料第 ${ci + 1} 段】\n${r.text}`);
+          }
+          patch(id, { progress: "" });
+          text = digests.join("\n\n") || "（材料中未抽取到与本主题相关的内容）";
+        } else {
+          text = await sendComplete(makeClient(p2, fetchImpl), buildStageRequest(s, ctx, pick.model), 1);
+        }
+      } else {
+        // 起草 / 定稿是正文，命中上限自动续写把篇幅写足；其余步骤单次即可
+        const rounds = s.id === "draft" || s.id === "final" ? 5 : 1;
+        text = await sendComplete(makeClient(p2, fetchImpl), buildStageRequest(s, ctx, pick.model), rounds);
+      }
       ctx.outputs[s.id] = text;
       patch(id, { outputs: [...getRun(id).outputs.filter((o) => o.stageId !== s.id), { stageId: s.id, summary: text }], status: { ...getRun(id).status, [s.id]: "完成" } });
     } catch (e) {
-      patch(id, { err: `${p2.label}（${s.role}）：${(e as Error).message.slice(0, 160)}`, status: { ...getRun(id).status, [s.id]: "待执行" }, running: false });
+      patch(id, { err: `${p2.label}（${s.role}）：${(e as Error).message.slice(0, 160)}`, status: { ...getRun(id).status, [s.id]: "待执行" }, running: false, progress: "" });
       return;
     }
   }

@@ -130,6 +130,31 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
   return { model, system: AGENT_SYS[stage.role], messages: [{ role: "user", content: user }], maxTokens };
 }
 
+// ——分块精读（map-reduce）：长材料切块逐块抽取，避免一坨塞进去被模型略读——
+// 按段落聚合到约 size 字一块；超长段落硬切。纯函数、可单测。
+export function chunkText(text: string, size = 6000): string[] {
+  const paras = text.replace(/\r/g, "").split(/\n{2,}/);
+  const chunks: string[] = [];
+  let cur = "";
+  for (const p of paras) {
+    if (cur && cur.length + p.length + 2 > size) { chunks.push(cur); cur = ""; }
+    cur = cur ? cur + "\n\n" + p : p;
+    while (cur.length > size * 1.6) { chunks.push(cur.slice(0, size)); cur = cur.slice(size); }   // 硬切超长段
+  }
+  if (cur.trim()) chunks.push(cur);
+  return chunks.length ? chunks : [text];
+}
+
+// 逐块精读的请求：忠实抽取本块里与主题相关的事实/数据/结论，不发挥、不编造。
+export function buildDigestRequest(input: PipelineInput, chunk: string, idx: number, total: number, model: string): ChatRequest {
+  const { subject } = frameFor(input);
+  const user = `${subject}。下面是本单材料的第 ${idx}/${total} 段（可能是研报 / 尽调稿的一部分）。` +
+    "请从这一段里，逐条抽取与本主题相关的：关键事实、数据（带口径 / 单位 / 时间）、结论与观点、以及表格里的重要数字。" +
+    "忠实原文、不要发挥、不要编造；有来源/日期就带上。若本段与主题无关，只回「（本段无相关内容）」。用要点列出。\n\n" +
+    `材料片段：\n${chunk}`;
+  return { model, system: AGENT_SYS.资料, messages: [{ role: "user", content: user }], maxTokens: 2000 };
+}
+
 // ——洽谈清单一键生成（#5）：聚焦「能不能进 / 能不能做 / 值不值得 / 合规风险」这些能改变决策的问题。——
 export interface ChecklistItem { text: string; intent: "要查" | "要问对方" | "待搞清"; dealBreaker?: boolean; }
 

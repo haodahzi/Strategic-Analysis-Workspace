@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   REPORT_PIPELINE, mockStageOutput, mockReport, buildStageRequest,
   buildChecklistRequest, parseChecklist, mockChecklist,
+  chunkText, buildDigestRequest,
 } from "./pipeline";
 
 describe("多智能体报告流水线", () => {
@@ -46,6 +47,25 @@ describe("多智能体报告流水线", () => {
     expect(rep.risks.some((r) => r.dealBreaker)).toBe(true);
     expect(rep.judgment.falsifiers.length).toBeGreaterThan(0);
     expect(rep.judgment.stance && rep.judgment.confidence && rep.judgment.grounds.length).toBeTruthy();
+  });
+});
+
+describe("分块精读 map-reduce", () => {
+  it("chunkText：长文本切成多块、每块不超尺寸；短文本单块", () => {
+    const long = Array.from({ length: 40 }, (_, i) => `第${i}段`.padEnd(400, "x")).join("\n\n");
+    const chunks = chunkText(long, 6000);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((c) => c.length <= 6000 * 1.6 + 10)).toBe(true);
+    expect(chunkText("短材料一句话", 6000)).toEqual(["短材料一句话"]);
+  });
+
+  it("buildDigestRequest：带主体、片段内容、第几段/共几段，system 为尽调口径", () => {
+    const req = buildDigestRequest({ industry: "算力租赁", ourRole: "", focus: "行业深度分析" }, "机架上架率 82%，电价 0.6 元/度", 2, 5, "m1");
+    expect(req.model).toBe("m1");
+    expect(req.system).toContain("尽调");
+    expect(req.messages[0].content).toContain("算力租赁");
+    expect(req.messages[0].content).toContain("第 2/5 段");
+    expect(req.messages[0].content).toContain("机架上架率 82%");
   });
 });
 
