@@ -1,6 +1,6 @@
 [package]
 name = "strategic-analysis-workbench"
-version = "0.8.5"
+version = "0.8.6"
 description = "战略发展分析工作台 — 决策副驾"
 edition = "2021"
 rust-version = "1.77.2"
