@@ -21,6 +21,19 @@
       if (blank && a.href) { e.preventDefault(); location.href = a.href; }
     }, true);
 
+    // 更关键的一类：研报详情用 JS 的 window.open(...) 打开新窗口，内置 WebView 直接丢弃——点了「完全没反应」。
+    // 覆盖 window.open：凡带真实地址（含站内相对路径）的一律改在本窗口内打开，用户就能进到正文页。
+    (function () {
+      var _open = window.open;
+      window.open = function (url) {
+        try {
+          var u = url == null ? '' : String(url);
+          if (u && !/^(javascript:|about:)/i.test(u)) { window.location.href = u; return null; }
+        } catch (e) { /* 落回原生 */ }
+        try { return _open.apply(window, arguments); } catch (e) { return null; }
+      };
+    })();
+
     function invoke(cmd, args) {
       var i = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke)
            || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
