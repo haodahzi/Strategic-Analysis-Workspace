@@ -20,6 +20,21 @@ describe("房子样式渲染（#7/#15）", () => {
     expect((h.match(/<li>/g) ?? []).length).toBe(2);
   });
 
+  it("「- **标签**：一句」形式的列表自动排成要点卡 what-grid（少大段文字主力）", () => {
+    const h = mdToHouseHtml("- **期限**：大卡主流 3+2\n- **押付**：卖方市场押三付一\n- **违约**：低于承诺按 80% 赔付");
+    expect(h).toContain('class="what-grid"');
+    expect((h.match(/class="what-item"/g) ?? []).length).toBe(3);
+    expect(h).toContain('class="what-label">期限</div>');
+    expect(h).toContain('class="what-text">大卡主流 3+2</div>');
+    expect(h).not.toContain("md-list");
+  });
+
+  it("混合列表（含非标签项）保持普通 md-list，不误转要点卡", () => {
+    const h = mdToHouseHtml("- **期限**：大卡 3+2\n- 普通一句话没有标签");
+    expect(h).toContain('<ul class="md-list">');
+    expect(h).not.toContain("what-grid");
+  });
+
   it("引用块按首词判语义：风险→红批注、结论→深色框、洞察→金色洞察", () => {
     expect(mdToHouseHtml("> 风险：数据无法复核")).toContain('class="anno red"');
     expect(mdToHouseHtml("> 结论：谨慎")).toContain('class="insight dark"');
@@ -202,10 +217,8 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
     "> 洞察：价值更多沉在触觉传感与微型驱动的一体化环节，而非结构件本身。",
     "",
     "### 需求侧",
-    "```what",
-    "* 人形机器人整机厂 | 配套需求随整机出货放量，目前**体量小、确定性有限** | key",
-    "工业 / 服务场景 | 对可靠性、寿命与成本更敏感，导入节奏偏**保守**",
-    "```",
+    "- **人形机器人整机厂**：配套需求随整机出货放量，目前**体量小、确定性有限**。",
+    "- **工业 / 服务场景**：对可靠性、寿命与成本更敏感，导入节奏偏**保守**。",
     "",
     "## 产业链",
     "```chain",

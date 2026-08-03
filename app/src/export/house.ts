@@ -236,7 +236,19 @@ export function mdToHouseHtml(md: string): string {
   let quote: string[] | null = null;
 
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
-  const flushList = () => { if (list) { out.push(`<ul class="md-list">${list.join("")}</ul>`); list = null; } };
+  // 列表收尾：整段都是「**标签**：一句话」形式（2–8 项）→ 自动排成要点卡片 what-grid（少大段文字的主力）；否则普通列表。
+  const LABEL_ITEM = /^\s*\*\*([^*]+?)\*\*\s*[:：]\s*(.+)$/;
+  const flushList = () => {
+    if (!list) return;
+    const items = list; list = null;
+    const parsed = items.map((t) => LABEL_ITEM.exec(t));
+    if (items.length >= 2 && items.length <= 8 && parsed.every(Boolean)) {
+      const cards = parsed.map((m) => `<div class="what-item"><div class="what-label">${inline(m![1].trim())}</div><div class="what-text">${inline(m![2].trim())}</div></div>`).join("");
+      out.push(`<div class="what-grid">${cards}</div>`);
+    } else {
+      out.push(`<ul class="md-list">${items.map((t) => `<li>${inline(t)}</li>`).join("")}</ul>`);
+    }
+  };
   const flushQuote = () => { if (quote) { out.push(renderQuote(quote.join(" "))); quote = null; } };
   const flushAll = () => { flushPara(); flushList(); flushQuote(); };
 
@@ -302,7 +314,7 @@ export function mdToHouseHtml(md: string): string {
     if (bq) { flushPara(); flushList(); (quote ??= []).push(bq[1]); continue; }
 
     const li = /^[-*]\s+(.*)$/.exec(line) ?? /^\d+[.、)]\s+(.*)$/.exec(line);
-    if (li) { flushPara(); flushQuote(); (list ??= []).push(`<li>${inline(li[1])}</li>`); continue; }
+    if (li) { flushPara(); flushQuote(); (list ??= []).push(li[1]); continue; }
 
     flushList(); flushQuote(); para.push(line);
   }
