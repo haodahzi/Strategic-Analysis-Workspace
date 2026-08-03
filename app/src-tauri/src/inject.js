@@ -8,6 +8,19 @@
     if (document.getElementById('zlgzt-bar')) return;
     var SRC = window.__ZLGZT_SRC__ || '信息源';
 
+    // 让「新窗口」链接在本内置窗口内打开：研报详情多为 <a target="_blank">，而内置 WebView 不处理弹窗，
+    // 点了就像没反应。捕获阶段接管这类点击、改为同窗导航，用户就能点进正文。
+    // （登录/微信扫码等弹窗不走 <a target="_blank">，不受影响。）
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      var a = t && t.closest ? t.closest('a[href]') : null;
+      if (!a) return;
+      var raw = a.getAttribute('href') || '';
+      if (/^(javascript:|#|mailto:|tel:)/i.test(raw)) return;
+      var blank = a.target === '_blank' || /(^|\s)_blank(\s|$)/.test(a.getAttribute('target') || '');
+      if (blank && a.href) { e.preventDefault(); location.href = a.href; }
+    }, true);
+
     function invoke(cmd, args) {
       var i = (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke)
            || (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);

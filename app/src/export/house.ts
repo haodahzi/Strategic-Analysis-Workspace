@@ -265,11 +265,13 @@ export function mdToHouseHtml(md: string): string {
     if (line === "") { flushAll(); continue; }
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) { flushAll(); out.push("<hr>"); continue; }
 
-    // 结构化围栏块：```chain（产业链）/ ```timeline（时间轴）；其余当代码块
-    const fence = /^`{3,}\s*([a-zA-Z]+)?\s*$/.exec(line);
-    if (fence) {
+    // 结构化围栏块：```chain（产业链）/ ```timeline（时间轴）等；其余当代码块。
+    // 关键容错：开栏行只要以 ``` 起头即可，lang 之后允许跟中文标题/说明并一律忽略
+    //（模型常把「```kpi 关键数字快览」写成一行）。绝不要求开栏行以 lang 结尾——否则带标题的
+    // 开栏行不匹配，其配对的收栏 ``` 反被误判为新开栏，把后续整段正文（甚至连着几章）吞进 <pre>。
+    if (/^`{3,}/.test(line)) {
       flushAll();
-      const lang = (fence[1] ?? "").toLowerCase();
+      const lang = (/^`{3,}\s*([a-zA-Z][\w-]*)/.exec(line)?.[1] ?? "").toLowerCase();
       const body: string[] = [];
       i++;
       while (i < lines.length && !/^`{3,}\s*$/.test(lines[i].trim())) { body.push(lines[i]); i++; }

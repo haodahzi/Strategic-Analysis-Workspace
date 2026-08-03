@@ -102,6 +102,35 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(h).toContain('class="card-sub">2年CAGR 32%</div>');
   });
 
+  it("回归：开栏行带中文标题（```kpi 关键数字快览）正确解析，且绝不吞掉后续章节", () => {
+    const md = [
+      "```kpi 关键数字快览",
+      "规模 | 197亿 | gold | 口径待核",
+      "增速 | 42% | teal |",
+      "```",
+      "",
+      "## 一、行业本质",
+      "正文一句话。",
+      "## 二、需求侧",
+      "正文两句话。",
+    ].join("\n");
+    const h = mdToHouseHtml(md);
+    expect(h).toContain('class="g2"');                       // 带标题的开栏也渲染成卡片
+    expect(h).toContain('class="card-val gold">197亿</div>');
+    expect(h).toContain('class="ch-title">一、行业本质');    // 后续两章各自独立、序号保留
+    expect(h).toContain('class="ch-title">二、需求侧');
+    expect(h).not.toContain("md-pre");                       // 绝不串成一个 <pre>
+  });
+
+  it("回归：```what 开栏行带标题不破坏解析、不吞后文", () => {
+    const md = ["```what 典型收入模型", "订阅制 | 付费用户数 × ARPPU", "* API | 调用量 × 单价", "```", "", "## 下一章", "正文。"].join("\n");
+    const h = mdToHouseHtml(md);
+    expect(h).toContain('class="what-grid"');
+    expect(h).toContain('class="what-item key"');
+    expect(h).toContain('class="ch-title">下一章');
+    expect(h).not.toContain("md-pre");
+  });
+
   it("```what 要点块（★拆段主力）：* 开头 / key 标记 → 重点项（金色左边）", () => {
     const h = mdToHouseHtml("```what\n* 关键要点 | 一句话说清 **重点**\n普通要点 | 一句话说清\n```");
     expect(h).toContain('class="what-grid"');
@@ -170,12 +199,6 @@ it("emit demo house report (when HOUSE_OUT set)", () => {
   const md = [
     "## 行业本质",
     "灵巧手是人形机器人完成精细操作的核心部件，其价值来自把感知、驱动与控制在有限空间内一体化集成。行业当前的收入主要来自整机厂配套与少量科研/演示订单，尚未形成规模化的终端商用。",
-    "```kpi",
-    "当前商用阶段 | 早期 | red | 配套 + 科研为主",
-    "价值高地 | 上游传感 | gold | 触觉 / 微型驱动",
-    "量产焦点 | 良率×成本 | | 决定能否放量",
-    "国产化 | 进行中 | teal | 传感 / 减速器替代",
-    "```",
     "> 洞察：价值更多沉在触觉传感与微型驱动的一体化环节，而非结构件本身。",
     "",
     "### 需求侧",

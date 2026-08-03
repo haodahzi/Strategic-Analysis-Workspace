@@ -113,7 +113,7 @@ export default function App() {
 
         <main className="app-main">
           {items === null && <div className="dash"><div className="set-hint">正在载入本机数据…</div></div>}
-          {items !== null && view === "dashboard" && <Dashboard items={list} onOpen={openProject} />}
+          {items !== null && view === "dashboard" && <Dashboard items={list} onOpen={openProject} onOpenReports={() => setView("reports")} />}
           {items !== null && view === "new" && <NewAnalysis onCreate={createAnalysis} onCancel={() => setView("dashboard")} />}
           {items !== null && view === "project" && (
             !project

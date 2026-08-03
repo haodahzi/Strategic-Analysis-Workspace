@@ -1,5 +1,5 @@
-import { kbIndustry, kbEnterprise } from "../data/seed";
 import { Analysis, STAGES, Stage } from "../types";
+import { listReports } from "../llm/reportLib";
 
 const STAGE_CLASS: Record<Stage, string> = {
   调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -19,10 +19,10 @@ function StageProgress({ stage }: { stage: Stage }) {
   );
 }
 
-export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen: (id: string, report?: boolean) => void }) {
+export default function Dashboard({ items, onOpen, onOpenReports }: { items: Analysis[]; onOpen: (id: string, report?: boolean) => void; onOpenReports?: () => void }) {
   const byStage = (s: Stage) => items.filter((p) => p.stage === s).length;
   const inProgress = items.filter((p) => p.deliverables.some((d) => d.status !== "完成")).length;
-  const kbCount = kbIndustry.length + kbEnterprise.length;
+  const reports = listReports();
 
   return (
     <div className="dash">
@@ -35,7 +35,7 @@ export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen
         <div className="kpi">
           <div className="kpi-n">{items.length}</div>
           <div className="kpi-l">在办分析</div>
-          <div className="kpi-x">{inProgress} 个尚有在办交付物</div>
+          <div className="kpi-x">{inProgress} 个仍在推进</div>
         </div>
         <div className="kpi">
           <div className="kpi-stages">
@@ -49,9 +49,9 @@ export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen
           <div className="kpi-l">阶段分布</div>
         </div>
         <div className="kpi">
-          <div className="kpi-n">{kbCount}</div>
-          <div className="kpi-l">交付物库</div>
-          <div className="kpi-x">行业分析 {kbIndustry.length} · 企业画像 {kbEnterprise.length}</div>
+          <div className="kpi-n">{reports.length}</div>
+          <div className="kpi-l">报告库</div>
+          <div className="kpi-x">已排版成品 · 可查看 / 导出 PDF</div>
         </div>
       </div>
 
@@ -98,28 +98,27 @@ export default function Dashboard({ items, onOpen }: { items: Analysis[]; onOpen
         ))}
       </div>
 
-      {/* 交付物库 */}
-      <div className="sec-head">交付物库（知识库 · 半耐用 · 复利资产）</div>
-      <div className="kb-grid">
-        <div className="kb-col">
-          <div className="kb-col-h">行业深度分析 · {kbIndustry.length}</div>
-          {kbIndustry.map((k) => (
-            <div key={k.id} className="kb-item">
-              <span>{k.industry}<span className="kb-ver">v{k.version}</span></span>
-              <span className="kb-up">{k.updatedAt}{k.hasSample ? " · 有样张" : ""}</span>
-            </div>
-          ))}
-        </div>
-        <div className="kb-col">
-          <div className="kb-col-h">企业画像 · {kbEnterprise.length}</div>
-          {kbEnterprise.map((k) => (
-            <div key={k.id} className="kb-item">
-              <span>{k.company}<span className="kb-ver">v{k.version}</span></span>
-              <span className="kb-up">{k.updatedAt}</span>
-            </div>
-          ))}
-        </div>
+      {/* 报告库（一键排版成品） */}
+      <div className="sec-head">
+        报告库 · 已排版成品
+        {onOpenReports && reports.length > 0 && (
+          <button type="button" className="app-btn ghost" style={{ marginLeft: 12 }} onClick={onOpenReports}>全部 {reports.length} 篇 →</button>
+        )}
       </div>
+      {reports.length === 0 ? (
+        <div className="set-hint">还没有报告——在某个分析的「深度分析」里生成定稿并点「一键排版」，即会存入报告库。</div>
+      ) : (
+        <div className="rl-list">
+          {reports.slice(0, 6).map((r) => (
+            <div key={r.id} className="rl-item">
+              <button type="button" className="rl-open" onClick={onOpenReports}>
+                <span className="rl-title">{r.title}</span>
+                <span className="rl-meta">{r.focus} · {r.subject}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

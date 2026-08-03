@@ -5,12 +5,10 @@
   "windows": ["source-*"],
   "remote": {
     "urls": [
-      "http://*.baogaocha.com",
-      "https://*.baogaocha.com",
-      "http://*.rongdatech.com",
-      "https://*.rongdatech.com",
-      "http://*.rongda.com",
-      "https://*.rongda.com",
+      "http://*.seedhangyan.com",
+      "https://*.seedhangyan.com",
+      "http://*.rongdasoft.com",
+      "https://*.rongdasoft.com",
       "http://*.qcc.com",
       "https://*.qcc.com",
       "http://*.cninfo.com.cn",
