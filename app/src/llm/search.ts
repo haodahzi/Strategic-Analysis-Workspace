@@ -59,24 +59,70 @@ export async function webSearch(cfg: AppConfig, query: string): Promise<SearchHi
   return parseHits(s.provider, await res.json());
 }
 
-// 跑多条查询、按 URL + 标题双重去重（干掉重复标题）、上限约 20 条；单条失败不阻断整体。
+// —— 源质量打分（第一层：域名先验 + 摘要级归因信号，不打开页面）——
+// 理念：域名只是第一道筛子，最终看「内容责任主体」。低档域名若正文明确归因到原始机构
+// （如「据智研咨询…」），可反超无归因、无日期的高档域名。以下清单可按需增删。
+
+// 内容农场 / 文库转存 / 纯 UGC：研报被二次上传、常付费墙，几乎无法作为可引用来源 → 枪毙（保底不置空）。
+const JUNK_DOMAINS = ["docin.com", "doc88.com", "book118.com", "renrendoc.com", "taodocs.com", "wenku.baidu.com", "doc.mbalib.com", "360doc.com", "xzbu.com", "wenmi.com", "yjbys.com", "renrendoc"];
+// 门户 / 自媒体号 / 泛 UGC：质量参差，作兜底但降权（含东财「财富号」——正是"域名不决定质量"的典型）。
+const LOW_DOMAINS = ["sohu.com", "baijiahao.baidu.com", "toutiao.com", "zaker.com", "k.sina", "blog.", "bbs.", "tieba.baidu.com", "zhihu.com", "csdn.net", "jianshu.com", "163.com/dy", "caifuhao.eastmoney.com"];
+// 官方 / 交易所披露 / 权威媒体 / 权威研究：优先。
+const HIGH_DOMAINS = [".gov.cn", ".edu.cn", "cninfo.com.cn", "sse.com.cn", "szse.cn", "neeq.com.cn", "stats.gov.cn", "miit.gov.cn", "xinhuanet.com", "people.com.cn", "chinadaily.com.cn", "caixin.com", "yicai.com", "21jingji.com", "jiemian.com", "stcn.com", "cs.com.cn", "cnstock.com", "eeo.com.cn", "nbd.com.cn"];
+
+export function classifyDomain(url: string): "high" | "mid" | "low" | "junk" {
+  const u = (url || "").toLowerCase();
+  if (JUNK_DOMAINS.some((d) => u.includes(d))) return "junk";
+  if (HIGH_DOMAINS.some((d) => u.includes(d))) return "high";
+  if (LOW_DOMAINS.some((d) => u.includes(d))) return "low";
+  return "mid";
+}
+
+// 归因线索：正文/标题里出现「据 / 引自 / 来源: / 援引 / 公告显示…」；原始机构名；日期；带单位的数字。
+// 收紧：真正的归因短语才算，避免「数据」里的"据"误判为有归因。
+const ATTRIB = /引自|援引|来源[:：]|数据来自|公告(显示|称)|(据|根据)[^。！？\n]{0,12}(报告|数据|研究院|咨询|证券|统计|机构|公告|指数|白皮书)|发布的?[^。！？\n]{0,8}(报告|指数|白皮书|数据)/;
+const AUTH_ORG = /[一-龥A-Za-z]{2,12}(研究院|咨询|证券|数据中心|统计局|交易所|工信部|发改委|信通院|人民银行|大学|研究所)/;
+const HAS_DATE = /20\d{2}\s*[-/年.]/;
+const HAS_FIG = /\d[\d,.]*\s*(亿|万|%|％|元|美元|倍|个百分点)/;
+
+// 一条命中的质量分：域名先验 + 归因/数据信号 + 查询词覆盖。分越高越靠前。
+export function scoreHit(hit: SearchHit, query: string): number {
+  const text = `${hit.title} ${hit.content}`;
+  const cls = classifyDomain(hit.url);
+  let s = cls === "high" ? 3 : cls === "low" ? -2 : cls === "junk" ? -6 : 0;
+  const attributed = ATTRIB.test(text);
+  const dated = HAS_DATE.test(text);
+  const fig = HAS_FIG.test(text);
+  if (attributed) s += 2;                       // 明确归因 → 低档域名也能提档（责任主体 > 域名）
+  if (AUTH_ORG.test(text)) s += 1;              // 命中权威原始机构
+  if (dated) s += 1;
+  if (fig) s += 1;
+  if (!attributed && !dated && !fig) s -= 2;    // 无归因、无日期、无数据 → 降档（哪怕高档域名）
+  const terms = query.split(/\s+/).filter((w) => w.length >= 2);
+  s += Math.min(terms.filter((w) => text.includes(w)).length, 3) * 0.5;   // 轻量相关性
+  return s;
+}
+
+// 跑多条查询 → 去重（URL + 标题）→ 按质量分重排 → 砍文库/UGC 垃圾源 → 上限 20 条。单条失败不阻断整体。
 export async function gatherSources(cfg: AppConfig, input: PipelineInput): Promise<SearchHit[]> {
   const seenUrl = new Set<string>();
   const seenTitle = new Set<string>();
-  const out: SearchHit[] = [];
-  const cap = 20;
+  const scored: { hit: SearchHit; score: number }[] = [];
   for (const q of queriesFor(input)) {
     try {
       for (const h of await webSearch(cfg, q)) {
         const t = h.title.replace(/\s+/g, "").toLowerCase();
         if (seenUrl.has(h.url) || (t && seenTitle.has(t))) continue;   // 同 URL 或同标题只留一条
         seenUrl.add(h.url); if (t) seenTitle.add(t);
-        out.push(h);
+        scored.push({ hit: h, score: scoreHit(h, q) });
       }
     } catch { /* 跳过失败的查询 */ }
-    if (out.length >= cap) break;
   }
-  return out.slice(0, cap);
+  // 砍垃圾源；若砍完为空（冷门题材只有文库）则回退不砍，避免零结果
+  const kept = scored.filter((s) => classifyDomain(s.hit.url) !== "junk");
+  const use = kept.length ? kept : scored;
+  use.sort((a, b) => b.score - a.score);
+  return use.slice(0, 20).map((s) => s.hit);
 }
 
 // 检索资料喂给「资料」步的块（带编号，供正文 [n] 引用）

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseHits, queriesFor, referencesMd, searchEnabled, sourcesBlock } from "./search";
+import { classifyDomain, parseHits, queriesFor, referencesMd, scoreHit, searchEnabled, sourcesBlock } from "./search";
 import { defaultConfig } from "../config/store";
 
 describe("联网检索辅助（纯函数）", () => {
@@ -23,6 +23,29 @@ describe("联网检索辅助（纯函数）", () => {
     expect(hb).toEqual([{ title: "标题甲", url: "https://a.com", content: "长摘要" }]);
     const tav = { results: [{ title: "T", url: "https://b.com", content: "C" }] };
     expect(parseHits("tavily", tav)).toEqual([{ title: "T", url: "https://b.com", content: "C" }]);
+  });
+
+  it("classifyDomain：文库/UGC=junk，官方/交易所/权威媒体=high，自媒体号=low，其余=mid", () => {
+    expect(classifyDomain("https://www.docin.com/p-123.html")).toBe("junk");
+    expect(classifyDomain("https://max.book118.com/html/x.shtm")).toBe("junk");
+    expect(classifyDomain("http://www.cninfo.com.cn/new/x")).toBe("high");
+    expect(classifyDomain("https://www.gov.cn/zhengce/x")).toBe("high");
+    expect(classifyDomain("https://www.caixin.com/2026/x.html")).toBe("high");
+    expect(classifyDomain("https://caifuhao.eastmoney.com/news/1")).toBe("low");
+    expect(classifyDomain("https://finance.eastmoney.com/a/1.html")).toBe("mid");
+  });
+
+  it("scoreHit：有明确原始机构归因的低档域名，反超无归因无日期的高档域名（责任主体 > 域名）", () => {
+    const attributedLow = { title: "存储芯片国内市场规模", url: "https://caifuhao.eastmoney.com/news/1", content: "据智研咨询发布的2025年报告，国内市场规模超过6500亿元。" };
+    const bareHigh = { title: "某栏目页", url: "https://www.gov.cn/x", content: "一句没有数据、没有日期、没有归因的话。" };
+    expect(scoreHit(attributedLow, "存储 规模")).toBeGreaterThan(scoreHit(bareHigh, "存储 规模"));
+  });
+
+  it("scoreHit：文库垃圾源分数为负、明显垫底", () => {
+    const junk = { title: "存储行业分析报告.pdf", url: "https://www.docin.com/p-1.html", content: "存储 规模 6500亿" };
+    const high = { title: "存储行业年报", url: "http://www.cninfo.com.cn/x", content: "据公告显示2025年营收618亿元" };
+    expect(scoreHit(junk, "存储 规模")).toBeLessThan(0);
+    expect(scoreHit(high, "存储 规模")).toBeGreaterThan(scoreHit(junk, "存储 规模"));
   });
 
   it("sourcesBlock 带编号与链接；referencesMd 生成参考文献列表", () => {
