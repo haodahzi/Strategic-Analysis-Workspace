@@ -4,7 +4,7 @@ import { visionEnabled, visionReadPdf } from "../llm/visionExtract";
 import { loadConfig } from "../config/store";
 import { Attachment } from "../llm/pipelineStore";
 import { effectiveSources } from "../sources/registry";
-import { listenGrab, listenReports, openExternal, openSource } from "../sources/browser";
+import { listenDownload, listenGrab, listenReports, openExternal, openSource, readDownload } from "../sources/browser";
 import { buildReportClipping } from "../sources/scrape";
 
 // 本单资料录入（#5）：手写备注 + 上传多份 PDF / 文本。附件后台提取正文喂模型，前台只显示文件名与字数。
@@ -20,8 +20,9 @@ export default function MaterialsInput(
   // 抓取回传 → 加入本单资料，带来源链接。用 ref 始终调最新 onAdd。
   const addRef = useRef(onAdd);
   addRef.current = onAdd;
+  const importRef = useRef<(f: File) => Promise<void>>(async () => {});
   useEffect(() => {
-    let unG = () => {}, unR = () => {};
+    let unG = () => {}, unR = () => {}, unD = () => {};
     // ① 单页正文
     void listenGrab((it) => { addRef.current({ name: it.name, text: it.text, url: it.url }); setBusy(`已抓取「${it.name}」加入本单`); }).then((f) => { unG = f; });
     // ② 研报清单（站内自动抓取）：原始候选 → scrape.ts 打分成清单
@@ -30,7 +31,16 @@ export default function MaterialsInput(
       if (clip) { addRef.current({ name: clip.name, text: clip.text, url: clip.url }); setBusy(`已抓取${clip.name}`); }
       else setBusy("本页没识别到研报条目，可改用「下载研报→上传」");
     }).then((f) => { unR = f; });
-    return () => { unG(); unR(); };
+    // ③ 站内点「下载」研报 → 读回文件 → pdfjs 抽取自动入库（省去手动上传）
+    void listenDownload(async (d) => {
+      try {
+        setBusy(`从下载导入「${d.name}」…`);
+        const buf = await readDownload(d.path);
+        const file = new File([buf], d.name, { type: /\.pdf$/i.test(d.name) ? "application/pdf" : "" });
+        await importRef.current(file);
+      } catch (e) { setBusy(`「${d.name}」导入失败：${(e as Error).message.slice(0, 90)}`); }
+    }).then((f) => { unD = f; });
+    return () => { unG(); unR(); unD(); };
   }, []);
 
   const openSrc = async (id: string, url: string, name: string) => {
@@ -44,35 +54,39 @@ export default function MaterialsInput(
     if (msg) setBusy(msg); else setBusy(`已在系统浏览器打开「${name}」：登录后下载研报回工作台上传`);
   };
 
+  // 单个文件入库：PDF 走文本提取（扫描件 / 复杂表格转视觉精读），其余按文本读入。手动上传与「下载自动入库」共用。
+  const importFile = async (f: File) => {
+    const cfg = loadConfig();
+    if (!(/\.pdf$/i.test(f.name) || f.type === "application/pdf")) {
+      try { onAdd({ name: f.name, text: await f.text() }); setBusy(`已导入「${f.name}」`); } catch { setBusy(`${f.name} 读取失败`); }
+      return;
+    }
+    setBusy(`解析 ${f.name}…`);
+    try {
+      const pages = await extractPdfPages(f, (p, t) => setBusy(`解析 ${f.name} · ${p}/${t} 页…`));
+      const textLen = pages.join("").replace(/\s/g, "").length;
+      const scanned = textLen < Math.max(40, pages.length * 8);   // 每页平均不到约 8 个非空白字 → 判扫描件
+      if (visionForce || scanned) {
+        if (!visionEnabled(cfg)) {
+          setBusy(`${f.name}：${scanned ? "像是扫描件 / 图片版" : "已勾视觉精读"}，需先到「设置 → 文档视觉模型」配一个带视觉的模型`);
+          return;
+        }
+        setBusy(`视觉精读 ${f.name}…（较慢）`);
+        const text = await visionReadPdf(cfg, f, (d, t) => setBusy(`视觉精读 ${f.name} · ${d}/${t} 页…`));
+        if (text.trim()) { onAdd({ name: f.name, text }); setBusy(`已导入「${f.name}」· ${text.length} 字`); }
+        else setBusy(`${f.name}：视觉模型没读出内容`);
+      } else {
+        const text = pages.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+        if (text.trim()) { onAdd({ name: f.name, text }); setBusy(`已导入「${f.name}」· ${text.length} 字`); }
+        else setBusy(`${f.name}：未提取到文本（可勾「视觉精读」用视觉模型再试）`);
+      }
+    } catch (e) { setBusy(`${f.name} 处理失败：${(e as Error).message.slice(0, 90)}`); }
+  };
+  importRef.current = importFile;
+
   const pick = async (files: FileList | null) => {
     if (!files || !files.length) return;
-    const cfg = loadConfig();
-    for (const f of Array.from(files)) {
-      if (!(/\.pdf$/i.test(f.name) || f.type === "application/pdf")) {
-        try { onAdd({ name: f.name, text: await f.text() }); setBusy(""); } catch { setBusy(`${f.name} 读取失败`); }
-        continue;
-      }
-      setBusy(`解析 ${f.name}…`);
-      try {
-        const pages = await extractPdfPages(f, (p, t) => setBusy(`解析 ${f.name} · ${p}/${t} 页…`));
-        const textLen = pages.join("").replace(/\s/g, "").length;
-        const scanned = textLen < Math.max(40, pages.length * 8);   // 每页平均不到约 8 个非空白字 → 判扫描件
-        if (visionForce || scanned) {
-          if (!visionEnabled(cfg)) {
-            setBusy(`${f.name}：${scanned ? "像是扫描件 / 图片版" : "已勾视觉精读"}，需先到「设置 → 文档视觉模型」配一个带视觉的模型`);
-            continue;
-          }
-          setBusy(`视觉精读 ${f.name}…（较慢）`);
-          const text = await visionReadPdf(cfg, f, (d, t) => setBusy(`视觉精读 ${f.name} · ${d}/${t} 页…`));
-          if (text.trim()) { onAdd({ name: f.name, text }); setBusy(""); }
-          else setBusy(`${f.name}：视觉模型没读出内容`);
-        } else {
-          const text = pages.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
-          if (text.trim()) { onAdd({ name: f.name, text }); setBusy(""); }
-          else setBusy(`${f.name}：未提取到文本（可勾「视觉精读」用视觉模型再试）`);
-        }
-      } catch (e) { setBusy(`${f.name} 处理失败：${(e as Error).message.slice(0, 90)}`); }
-    }
+    for (const f of Array.from(files)) await importFile(f);
   };
 
   return (
@@ -91,7 +105,7 @@ export default function MaterialsInput(
                 onClick={() => void openExt(s.url, s.name)}>↗</button>
             </span>
           ))}
-          <span className="mi-src-tip">登录后下载研报回来上传（质量最高），或用页内「抓取本页研报清单 / 正文」；内置打不开点 ↗ 走系统浏览器</span>
+          <span className="mi-src-tip">登录后在站内点「下载」研报，会自动抽取入库（无需手动上传）；或用页内「抓取本页研报清单 / 正文」；内置打不开点 ↗ 走系统浏览器</span>
         </div>
       )}
       <div className="mi-row">

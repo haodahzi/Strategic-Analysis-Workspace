@@ -61,3 +61,25 @@ export async function listenReports(cb: (p: ReportsPayload) => void): Promise<()
     return () => {};
   }
 }
+
+// 订阅「内置浏览器下载完成」（用户在站内点『下载』研报）。回传落盘路径 + 文件名，供前端抽取自动入库。
+export interface DownloadItem { path: string; name: string; }
+export async function listenDownload(cb: (d: DownloadItem) => void): Promise<() => void> {
+  if (!isTauri()) return () => {};
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    const un = await listen<DownloadItem>("source-download", (e) => {
+      const p = e.payload;
+      if (p && typeof p.path === "string" && p.path.trim()) cb(p);
+    });
+    return un;
+  } catch {
+    return () => {};
+  }
+}
+
+// 回读下载文件的字节（受控目录，Rust 侧校验）。返回 ArrayBuffer，交 pdfjs 抽取。
+export async function readDownload(path: string): Promise<ArrayBuffer> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<ArrayBuffer>("read_download", { path });
+}

@@ -92,7 +92,7 @@
         + 'padding:6px 14px;background:#8a1f18;color:#fff;font-size:13px;box-shadow:0 1px 6px rgba(0,0,0,.3);'
         + 'font-family:-apple-system,Segoe UI,Microsoft YaHei,sans-serif';
       var lb = document.createElement('span');
-      lb.textContent = '战略工作台 · 从「' + SRC + '」获取：登录后下载研报回工作台上传（最佳），或抓取本页研报清单 / 正文';
+      lb.textContent = '战略工作台 · 从「' + SRC + '」获取：登录后点站内「下载」研报即自动入库，或抓取本页研报清单 / 正文';
       lb.style.cssText = 'flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
       bar.appendChild(lb);
 

@@ -70,6 +70,27 @@ fn open_external(url: String) -> Result<(), String> {
     open::that(u).map_err(|e| e.to_string())
 }
 
+// 回读刚下载的研报文件（供前端 pdfjs 抽取后自动入库）。仅允许读「下载 / 应用缓存 / 临时」目录内的文件，
+// 杜绝第三方站点经内置浏览器越权读取任意本地文件。返回原始字节（前端得到 ArrayBuffer）。
+#[tauri::command]
+fn read_download(app: tauri::AppHandle, path: String) -> Result<tauri::ipc::Response, String> {
+    let canon = std::fs::canonicalize(std::path::PathBuf::from(&path)).map_err(|e| e.to_string())?;
+    let roots = [
+        app.path().download_dir().ok(),
+        app.path().app_cache_dir().ok(),
+        std::env::temp_dir().canonicalize().ok(),
+    ];
+    let ok = roots
+        .iter()
+        .flatten()
+        .any(|r| std::fs::canonicalize(r).map(|rc| canon.starts_with(rc)).unwrap_or(false));
+    if !ok {
+        return Err("只允许读取下载 / 缓存目录内的文件".into());
+    }
+    let bytes = std::fs::read(&canon).map_err(|e| e.to_string())?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 // 打开信息源内置浏览器窗口。label=source-<id>，重复打开则聚焦；建窗强制在主线程执行以免卡死。
 #[tauri::command]
 async fn open_source_browser(app: tauri::AppHandle, url: String, label: String, title: String, name: String) -> Result<(), String> {
@@ -82,12 +103,27 @@ async fn open_source_browser(app: tauri::AppHandle, url: String, label: String, 
     let app2 = app.clone();
     let (tx, rx) = std::sync::mpsc::channel();
     app.run_on_main_thread(move || {
+        let dl_app = app2.clone();
         let res = WebviewWindowBuilder::new(&app2, label, WebviewUrl::External(parsed))
             .title(title)
             .inner_size(1200.0, 840.0)
             .center()
             .initialization_script(&script)
-            .on_download(|_w, _e| true) // 放行站内研报下载（WebView 默认保存到「下载」）
+            // 放行站内研报下载；下载完成后把落盘路径广播给主窗口，前端 pdfjs 抽取后自动入库。
+            .on_download(move |_w, event| {
+                if let tauri::webview::DownloadEvent::Finished { path, success, .. } = event {
+                    if success {
+                        if let Some(p) = path {
+                            let name = p.file_name().and_then(|s| s.to_str()).map(String::from)
+                                .unwrap_or_else(|| "下载文件".into());
+                            let _ = dl_app.emit("source-download", serde_json::json!({
+                                "path": p.to_string_lossy(), "name": name
+                            }));
+                        }
+                    }
+                }
+                true
+            })
             .build()
             .map(|_| ())
             .map_err(|e| e.to_string());
@@ -101,7 +137,7 @@ async fn open_source_browser(app: tauri::AppHandle, url: String, label: String, 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![open_source_browser, open_external, grab_page, grab_reports, kv_get, kv_set])
+        .invoke_handler(tauri::generate_handler![open_source_browser, open_external, grab_page, grab_reports, read_download, kv_get, kv_set])
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
