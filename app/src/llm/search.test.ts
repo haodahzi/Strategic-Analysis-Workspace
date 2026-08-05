@@ -25,12 +25,13 @@ describe("联网检索辅助（纯函数）", () => {
     expect(parseHits("tavily", tav)).toEqual([{ title: "T", url: "https://b.com", content: "C" }]);
   });
 
-  it("classifyDomain：文库/UGC=junk，官方/交易所/权威媒体=high，自媒体号=low，其余=mid", () => {
+  it("classifyDomain：文库=junk，官方/交易所=t0，免费权威媒体=t1，付费权威=t1paid，自媒体号=low，其余=mid", () => {
     expect(classifyDomain("https://www.docin.com/p-123.html")).toBe("junk");
     expect(classifyDomain("https://max.book118.com/html/x.shtm")).toBe("junk");
-    expect(classifyDomain("http://www.cninfo.com.cn/new/x")).toBe("high");
-    expect(classifyDomain("https://www.gov.cn/zhengce/x")).toBe("high");
-    expect(classifyDomain("https://www.caixin.com/2026/x.html")).toBe("high");
+    expect(classifyDomain("http://www.cninfo.com.cn/new/x")).toBe("t0");
+    expect(classifyDomain("https://www.gov.cn/zhengce/x")).toBe("t0");
+    expect(classifyDomain("https://www.yicai.com/news/x.html")).toBe("t1");
+    expect(classifyDomain("https://www.caixin.com/2026/x.html")).toBe("t1paid");
     expect(classifyDomain("https://caifuhao.eastmoney.com/news/1")).toBe("low");
     expect(classifyDomain("https://finance.eastmoney.com/a/1.html")).toBe("mid");
   });
