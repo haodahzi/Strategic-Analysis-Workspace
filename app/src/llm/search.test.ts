@@ -49,13 +49,13 @@ describe("联网检索辅助（纯函数）", () => {
     expect(scoreHit(high, "存储 规模")).toBeGreaterThan(scoreHit(junk, "存储 规模"));
   });
 
-  it("sourcesBlock 带编号与链接；referencesMd 生成参考文献列表", () => {
+  it("sourcesBlock 带编号与链接；referencesMd 生成参考资料列表", () => {
     const hits = [{ title: "甲", url: "https://a.com", content: "内容A" }, { title: "乙", url: "https://b.com", content: "内容B" }];
     const b = sourcesBlock(hits);
     expect(b).toContain("[1] 甲");
     expect(b).toContain("https://a.com");
     const r = referencesMd(hits);
-    expect(r).toContain("## 参考文献");
+    expect(r).toContain("## 参考资料");
     expect(r).toContain("1. [甲](https://a.com)");
     expect(r).toContain("2. [乙](https://b.com)");
   });

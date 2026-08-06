@@ -144,7 +144,7 @@ export function sourcesBlock(hits: SearchHit[]): string {
     hits.map((h, i) => `[${i + 1}] ${h.title}\n${h.url}\n${h.content}`).join("\n\n");
 }
 
-// 文末参考文献
+// 文末参考资料
 export function referencesMd(hits: SearchHit[]): string {
-  return "## 参考文献\n\n" + hits.map((h, i) => `${i + 1}. [${h.title || h.url}](${h.url})`).join("\n");
+  return "## 参考资料\n\n" + hits.map((h, i) => `${i + 1}. [${h.title || h.url}](${h.url})`).join("\n");
 }

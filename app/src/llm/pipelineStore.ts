@@ -196,8 +196,8 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
     ...getRun(id).attachments.map((a) => (a.url ? `[${a.name}](${a.url})（上传 / 抓取）` : `${a.name}（上传材料）`)),
     ...getRun(id).sources.map((h) => `[${h.title || h.url}](${h.url})`),
   ];
-  if (md.trim() && refs.length && !md.includes("参考文献")) {
-    md += "\n\n## 参考文献\n\n" + refs.map((r, i) => `${i + 1}. ${r}`).join("\n");
+  if (md.trim() && refs.length && !/(^|\n)#{1,6}\s*参考(资料|文献)/.test(md)) {
+    md += "\n\n## 参考资料\n\n" + refs.map((r, i) => `${i + 1}. ${r}`).join("\n");
   }
   patch(id, { realReport: md, done: true, running: false });
   // #8：定稿完成即联动进报告库（同一单同类型自动更新，不产生重复）
