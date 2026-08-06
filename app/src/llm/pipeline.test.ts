@@ -39,6 +39,17 @@ describe("多智能体报告流水线", () => {
     expect(req.messages[0].content).toContain("drivers");
   });
 
+  it("buildStageRequest：起草 / 定稿步注入框架全文 + 结构纪律（严格按章节顺序、不漏节）", () => {
+    const ctx = { input: { industry: "存储芯片", ourRole: "", focus: "行业深度分析" }, materials: "", outputs: { plan: "骨架", research: "研判", draft: "初稿", red: "审查" } };
+    for (const id of ["draft", "final"]) {
+      const c = buildStageRequest(REPORT_PIPELINE.find((s) => s.id === id)!, ctx, "m1").messages[0].content;
+      expect(c).toContain("必须遵循的内置框架");
+      expect(c).toContain("商业模式与盈利公式");   // 框架全文注入 → 含这个易漏子项
+      expect(c).toContain("结构纪律");
+      expect(c).toContain("不许重排");
+    }
+  });
+
   it("buildStageRequest：定稿步吃到初稿与红队意见", () => {
     const ctx = {
       input: { industry: "光伏", ourRole: "牵头整合", focus: "项目可行性" },

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildQueryGenRequest, classifyDomain, freshnessScore, latestYear, parseHits, parseQueries,
+  buildQueryGenRequest, classifyDomain, coreTitle, freshnessScore, latestYear, parseHits, parseQueries,
   queriesFor, referencesMd, scoreHit, searchEnabled, searchRequest, sourcesBlock,
 } from "./search";
 import { defaultConfig } from "../config/store";
@@ -129,6 +129,24 @@ describe("B4 新鲜度分档（根治 2021 老数据与 2026 同分）", () => {
     const stale = { title: "市场规模", url: "https://www.yicai.com/b", content: "据某研究院2020年报告 规模超6500亿元" };
     expect(scoreHit(fresh, "市场 规模", { now, timeRange: "threeYears" }))
       .toBeGreaterThan(scoreHit(stale, "市场 规模", { now, timeRange: "threeYears" }));
+  });
+});
+
+describe("参考资料去重（coreTitle 剥站点尾巴）", () => {
+  it("同一标题被不同站点转载（只差 _栏目 / - 站点）→ 归一为同一核心标题", () => {
+    const a = "【存储芯片】行业市场规模:2024年市场规模将达1671亿美元 DRAM占比56.8%_行业研究报告 - 前瞻网";
+    const b = "【存储芯片】行业市场规模:2024年市场规模将达1671亿美元 DRAM占比56.8%_经济学人 - 手机前瞻网";
+    const c = "【存储芯片】行业市场规模:2024年市场规模将达1671亿美元 DRAM占比56.8%_股票频道_证券之星";
+    expect(coreTitle(a)).toBe(coreTitle(b));
+    expect(coreTitle(b)).toBe(coreTitle(c));
+  });
+  it("全 / 半角括号与结尾「- 站点名」归一", () => {
+    expect(coreTitle("2024年全球存储芯片市场规模及结构预测分析（图）"))
+      .toBe(coreTitle("2024年全球存储芯片市场规模及结构预测分析(图)-中商情报网"));
+  });
+  it("数字 / 内容不同的标题不被误判为重复", () => {
+    expect(coreTitle("2024年存储芯片市场规模约903.7亿美元_报告大厅"))
+      .not.toBe(coreTitle("2024年存储芯片市场规模约5170亿元_报告大厅"));
   });
 });
 

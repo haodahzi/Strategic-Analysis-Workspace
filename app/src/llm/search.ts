@@ -225,7 +225,18 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
   return out;
 }
 
-// 跑多条查询（并发）→ 去重（URL + 标题）→ 按质量分重排 → 丢弃低于质量线者 → 上限 maxSources。
+// 参考资料去重用「核心标题」：剥掉站点归属尾巴（_栏目_站点 / - 站点）、统一全半角与空格，
+// 让「同一篇报告被不同站点二次转载」（标题只差尾巴）判为重复。纯函数、可单测。
+export function coreTitle(title: string): string {
+  return (title || "")
+    .split(/[_|｜]/)[0]                          // 站点 / 栏目通常在第一个 _ 或 ｜ 之后
+    .replace(/\s*[-–—]\s*[^-–—]{1,20}$/, "")     // 结尾「 - 站点名」也剥掉
+    .replace(/（/g, "(").replace(/）/g, ")")      // 全角括号 → 半角
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
+// 跑多条查询（并发）→ 去重（URL + 核心标题）→ 按质量分重排 → 丢弃低于质量线者 → 上限 maxSources。
 // queries：B1 由调用方（模型主路径）传入；缺省则回退硬化模板。均按 maxQueries 收口。
 export async function gatherSources(cfg: AppConfig, input: PipelineInput, queries?: string[]): Promise<SearchHit[]> {
   const budget = queryBudget(cfg);
@@ -243,8 +254,8 @@ export async function gatherSources(cfg: AppConfig, input: PipelineInput, querie
   const scored: { hit: SearchHit; score: number }[] = [];
   for (let qi = 0; qi < qs.length; qi++) {
     for (const h of perQuery[qi]) {
-      const t = h.title.replace(/\s+/g, "").toLowerCase();
-      if (!h.url || seenUrl.has(h.url) || (t && seenTitle.has(t))) continue;   // 同 URL 或同标题只留一条
+      const t = coreTitle(h.title);
+      if (!h.url || seenUrl.has(h.url) || (t && seenTitle.has(t))) continue;   // 同 URL 或同核心标题只留一条
       seenUrl.add(h.url); if (t) seenTitle.add(t);
       scored.push({ hit: h, score: scoreHit(h, qs[qi], { now, timeRange }) });
     }

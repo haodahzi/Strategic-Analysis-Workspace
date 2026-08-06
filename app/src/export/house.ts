@@ -171,14 +171,15 @@ function renderKpi(rows: string[]): string {
 
 // 要点块（★最常用的「拆段」组件）——```what 每行：小标签 | 一句话 | key(可选)；行首 * 或第 3 段含 key/★/重点 → 重点项（金色左边）。
 function renderWhat(rows: string[]): string {
-  const items = rows.map((r) => r.trim()).filter(Boolean).map((r) => {
+  const items = rows.map((r) => r.trim()).filter(Boolean).map((r, i) => {
     let key = /^\*\s+/.test(r);
     const c = r.replace(/^\*\s+/, "").split("|").map((x) => x.trim());
     if (/key|★|重点/.test(c[2] ?? "")) key = true;
     const hasLabel = c.length >= 2;
     const label = hasLabel && c[0] ? `<div class="what-label">${inline(c[0])}</div>` : "";
     const text = hasLabel ? c[1] : c[0];
-    return `<div class="what-item${key ? " key" : ""}">${label}<div class="what-text">${inline(text ?? "")}</div></div>`;
+    const cls = key ? " key" : ` c-${CYCLE_COLORS[i % CYCLE_COLORS.length]}`;   // 重点项金色强调，其余轮转装饰色
+    return `<div class="what-item${cls}">${label}<div class="what-text">${inline(text ?? "")}</div></div>`;
   });
   return `<div class="what-grid">${items.join("")}</div>`;
 }
@@ -231,6 +232,8 @@ function renderChk(rows: string[]): string {
 // 分组要点块（变体A：方形编号色签 01/02…，语义色轮转）——```groups
 //   可选首行「# 行动式小标题」；不带 - 的行 = 组标题，带 - 的行 = 组内要点「标签 | 一句话」。
 const GROUP_COLORS = ["red", "gold", "teal", "blue", "purple"];
+// 装饰性轮转色（章节强调条、要点卡左边框）——不含 red，红色留给风险 / 负面语义，避免误读。
+const CYCLE_COLORS = ["gold", "teal", "blue", "purple"];
 interface GroupBlk { title: string; items: { label: string; note: string }[]; }
 function renderGroups(rows: string[]): string {
   let cap = "";
@@ -273,6 +276,7 @@ export function mdToHouseHtml(md: string): string {
   let para: string[] = [];
   let list: string[] | null = null;
   let quote: string[] | null = null;
+  let chapterIdx = 0;   // ## 章计数：给章节标题轮转强调色
 
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
   // 列表收尾：整段都是「**标签**：一句话」形式（2–8 项）→ 自动排成要点卡片 what-grid（少大段文字的主力）；否则普通列表。
@@ -282,7 +286,7 @@ export function mdToHouseHtml(md: string): string {
     const items = list; list = null;
     const parsed = items.map((t) => LABEL_ITEM.exec(t));
     if (items.length >= 2 && items.length <= 8 && parsed.every(Boolean)) {
-      const cards = parsed.map((m) => `<div class="what-item"><div class="what-label">${inline(m![1].trim())}</div><div class="what-text">${inline(m![2].trim())}</div></div>`).join("");
+      const cards = parsed.map((m, i) => `<div class="what-item c-${CYCLE_COLORS[i % CYCLE_COLORS.length]}"><div class="what-label">${inline(m![1].trim())}</div><div class="what-text">${inline(m![2].trim())}</div></div>`).join("");
       out.push(`<div class="what-grid">${cards}</div>`);
     } else {
       out.push(`<ul class="md-list">${items.map((t) => `<li>${inline(t)}</li>`).join("")}</ul>`);
@@ -345,7 +349,7 @@ export function mdToHouseHtml(md: string): string {
     if (h) {
       flushAll();
       const lvl = h[1].length, title = inline(h[2]);
-      if (lvl <= 2) out.push(`<div class="chapter"><div class="ch-hd"><div class="ch-meta"><div class="ch-title">${title}</div></div></div></div>`);
+      if (lvl <= 2) out.push(`<div class="chapter c-${CYCLE_COLORS[chapterIdx++ % CYCLE_COLORS.length]}"><div class="ch-hd"><div class="ch-meta"><div class="ch-title">${title}</div></div></div></div>`);
       else if (lvl === 3) out.push(`<div class="sec-t">${title}</div>`);
       else out.push(`<div class="sub-tag">${title}</div>`);
       continue;

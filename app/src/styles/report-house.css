@@ -164,6 +164,18 @@ hr{border:none;border-top:1px solid var(--border2);margin:26px 0}
 .what-label{font-family:var(--mono);font-size:10px;letter-spacing:.5px;color:var(--ink2);font-weight:600;margin-bottom:5px}
 .what-text{font-size:13px;color:var(--ink2);line-height:1.6}
 .what-text strong{color:var(--ink)}
+/* 要点卡左边框轮转装饰色（配色更丰富；.key 仍走金色强调） */
+.what-item.c-gold{border-left-color:var(--gold)}
+.what-item.c-teal{border-left-color:var(--teal)}
+.what-item.c-blue{border-left-color:var(--blue)}
+.what-item.c-purple{border-left-color:var(--purple)}
+
+/* ===== 章节强调色轮转（每个 ## 章一个强调色：左竖条 + 同色下边线，配色更丰富）===== */
+.chapter{--accent:var(--gold)}
+.chapter.c-teal{--accent:var(--teal)}
+.chapter.c-blue{--accent:var(--blue)}
+.chapter.c-purple{--accent:var(--purple)}
+.ch-hd{border-bottom-color:var(--accent);border-left:4px solid var(--accent);padding-left:13px}
 
 /* ===== MROW（指标条 · 迷你条形图）===== */
 .mrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border2)}

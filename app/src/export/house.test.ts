@@ -7,11 +7,20 @@ import { buildHouseDoc, mdToHouseHtml } from "./house";
 describe("房子样式渲染（#7/#15）", () => {
   it("标题分级：# / ## → 章（不自动加序号）；### → 小节；#### → 副标签", () => {
     const h = mdToHouseHtml("## 供给与格局\n### 主要玩家\n#### 备注");
-    expect(h).toContain('class="chapter"');
+    expect(h).toContain('class="chapter c-gold"');   // 首章轮转到 gold 强调色
     expect(h).not.toContain('ch-n');   // 不再自动加 01/02 序号（#2a）
     expect(h).toContain('class="ch-title">供给与格局');
     expect(h).toContain('class="sec-t">主要玩家');
     expect(h).toContain('class="sub-tag">备注');
+  });
+
+  it("多个 ## 章轮转强调色：gold → teal → blue → purple → 回到 gold", () => {
+    const h = mdToHouseHtml("## 一\n## 二\n## 三\n## 四\n## 五");
+    expect(h).toContain('class="chapter c-gold"');
+    expect(h).toContain('class="chapter c-teal"');
+    expect(h).toContain('class="chapter c-blue"');
+    expect(h).toContain('class="chapter c-purple"');
+    expect((h.match(/class="chapter c-gold"/g) ?? []).length).toBe(2);   // 第 1、5 章都回到 gold
   });
 
   it("列表渲染为 md-list", () => {
@@ -23,7 +32,8 @@ describe("房子样式渲染（#7/#15）", () => {
   it("「- **标签**：一句」形式的列表自动排成要点卡 what-grid（少大段文字主力）", () => {
     const h = mdToHouseHtml("- **期限**：大卡主流 3+2\n- **押付**：卖方市场押三付一\n- **违约**：低于承诺按 80% 赔付");
     expect(h).toContain('class="what-grid"');
-    expect((h.match(/class="what-item"/g) ?? []).length).toBe(3);
+    expect((h.match(/class="what-item/g) ?? []).length).toBe(3);   // 三张卡（各带轮转色 class）
+    expect(h).toContain('class="what-item c-gold"');               // 首卡 gold
     expect(h).toContain('class="what-label">期限</div>');
     expect(h).toContain('class="what-text">大卡主流 3+2</div>');
     expect(h).not.toContain("md-list");
@@ -150,7 +160,7 @@ describe("房子样式渲染（#7/#15）", () => {
     const h = mdToHouseHtml("```what\n* 关键要点 | 一句话说清 **重点**\n普通要点 | 一句话说清\n```");
     expect(h).toContain('class="what-grid"');
     expect(h).toContain('class="what-item key"');               // * → 重点
-    expect(h).toContain('class="what-item"><div class="what-label">普通要点');
+    expect(h).toContain('class="what-item c-teal"><div class="what-label">普通要点');   // 非重点项走轮转色
     expect(h).toContain('class="what-label">关键要点</div>');
     expect(h).toContain("<strong>重点</strong>");
   });
