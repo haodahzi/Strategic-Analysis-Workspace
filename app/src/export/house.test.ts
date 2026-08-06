@@ -5,22 +5,22 @@ import { dirname, resolve } from "node:path";
 import { buildHouseDoc, mdToHouseHtml } from "./house";
 
 describe("房子样式渲染（#7/#15）", () => {
-  it("标题分级：# / ## → 章（不自动加序号）；### → 小节；#### → 副标签", () => {
+  it("标题分级：# / ## → 章（自动序号 01）；### → 小节（子序号 01.1）；#### → 副标签", () => {
     const h = mdToHouseHtml("## 供给与格局\n### 主要玩家\n#### 备注");
-    expect(h).toContain('class="chapter c-gold"');   // 首章轮转到 gold 强调色
-    expect(h).not.toContain('ch-n');   // 不再自动加 01/02 序号（#2a）
+    expect(h).toContain('class="chapter"');          // 标题素净：不带轮转色
+    expect(h).toContain('class="ch-n">01</div>');    // 恢复章节序号，层次更清
     expect(h).toContain('class="ch-title">供给与格局');
-    expect(h).toContain('class="sec-t">主要玩家');
+    expect(h).toContain('class="sec-n">01.1</span>');   // 小节带子序号
+    expect(h).toContain('主要玩家');
     expect(h).toContain('class="sub-tag">备注');
   });
 
-  it("多个 ## 章轮转强调色：gold → teal → blue → purple → 回到 gold", () => {
-    const h = mdToHouseHtml("## 一\n## 二\n## 三\n## 四\n## 五");
-    expect(h).toContain('class="chapter c-gold"');
-    expect(h).toContain('class="chapter c-teal"');
-    expect(h).toContain('class="chapter c-blue"');
-    expect(h).toContain('class="chapter c-purple"');
-    expect((h.match(/class="chapter c-gold"/g) ?? []).length).toBe(2);   // 第 1、5 章都回到 gold
+  it("多个 ## 章自动递增序号 01/02/03…（标题素净、不上色）", () => {
+    const h = mdToHouseHtml("## 一\n## 二\n## 三");
+    expect(h).toContain('class="ch-n">01</div>');
+    expect(h).toContain('class="ch-n">02</div>');
+    expect(h).toContain('class="ch-n">03</div>');
+    expect(h).not.toContain('class="chapter c-');   // 标题不带轮转色
   });
 
   it("列表渲染为 md-list", () => {

@@ -170,12 +170,9 @@ hr{border:none;border-top:1px solid var(--border2);margin:26px 0}
 .what-item.c-blue{border-left-color:var(--blue)}
 .what-item.c-purple{border-left-color:var(--purple)}
 
-/* ===== 章节强调色轮转（每个 ## 章一个强调色：左竖条 + 同色下边线，配色更丰富）===== */
-.chapter{--accent:var(--gold)}
-.chapter.c-teal{--accent:var(--teal)}
-.chapter.c-blue{--accent:var(--blue)}
-.chapter.c-purple{--accent:var(--purple)}
-.ch-hd{border-bottom-color:var(--accent);border-left:4px solid var(--accent);padding-left:13px}
+/* 章节标题保持素净（灰序号 + 黑标题 + 黑下线，参考样张）——配色只落在正文卡片，不上标题。
+   ### 子序号 0X.1：灰、等宽、克制。 */
+.sec-t .sec-n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink3);margin-right:7px}
 
 /* ===== MROW（指标条 · 迷你条形图）===== */
 .mrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border2)}

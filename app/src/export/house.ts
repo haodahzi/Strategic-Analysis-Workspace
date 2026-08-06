@@ -276,7 +276,8 @@ export function mdToHouseHtml(md: string): string {
   let para: string[] = [];
   let list: string[] | null = null;
   let quote: string[] | null = null;
-  let chapterIdx = 0;   // ## 章计数：给章节标题轮转强调色
+  let chapterIdx = 0;   // ## 章计数：给章节标题轮转强调色 + 自动序号
+  let secIdx = 0;       // ### 小节计数（每章重置）：子序号 0X.1 / 0X.2
 
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
   // 列表收尾：整段都是「**标签**：一句话」形式（2–8 项）→ 自动排成要点卡片 what-grid（少大段文字的主力）；否则普通列表。
@@ -349,9 +350,15 @@ export function mdToHouseHtml(md: string): string {
     if (h) {
       flushAll();
       const lvl = h[1].length, title = inline(h[2]);
-      if (lvl <= 2) out.push(`<div class="chapter c-${CYCLE_COLORS[chapterIdx++ % CYCLE_COLORS.length]}"><div class="ch-hd"><div class="ch-meta"><div class="ch-title">${title}</div></div></div></div>`);
-      else if (lvl === 3) out.push(`<div class="sec-t">${title}</div>`);
-      else out.push(`<div class="sub-tag">${title}</div>`);
+      if (lvl <= 2) {
+        const num = String(chapterIdx + 1).padStart(2, "0");   // 章序号 01 / 02…（标题保持素净：灰序号 + 黑标题 + 黑下线）
+        chapterIdx++; secIdx = 0;
+        out.push(`<div class="chapter"><div class="ch-hd"><div class="ch-n">${num}</div><div class="ch-meta"><div class="ch-title">${title}</div></div></div></div>`);
+      } else if (lvl === 3) {
+        secIdx++;
+        const sn = `${String(Math.max(chapterIdx, 1)).padStart(2, "0")}.${secIdx}`;   // 子序号 0X.1
+        out.push(`<div class="sec-t"><span class="sec-n">${sn}</span>${title}</div>`);
+      } else out.push(`<div class="sub-tag">${title}</div>`);
       continue;
     }
 
