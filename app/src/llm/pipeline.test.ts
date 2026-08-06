@@ -30,6 +30,15 @@ describe("多智能体报告流水线", () => {
     expect(req.messages[0].content).toContain("冷链物流");
   });
 
+  it("buildStageRequest：起草步带「选形器」排版指引（关系→形态、行动式小标题、新组件）", () => {
+    const ctx = { input: { industry: "灵巧手", ourRole: "", focus: "行业深度分析" }, materials: "", outputs: { plan: "骨架", research: "研判" } };
+    const req = buildStageRequest(REPORT_PIPELINE.find((s) => s.id === "draft")!, ctx, "m1");
+    expect(req.messages[0].content).toContain("选形器");
+    expect(req.messages[0].content).toContain("行动式小标题");
+    expect(req.messages[0].content).toContain("groups");
+    expect(req.messages[0].content).toContain("drivers");
+  });
+
   it("buildStageRequest：定稿步吃到初稿与红队意见", () => {
     const ctx = {
       input: { industry: "光伏", ourRole: "牵头整合", focus: "项目可行性" },

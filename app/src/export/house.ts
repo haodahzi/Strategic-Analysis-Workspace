@@ -228,6 +228,45 @@ function renderChk(rows: string[]): string {
   return `<div class="chk">${items.join("")}</div>`;
 }
 
+// 分组要点块（变体A：方形编号色签 01/02…，语义色轮转）——```groups
+//   可选首行「# 行动式小标题」；不带 - 的行 = 组标题，带 - 的行 = 组内要点「标签 | 一句话」。
+const GROUP_COLORS = ["red", "gold", "teal", "blue", "purple"];
+interface GroupBlk { title: string; items: { label: string; note: string }[]; }
+function renderGroups(rows: string[]): string {
+  let cap = "";
+  const blks: GroupBlk[] = [];
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = /^#\s+(.*)$/.exec(line);
+    if (h && !blks.length) { cap = h[1]; continue; }        // 首行行动式小标题
+    if (line.startsWith("-")) {
+      const c = line.replace(/^-+\s*/, "").split("|").map((x) => x.trim());
+      if (blks.length) blks[blks.length - 1].items.push({ label: c[0] ?? "", note: c[1] ?? "" });
+      continue;
+    }
+    blks.push({ title: line.replace(/\s*\|.*$/, "").trim(), items: [] });   // 组标题另起一行
+  }
+  const cards = blks.map((b, i) => {
+    const col = GROUP_COLORS[i % GROUP_COLORS.length];
+    const rrs = b.items.map((it) => `<div class="grp-r">${it.label ? `<b>${inline(it.label)}</b>` : ""}<span>${inline(it.note)}</span></div>`).join("");
+    return `<div class="grp c-${col}"><div class="grp-hd"><span class="grp-n">${String(i + 1).padStart(2, "0")}</span><h4>${inline(b.title)}</h4></div>${rrs}</div>`;
+  }).join("");
+  return `${cap ? `<div class="grp-cap">${inline(cap)}</div>` : ""}<div class="groups">${cards}</div>`;
+}
+
+// 驱动树（方案②三支柱：无连线，结论作横梁压在多根支柱上，最不易糊）——```drivers
+//   首行 = 结论横梁；其后每行 = 一根支柱「名称 | 一句支撑说明」。
+function renderDrivers(rows: string[]): string {
+  const lines = rows.map((r) => r.trim()).filter(Boolean);
+  if (!lines.length) return "";
+  const beam = lines[0].replace(/^#\s+/, "");
+  const pillars = lines.slice(1).map((l) => l.replace(/^-+\s*/, "").split("|").map((x) => x.trim()));
+  const ticks = pillars.map(() => "<span>▲</span>").join("");
+  const cols = pillars.map((c) => `<div class="drv-col"><b>${inline(c[0] ?? "")}</b><small>${inline(c[1] ?? "")}</small></div>`).join("");
+  return `<div class="drv"><div class="drv-beam">${inline(beam)}</div><div class="drv-ticks">${ticks}</div><div class="drv-pillars">${cols}</div></div>`;
+}
+
 export function mdToHouseHtml(md: string): string {
   const lines = md.replace(/\r/g, "").split("\n");
   const out: string[] = [];
@@ -296,6 +335,8 @@ export function mdToHouseHtml(md: string): string {
       else if (lang === "verdict") out.push(renderVerdict(body));
       else if (lang === "mrow" || lang === "bars") out.push(renderMrow(body));
       else if (lang === "chk") out.push(renderChk(body));
+      else if (lang === "groups") out.push(renderGroups(body));
+      else if (lang === "drivers") out.push(renderDrivers(body));
       else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
       continue;
     }

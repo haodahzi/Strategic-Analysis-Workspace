@@ -181,6 +181,43 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(h).toContain('class="chk-r">缺牌照即红线</div>');
   });
 
+  it("```groups 分组要点块（变体A）：编号 01/02、语义色轮转、组内标签+说明、可选行动式小标题", () => {
+    const h = mdToHouseHtml([
+      "```groups",
+      "# 三类风险里经营与财务最该盯",
+      "经营与财务",
+      "- 盈利可持续性 | 累计未弥补亏损",
+      "- 客户集中度 | 前五大占比偏高",
+      "技术与产业链",
+      "- 技术迭代 | 能否追赶先进制程",
+      "```",
+    ].join("\n"));
+    expect(h).toContain('class="grp-cap">三类风险里经营与财务最该盯</div>');
+    expect(h).toContain('class="groups"');
+    expect(h).toContain('class="grp c-red"');                  // 第 1 组 red
+    expect(h).toContain('class="grp c-gold"');                 // 第 2 组 gold（轮转）
+    expect(h).toContain('class="grp-n">01</span>');
+    expect(h).toContain('class="grp-n">02</span>');
+    expect(h).toContain("<h4>经营与财务</h4>");
+    expect(h).toContain("<b>盈利可持续性</b><span>累计未弥补亏损</span>");
+  });
+
+  it("```drivers 驱动树三支柱（方案②）：首行结论横梁 + 每根支柱 + 支柱数对应 ▲", () => {
+    const h = mdToHouseHtml([
+      "```drivers",
+      "行业需求扩张 ＝ 三重驱动共同支撑",
+      "场景碎片化 | 商用嵌入酒店/办公/车",
+      "政策导向 | 家电×AI×物联网融合",
+      "人口结构长逻辑 | 老龄化+职场亚健康",
+      "```",
+    ].join("\n"));
+    expect(h).toContain('class="drv-beam">行业需求扩张 ＝ 三重驱动共同支撑</div>');
+    expect(h).toContain('class="drv-pillars"');
+    expect((h.match(/class="drv-col"/g) ?? []).length).toBe(3);
+    expect((h.match(/▲/g) ?? []).length).toBe(3);              // 三根支柱三个 ▲
+    expect(h).toContain("<b>场景碎片化</b><small>商用嵌入酒店/办公/车</small>");
+  });
+
   it("表格合计行：首列 **加粗** → tr-bold；普通行仍是 <tr>", () => {
     const h = mdToHouseHtml("| 项 | 值 |\n| --- | --- |\n| 收入 | 100 |\n| **合计** | 130 |");
     expect(h).toContain('<tr class="tr-bold">');
