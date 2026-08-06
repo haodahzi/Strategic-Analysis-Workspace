@@ -60,3 +60,32 @@ describe("配置持久化 · 数据源", () => {
     expect(loadConfig().dataSources.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe("配置持久化 · 检索（B 升级）", () => {
+  beforeEach(() => { (globalThis as unknown as { localStorage: MemLS }).localStorage = new MemLS(); });
+
+  it("默认检索：条数 10、召回上限 50、时间范围近 3 年", () => {
+    const s = loadConfig().search;
+    expect(s.maxQueries).toBe(10);
+    expect(s.maxSources).toBe(50);
+    expect(s.freshness).toBe("threeYears");
+  });
+
+  it("旧配置（有 search 但无 maxQueries）一次性把时间范围升到近 3 年，其它字段保留", () => {
+    (globalThis as unknown as { localStorage: MemLS }).localStorage.setItem(
+      "dw.config.v1",
+      JSON.stringify({ defaultProvider: "mock", search: { provider: "bocha", apiKey: "k", baseUrl: "b", maxResults: 10, preferDomains: [], freshness: "noLimit" } }),
+    );
+    const s = loadConfig().search;
+    expect(s.freshness).toBe("threeYears");   // 旧默认被迁移
+    expect(s.apiKey).toBe("k");               // 其它字段保留
+  });
+
+  it("新配置（已带 maxQueries）保留用户的时间范围选择（含不限），不再被迁移覆盖", () => {
+    const cfg = loadConfig();
+    saveConfig({ ...cfg, search: { ...cfg.search, maxQueries: 12, freshness: "noLimit" } });
+    const s = loadConfig().search;
+    expect(s.maxQueries).toBe(12);
+    expect(s.freshness).toBe("noLimit");
+  });
+});

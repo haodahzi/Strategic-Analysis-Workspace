@@ -4,13 +4,13 @@ import {
   MockReport, PipelineCtx, PipelineInput, REPORT_PIPELINE, StageResult,
   buildDigestRequest, buildStageRequest, chunkText, mockReport, mockStageOutput,
 } from "./pipeline";
-import { ChatRequest, LLMClient } from "./types";
+import { AppConfig, ChatRequest, LLMClient } from "./types";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
 import { saveReport } from "./reportLib";
 import { markUnread } from "./unread";
-import { SearchHit, gatherSources, searchEnabled, sourcesBlock } from "./search";
+import { SearchHit, buildQueryGenRequest, gatherSources, parseQueries, queriesFor, searchEnabled, sourcesBlock } from "./search";
 import { kvGet, kvSet } from "../data/persist";
 
 export type RunStatus = "待执行" | "进行中" | "完成";
@@ -123,6 +123,22 @@ async function sendComplete(client: LLMClient, req: ChatRequest, maxRounds = 5):
   return full;
 }
 
+// B1：检索词生成——主路径用「规划」模型产出互不重复、覆盖不同角度的检索式；
+// mock / 非真实 provider / 调用失败 / 产出过少（视为异常）时，回退硬化模板。均按 maxQueries 收口。
+async function generateQueries(cfg: AppConfig, input: PipelineInput, fetchImpl: Awaited<ReturnType<typeof getLlmFetch>>): Promise<string[]> {
+  const max = Math.min(15, Math.max(1, Math.round(cfg.search.maxQueries || 10)));
+  const pick = cfg.agents["规划"];
+  const prov = providerById(cfg, pick.provider);
+  if (prov.id !== "mock") {
+    try {
+      const r = await makeClient(prov, fetchImpl).send(buildQueryGenRequest(input, pick.model, max));
+      const qs = parseQueries(r.text, max);
+      if (qs.length >= 3) return qs;   // 太少视为异常 → 兜底
+    } catch { /* 回退模板 */ }
+  }
+  return queriesFor(input).slice(0, max);
+}
+
 // 启动 / 续跑一份深度分析。异步循环活在 store 里，组件卸载也继续。resume=从已完成的步接着跑（#6）。
 async function runPipeline(id: string, input: PipelineInput, resume: boolean): Promise<void> {
   if (getRun(id).running) return;
@@ -152,12 +168,17 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
   for (const s of REPORT_PIPELINE) {
     if (resume && ctx.outputs[s.id] != null) continue;
     patch(id, { status: { ...getRun(id).status, [s.id]: "进行中" } });
-    // 「资料」步前先联网检索（若配了搜索），把带编号与链接的来源并进材料；失败则降级为不联网
+    // 「资料」步前先联网检索（若配了搜索）：先由模型生成检索词（B1），再并发取源、重排收口（B2/B2b/B4），
+    // 把带编号与链接的来源并进材料；失败则降级为不联网。
     if (s.id === "research" && searchEnabled(cfg)) {
       try {
-        const hits = await gatherSources(cfg, input);
+        patch(id, { progress: "生成检索词…" });
+        const queries = await generateQueries(cfg, input, fetchImpl);
+        patch(id, { progress: `联网检索 ${queries.length} 个角度…` });
+        const hits = await gatherSources(cfg, input, queries);
+        patch(id, { progress: "" });
         if (hits.length) { patch(id, { sources: hits }); ctx.materials = [materials, sourcesBlock(hits)].filter(Boolean).join("\n\n"); }
-      } catch { /* 检索失败不阻断 */ }
+      } catch { patch(id, { progress: "" }); /* 检索失败不阻断 */ }
     }
     const pick = cfg.agents[s.role];
     const p2 = providerById(cfg, pick.provider);

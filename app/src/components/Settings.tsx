@@ -121,8 +121,20 @@ export default function Settings() {
               <label className="fld"><span>Base URL</span>
                 <input className="key-input wide" value={cfg.search.baseUrl} onChange={(e) => patchSearch({ baseUrl: e.target.value })} />
               </label>
-              <label className="fld"><span>每条查询取回条数（博查最高 50）</span>
-                <input className="key-input wide" type="number" min={1} max={50} value={cfg.search.maxResults} onChange={(e) => patchSearch({ maxResults: Math.max(1, Math.min(50, Number(e.target.value) || 10)) })} />
+              <label className="fld"><span>检索条数 · 不同角度（7–15，去重后不足不硬凑）</span>
+                <input className="key-input wide" type="number" min={7} max={15} value={cfg.search.maxQueries} onChange={(e) => patchSearch({ maxQueries: Math.max(7, Math.min(15, Number(e.target.value) || 10)) })} />
+              </label>
+            </div>
+            <div className="prov-two">
+              <label className="fld"><span>召回上限 · 重排后最多保留（默认 50，低于质量线者丢弃、不硬填满）</span>
+                <input className="key-input wide" type="number" min={10} max={50} value={cfg.search.maxSources} onChange={(e) => patchSearch({ maxSources: Math.max(10, Math.min(50, Number(e.target.value) || 50)) })} />
+              </label>
+              <label className="fld"><span>时间范围 · 新鲜度（打分软收紧，不硬筛、不误杀年报 / 常青内容）</span>
+                <select className="set-select" value={cfg.search.freshness} onChange={(e) => patchSearch({ freshness: e.target.value })}>
+                  <option value="threeYears">近 3 年（默认）</option>
+                  <option value="oneYear">近 1 年</option>
+                  <option value="noLimit">不限</option>
+                </select>
               </label>
             </div>
           </>

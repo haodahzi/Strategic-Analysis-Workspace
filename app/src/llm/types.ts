@@ -36,9 +36,11 @@ export interface SearchConfig {
   provider: "none" | "tavily" | "bocha";
   apiKey?: string;
   baseUrl: string;         // tavily: https://api.tavily.com/search；bocha: https://api.bocha.cn/v1/web-search
-  maxResults: number;      // 每条查询取回条数
+  maxResults: number;      // 每条查询的候选池大小（内部：越大候选越多、重排后按 maxSources 收口）
+  maxQueries: number;      // B2：每份报告的检索角度数（7–15，上限；去重后不足不硬凑）
+  maxSources: number;      // B2b：召回上限（重排后最多保留几条；低于质量线者丢弃，冷门题材不硬填满）
   preferDomains: string[]; // 优先信息源域名（先在这些站内搜，再搜全网）
-  freshness: string;       // 时间过滤：noLimit / oneYear / oneMonth（博查支持）
+  freshness: string;       // B4：时间范围档（打分用软收紧，非 API 硬筛）：noLimit / oneYear / threeYears
 }
 
 // 数据源配置（内置浏览器登录取数 / 专用 API）——用户自填、可覆盖默认、可新增（企查查等高质量源 Key 都放这）。

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { classifyDomain, parseHits, queriesFor, referencesMd, scoreHit, searchEnabled, sourcesBlock } from "./search";
+import {
+  buildQueryGenRequest, classifyDomain, freshnessScore, latestYear, parseHits, parseQueries,
+  queriesFor, referencesMd, scoreHit, searchEnabled, searchRequest, sourcesBlock,
+} from "./search";
 import { defaultConfig } from "../config/store";
 
 describe("联网检索辅助（纯函数）", () => {
@@ -58,5 +61,96 @@ describe("联网检索辅助（纯函数）", () => {
     expect(r).toContain("## 参考资料");
     expect(r).toContain("1. [甲](https://a.com)");
     expect(r).toContain("2. [乙](https://b.com)");
+  });
+});
+
+describe("B1 检索词生成（模型主路径 + 硬化模板兜底）", () => {
+  it("queriesFor：企业类每条焊入行业词消歧同名公司，多角度", () => {
+    const co = queriesFor({ industry: "机器人", ourRole: "", focus: "企业画像", company: "松延动力" });
+    expect(co.length).toBeGreaterThanOrEqual(6);
+    expect(co.every((q) => q.includes("松延动力") && q.includes("机器人"))).toBe(true);
+  });
+
+  it("buildQueryGenRequest：带主体、上限 N、企业类要求带行业词消歧，system 为检索策略", () => {
+    const req = buildQueryGenRequest({ industry: "机器人", ourRole: "", focus: "企业画像", company: "松延动力" }, "m1", 12);
+    expect(req.model).toBe("m1");
+    expect(req.messages[0].content).toContain("松延动力");
+    expect(req.messages[0].content).toContain("最多 12 条");
+    expect(req.messages[0].content).toContain("机器人");   // 消歧提示
+    expect(req.system).toContain("检索");
+  });
+
+  it("parseQueries：去编号/项目符号/引号/标签、丢整句解释、去重", () => {
+    const raw = [
+      "1. 松延动力 机器人 简介",
+      "- 松延动力 机器人 营收 利润",
+      "「松延动力 机器人 简介」",                         // 去重后与第 1 条重复
+      "检索式：松延动力 机器人 股东",
+      "这是一句解释性的话，不应作为检索式出现在结果里。",   // 整句 → 丢
+      "松延动力 机器人 客户",
+    ].join("\n");
+    const qs = parseQueries(raw, 10);
+    expect(qs).toContain("松延动力 机器人 简介");
+    expect(qs).toContain("松延动力 机器人 股东");         // 标签「检索式：」被剥掉
+    expect(qs.filter((q) => q === "松延动力 机器人 简介").length).toBe(1);   // 去重
+    expect(qs.some((q) => q.includes("解释性"))).toBe(false);                // 整句被丢
+  });
+
+  it("parseQueries：上限截断——超过 N 条只取前 N（不足不补由调用方保证）", () => {
+    const raw = Array.from({ length: 12 }, (_, i) => `词${i} 角度`).join("\n");
+    expect(parseQueries(raw, 8).length).toBe(8);
+  });
+});
+
+describe("B4 新鲜度分档（根治 2021 老数据与 2026 同分）", () => {
+  const now = new Date("2026-08-06");
+
+  it("latestYear：取正文最新年份，无则 null", () => {
+    expect(latestYear("2021年发布，2025年更新")).toBe(2025);
+    expect(latestYear("没有年份")).toBe(null);
+  });
+
+  it("freshnessScore：近1年+2 / 2–3年+1 / 4–5年-1 / 更老·无日期-2", () => {
+    expect(freshnessScore("2025年数据", now, "noLimit")).toBe(2);
+    expect(freshnessScore("2023年数据", now, "noLimit")).toBe(1);
+    expect(freshnessScore("2021年数据", now, "noLimit")).toBe(-1);
+    expect(freshnessScore("2016年数据", now, "noLimit")).toBe(-2);
+    expect(freshnessScore("无日期文本", now, "noLimit")).toBe(-2);
+  });
+
+  it("freshnessScore：时间范围档软收紧——超窗内容再压 1 分（不硬删）", () => {
+    expect(freshnessScore("2021年数据", now, "threeYears")).toBe(-2);   // -1 再 -1
+    expect(freshnessScore("2025年数据", now, "threeYears")).toBe(2);    // 窗内不压
+    expect(freshnessScore("2024年数据", now, "oneYear")).toBeLessThan(freshnessScore("2024年数据", now, "noLimit"));
+  });
+
+  it("scoreHit：同源同归因，新料排在旧料前", () => {
+    const fresh = { title: "市场规模", url: "https://www.yicai.com/a", content: "据某研究院2025年报告 规模超6500亿元" };
+    const stale = { title: "市场规模", url: "https://www.yicai.com/b", content: "据某研究院2020年报告 规模超6500亿元" };
+    expect(scoreHit(fresh, "市场 规模", { now, timeRange: "threeYears" }))
+      .toBeGreaterThan(scoreHit(stale, "市场 规模", { now, timeRange: "threeYears" }));
+  });
+});
+
+describe("检索请求组装（searchRequest）", () => {
+  it("博查：Bearer 头 + 大候选池 count + summary；不向 API 传时间硬筛（一律 noLimit）", () => {
+    const c = defaultConfig();
+    const cfg = { ...c, search: { ...c.search, provider: "bocha" as const, apiKey: "k", baseUrl: "https://api.bocha.cn/v1/web-search", freshness: "oneYear" } };
+    const req = searchRequest(cfg, "存储 规模");
+    expect(req.headers.authorization).toBe("Bearer k");
+    const body = req.body as Record<string, unknown>;
+    expect(body.summary).toBe(true);
+    expect(Number(body.count)).toBeGreaterThanOrEqual(20);
+    expect(body.freshness).toBe("noLimit");   // 设置里选了近1年也不下发给 API（交给打分）
+  });
+
+  it("Tavily：api_key 放 body，带 max_results 与 search_depth", () => {
+    const c = defaultConfig();
+    const cfg = { ...c, search: { ...c.search, provider: "tavily" as const, apiKey: "tvly", baseUrl: "https://api.tavily.com/search" } };
+    const req = searchRequest(cfg, "存储 规模");
+    const body = req.body as Record<string, unknown>;
+    expect(body.api_key).toBe("tvly");
+    expect(Number(body.max_results)).toBeGreaterThanOrEqual(10);
+    expect(body.search_depth).toBe("basic");
   });
 });

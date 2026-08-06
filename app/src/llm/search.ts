@@ -1,6 +1,6 @@
 // 联网检索（用户自配的搜索 API，默认 Tavily）：为报告接地、给真实引用来源。
 // 走 getLlmFetch（Tauri 下用 http 插件绕过 CORS）。未配 Key 时全部降级为「不联网」。
-import { AppConfig, SearchConfig } from "./types";
+import { AppConfig, ChatRequest, HttpSpec, SearchConfig } from "./types";
 import { PipelineInput } from "./pipeline";
 import { getLlmFetch } from "./runtime";
 
@@ -32,33 +32,110 @@ export function parseHits(provider: SearchConfig["provider"], json: unknown): Se
   return results.map((r) => ({ title: String(r.title ?? r.url ?? ""), url: String(r.url ?? ""), content: String(r.content ?? "") })).filter((h) => h.url);
 }
 
-// 按分析类型生成几条检索词（纯函数、可测）
+// —— B1 检索词生成：模型主路径（buildQueryGenRequest + parseQueries）+ 硬化模板兜底（queriesFor）——
+// 定位：主路径由模型按主体产出「互不重复、覆盖不同角度」的检索式；模型不可用 / mock / 失败 / 产出异常时，
+// 回退到「焊入行业限定词」的硬化模板（降低同名实体串台）。二者是同一功能的两条路径，不当两件事做。
+
+// 企业类的主体措辞：把行业词焊进去消歧（松延动力 机器人 …），避免同名公司串台。
+function companySubject(input: PipelineInput): string {
+  const co = input.company || input.industry;
+  const ind = input.industry && input.industry !== co ? input.industry : "";
+  return ind ? `${co} ${ind}` : co;
+}
+
+// 兜底基线（硬化模板）：按类型给 ~8 个不同角度、行业限定已焊入；调用方再按 maxQueries 收口。
 export function queriesFor(input: PipelineInput): string[] {
-  const subj = input.company || input.industry;
   const f = input.focus || "";
-  if (f.includes("企业")) return [`${subj} 公司简介 主营业务`, `${subj} 营收 财务 数据`, `${subj} 融资 股东 团队`, `${subj} 行业地位 竞争对手`];
-  if (f.includes("项目")) return [`${input.industry} 行业现状 规模`, `${input.industry} 政策 监管 准入`, `${input.counterparty || subj} 背景 资质`, `${input.industry} 风险 案例`];
-  return [`${subj} 行业现状 市场规模`, `${subj} 竞争格局 主要企业`, `${subj} 产业链 上中下游`, `${subj} 政策 趋势 前景`];
+  if (f.includes("企业")) {
+    const s = companySubject(input);
+    return [`${s} 公司简介 主营业务`, `${s} 营收 利润 财务数据`, `${s} 实控人 股东 股权`, `${s} 主要客户 订单 集中度`,
+      `${s} 竞争对手 行业地位`, `${s} 诉讼 处罚 合规`, `${s} 技术 研发 产品`, `${s} 年报 公告 官网`];
+  }
+  if (f.includes("项目")) {
+    const ind = input.industry, who = input.counterparty || ind;
+    return [`${ind} 行业准入 政策 门槛`, `${ind} 资质 牌照 合规红线`, `${who} 背景 资质 实力`, `${ind} 投资 成本 回收周期`,
+      `${ind} 风险 违约 案例`, `${ind} 交易结构 合作模式`, `${ind} 市场规模 现状`, `${ind} 龙头 竞争格局`];
+  }
+  const ind = input.industry;
+  return [`${ind} 市场规模 增速`, `${ind} 产业链 上中下游`, `${ind} 竞争格局 集中度`, `${ind} 政策 监管 规划`,
+    `${ind} 技术 路线 趋势`, `${ind} 需求 应用 下游`, `${ind} 龙头企业`, `${ind} 统计公报 协会 白皮书`];
+}
+
+// 主路径：让模型为本主体设计最多 max 条互不重复、覆盖不同角度的检索式（纯函数，返回请求）。
+export function buildQueryGenRequest(input: PipelineInput, model: string, max: number): ChatRequest {
+  const f = input.focus || "";
+  const isCo = f.includes("企业"), isDeal = f.includes("项目");
+  const subj = isCo ? (input.company || input.industry) : input.industry;
+  const kind = isCo ? "公司" : isDeal ? "项目 / 交易" : "行业";
+  const angles = isCo
+    ? "公司简介与主营、营收与财务、实控人与股东、主要客户与订单集中度、竞争对手与行业地位、诉讼与处罚与合规、技术与研发与产品、产能与在建、融资、一手源（年报 / 公告 / 官网）"
+    : isDeal
+      ? "行业准入与政策门槛、资质牌照与合规红线、对方背景与资质、投资成本与回收、风险与违约案例、交易结构与合作模式、市场规模与现状、一手源（部委规定 / 公告）"
+      : "市场规模与增速、产业链上中下游、竞争格局与集中度、政策与监管、技术与路线、需求与下游应用、商业模式、龙头企业、一手源（统计公报 / 协会 / 白皮书）";
+  const dedup = isCo && input.industry && input.industry !== subj
+    ? `每条都带上行业词「${input.industry}」以消歧同名公司。` : "";
+  const user =
+    `研究主体：「${subj}」（${kind}${isCo && input.industry ? "，行业：" + input.industry : ""}）。\n` +
+    `设计最多 ${max} 条中文检索式，供搜索引擎为这份研究取真实资料。要求：\n` +
+    `1) 每条覆盖一个不同角度、互不重复、不要近义改写；可参考这些角度：${angles}。\n` +
+    `2) 每条 2–6 个关键词、空格分隔，不加标点、不加编号、不加解释。\n` +
+    `3) ${dedup}优先能取到一手 / 权威来源的措辞。\n` +
+    `4) 若真正不同的角度不足 ${max} 个，就少给几条——不要为凑数写重复或注水的检索式。\n` +
+    `每行一条，只输出检索式本身。`;
+  return {
+    model,
+    system: "你是检索策略师：为研究主体设计互不重复、覆盖不同角度的中文检索式，每行一条，只输出检索词本身、不加编号或解释。",
+    messages: [{ role: "user", content: user }],
+    maxTokens: 500,
+  };
+}
+
+// 解析模型产出：去编号 / 项目符号 / 引号、丢空行与整句解释、规范化去重、上限 max（不足不补）。
+export function parseQueries(text: string, max: number): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of (text || "").replace(/\r/g, "").split("\n")) {
+    const line = raw.trim()
+      .replace(/^[-*·•]\s*/, "")
+      .replace(/^\d+[.、)]\s*/, "")
+      .replace(/^检索(式|词)\s*\d*\s*[:：]?\s*/, "")
+      .replace(/^[「『"'`]+/, "").replace(/[」』"'`]+$/, "")
+      .replace(/[。！？!?，,、;；]+$/, "")
+      .trim();
+    if (!line || line.length > 40 || /[。！？，；、：]/.test(line)) continue;   // 空 / 整句解释（含中文标点）→ 丢
+    const norm = line.replace(/\s+/g, "").toLowerCase();
+    if (norm.length < 2 || seen.has(norm)) continue;                    // 去重（去空格后比对）
+    seen.add(norm);
+    out.push(line);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+// 组装一条查询的 HTTP 请求（纯函数、可单测）。
+// 关键（B4）：不再向 API 传时间范围硬筛——一律 noLimit 把候选全取回，时效收紧交给下面的打分，
+// 免得 API「一刀切」误杀年报（年初发、覆盖上一年）与常青内容（行业本质 / 产业链 / 商业模式）。
+export function searchRequest(cfg: AppConfig, query: string): HttpSpec {
+  const s = cfg.search;
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (s.provider === "bocha") {
+    // 博查：Bearer 鉴权，summary 取长摘要（利于识别归因）。按「查询次数」计费而非结果数，
+    // count 调大（单次最多 50）→ 更大候选池 + 狠排序换质量，费用不变。
+    headers.authorization = `Bearer ${s.apiKey ?? ""}`;
+    const pool = Math.min(50, Math.max(s.maxResults || 10, 20));
+    return { url: s.baseUrl, headers, body: { query, count: pool, summary: true, freshness: "noLimit" } };
+  }
+  // tavily：api_key 放 body；也过取一个候选池，交给重排。
+  const pool = Math.min(20, Math.max(s.maxResults || 10, 10));
+  return { url: s.baseUrl, headers, body: { api_key: s.apiKey, query, max_results: pool, search_depth: "basic" } };
 }
 
 export async function webSearch(cfg: AppConfig, query: string): Promise<SearchHit[]> {
-  const s = cfg.search;
+  const { url, headers, body } = searchRequest(cfg, query);
   const fetchImpl = await getLlmFetch();
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  let body: string;
-  if (s.provider === "bocha") {
-    // 博查：Bearer 鉴权，summary 取长摘要（利于识别归因），freshness 控时间范围。
-    // 博查按「查询次数」计费而非结果数：count 调大（单次最多 50）→ 更大候选池 + 狠排序换质量，费用不变。
-    headers.authorization = `Bearer ${s.apiKey ?? ""}`;
-    const pool = Math.min(50, Math.max(s.maxResults || 10, 20));
-    body = JSON.stringify({ query, count: pool, summary: true, freshness: s.freshness || "noLimit" });
-  } else {
-    // tavily：api_key 放 body
-    body = JSON.stringify({ api_key: s.apiKey, query, max_results: s.maxResults, search_depth: "basic" });
-  }
-  const res = await fetchImpl(s.baseUrl, { method: "POST", headers, body });
+  const res = await fetchImpl(url, { method: "POST", headers, body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`搜索 ${res.status}`);
-  return parseHits(s.provider, await res.json());
+  return parseHits(cfg.search.provider, await res.json());
 }
 
 // —— 源质量打分（第一层：域名先验 + 摘要级归因信号，不打开页面）——
@@ -95,47 +172,89 @@ export function classifyDomain(url: string): "t0" | "t1" | "t1paid" | "mid" | "l
 const ATTRIB = /引自|援引|来源[:：]|数据来自|公告(显示|称)|(据|根据)[^。！？\n]{0,12}(报告|数据|研究院|咨询|证券|统计|机构|公告|指数|白皮书)|发布的?[^。！？\n]{0,8}(报告|指数|白皮书|数据)/;
 // 权威原始机构：具名的券商/研究机构（付费源靠这里从免费页"捞"结论）+ 通用后缀兜底。
 const AUTH_ORG = /中信证券|中金公司|中金|华泰证券|广发证券|申万宏源|招商证券|国泰海通|银河证券|中信建投|IDC|Mysteel|钢联|卓创|艾瑞|头豹|灼识|沙利文|Gartner|Canalys|Counterpoint|TrendForce|集邦|Omdia|彭博|Bloomberg|财新|[一-龥A-Za-z]{2,12}(研究院|咨询|证券|数据中心|统计局|交易所|工信部|发改委|信通院|人民银行|大学|研究所)/;
-const HAS_DATE = /20\d{2}\s*[-/年.]/;
 const HAS_FIG = /\d[\d,.]*\s*(亿|万|%|％|元|美元|倍|个百分点)/;
 
-// 一条命中的质量分：域名先验 + 归因/数据信号 + 查询词覆盖。分越高越靠前。
-export function scoreHit(hit: SearchHit, query: string): number {
+// —— B4 新鲜度：分档打分，根治「有年份就 +1、2021 与 2026 同分」的老数据混入。——
+// 取正文里最新的年份估算「年龄」：近1年 +2 / 2–3年 +1 / 4–5年 -1 / 更老·无日期 -2。
+// 设置档（时间范围）再做一层「软收紧」：超出所选窗口再 -1（不硬删，年报/常青仍可凭其它信号浮上来）。
+export function latestYear(text: string): number | null {
+  const ys = (text.match(/20\d{2}/g) ?? []).map(Number).filter((y) => y >= 2000 && y <= 2099);
+  return ys.length ? Math.max(...ys) : null;
+}
+export function freshnessScore(text: string, now: Date, timeRange: string): number {
+  const year = latestYear(text);
+  if (year == null) return -2;                                            // 无日期
+  const age = now.getFullYear() - year;
+  let s = age <= 1 ? 2 : age <= 3 ? 1 : age <= 5 ? -1 : -2;               // 近1年 / 2–3年 / 4–5年 / 更老
+  const limit = timeRange === "oneYear" ? 1 : timeRange === "threeYears" ? 3 : Infinity;
+  if (age > limit) s -= 1;                                                // 设置档软收紧
+  return s;
+}
+
+export interface ScoreOpts { now?: Date; timeRange?: string; }
+
+// 一条命中的质量分：域名先验 + 归因/权威机构/数据信号 + 新鲜度分档 + 查询词覆盖。分越高越靠前。
+export function scoreHit(hit: SearchHit, query: string, opts: ScoreOpts = {}): number {
+  const now = opts.now ?? new Date();
+  const timeRange = opts.timeRange ?? "noLimit";
   const text = `${hit.title} ${hit.content}`;
   const cls = classifyDomain(hit.url);
   let s = cls === "t0" ? 4 : cls === "t1" ? 3 : cls === "t1paid" ? 1 : cls === "low" ? -2 : cls === "junk" ? -6 : 0;
-  const attributed = ATTRIB.test(text);
-  const dated = HAS_DATE.test(text);
-  const fig = HAS_FIG.test(text);
-  if (attributed) s += 2;                       // 明确归因 → 低档域名也能提档（责任主体 > 域名）
+  if (ATTRIB.test(text)) s += 2;                // 明确归因 → 低档域名也能提档（责任主体 > 域名）
   if (AUTH_ORG.test(text)) s += 1;              // 命中权威原始机构
-  if (dated) s += 1;
-  if (fig) s += 1;
-  if (!attributed && !dated && !fig) s -= 2;    // 无归因、无日期、无数据 → 降档（哪怕高档域名）
+  if (HAS_FIG.test(text)) s += 1;               // 带单位的数字
+  s += freshnessScore(text, now, timeRange);    // 新鲜度分档（含「无日期 -2」）
   const terms = query.split(/\s+/).filter((w) => w.length >= 2);
   s += Math.min(terms.filter((w) => text.includes(w)).length, 3) * 0.5;   // 轻量相关性
   return s;
 }
 
-// 跑多条查询 → 去重（URL + 标题）→ 按质量分重排 → 砍文库/UGC 垃圾源 → 上限 20 条。单条失败不阻断整体。
-export async function gatherSources(cfg: AppConfig, input: PipelineInput): Promise<SearchHit[]> {
+// B2b 质量线：重排后低于此分的直接丢——冷门题材宁少勿滥，不硬填满 maxSources。
+export const SCORE_FLOOR = 0;
+const CONCURRENCY = 4;   // 有界并发：N 可达 15，顺序跑会明显拖慢「资料」步
+
+export function queryBudget(cfg: AppConfig): number { return Math.min(15, Math.max(1, Math.round(cfg.search.maxQueries || 10))); }
+export function sourceCap(cfg: AppConfig): number { return Math.min(50, Math.max(10, Math.round(cfg.search.maxSources || 50))); }
+
+// 有界并发 map：保持输入顺序，单项失败由 fn 内部兜底（返回空），不 reject 整体。
+async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let i = 0;
+  const worker = async () => { while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+// 跑多条查询（并发）→ 去重（URL + 标题）→ 按质量分重排 → 丢弃低于质量线者 → 上限 maxSources。
+// queries：B1 由调用方（模型主路径）传入；缺省则回退硬化模板。均按 maxQueries 收口。
+export async function gatherSources(cfg: AppConfig, input: PipelineInput, queries?: string[]): Promise<SearchHit[]> {
+  const budget = queryBudget(cfg);
+  const qs = (queries?.length ? queries : queriesFor(input)).slice(0, budget);
+  const now = new Date();
+  const timeRange = cfg.search.freshness || "noLimit";
+
+  // 每条查询并发跑；单条失败返回空、不阻断整体（结果按查询顺序对齐，便于稳定去重与相关性打分）
+  const perQuery = await mapLimit(qs, CONCURRENCY, async (q) => {
+    try { return await webSearch(cfg, q); } catch { return [] as SearchHit[]; }
+  });
+
   const seenUrl = new Set<string>();
   const seenTitle = new Set<string>();
   const scored: { hit: SearchHit; score: number }[] = [];
-  for (const q of queriesFor(input)) {
-    try {
-      for (const h of await webSearch(cfg, q)) {
-        const t = h.title.replace(/\s+/g, "").toLowerCase();
-        if (seenUrl.has(h.url) || (t && seenTitle.has(t))) continue;   // 同 URL 或同标题只留一条
-        seenUrl.add(h.url); if (t) seenTitle.add(t);
-        scored.push({ hit: h, score: scoreHit(h, q) });
-      }
-    } catch { /* 跳过失败的查询 */ }
+  for (let qi = 0; qi < qs.length; qi++) {
+    for (const h of perQuery[qi]) {
+      const t = h.title.replace(/\s+/g, "").toLowerCase();
+      if (!h.url || seenUrl.has(h.url) || (t && seenTitle.has(t))) continue;   // 同 URL 或同标题只留一条
+      seenUrl.add(h.url); if (t) seenTitle.add(t);
+      scored.push({ hit: h, score: scoreHit(h, qs[qi], { now, timeRange }) });
+    }
   }
-  // 砍垃圾源；若砍完为空（冷门题材只有文库）则回退不砍，避免零结果
-  const kept = scored.filter((s) => classifyDomain(s.hit.url) !== "junk");
-  const use = kept.length ? kept : scored;
-  use.sort((a, b) => b.score - a.score);
-  return use.slice(0, 20).map((s) => s.hit);
+  scored.sort((a, b) => b.score - a.score);
+  // 达标线以上者优先；若砍完为空（冷门题材），回退到「非文库」保底，仍不收文库垃圾源
+  const kept = scored.filter((s) => s.score >= SCORE_FLOOR);
+  const nonJunk = scored.filter((s) => classifyDomain(s.hit.url) !== "junk");
+  const use = kept.length ? kept : (nonJunk.length ? nonJunk : scored);
+  return use.slice(0, sourceCap(cfg)).map((s) => s.hit);   // 上限是天花板、不是保底
 }
 
 // 检索资料喂给「资料」步的块（带编号，供正文 [n] 引用）

@@ -1,4 +1,4 @@
-import { AGENT_ROLES, AgentRole, AppConfig, DataSourceCfg, ModelPick, ProviderConfig, ProviderId } from "../llm/types";
+import { AGENT_ROLES, AgentRole, AppConfig, DataSourceCfg, ModelPick, ProviderConfig, ProviderId, SearchConfig } from "../llm/types";
 import { DEFAULT_PROVIDERS } from "../llm/providers";
 import { DATA_SOURCES } from "../sources/registry";
 
@@ -16,7 +16,7 @@ export function defaultConfig(): AppConfig {
   for (const a of AGENT_ROLES) agents[a] = { ...MOCK };
   return {
     providers, defaultProvider: "mock", step0: { ...MOCK }, agents,
-    search: { provider: "none", baseUrl: "https://api.tavily.com/search", maxResults: 10, preferDomains: [], freshness: "noLimit" },
+    search: { provider: "none", baseUrl: "https://api.tavily.com/search", maxResults: 10, maxQueries: 10, maxSources: 50, preferDomains: [], freshness: "threeYears" },
     vision: { ...MOCK },
     dataSources: defaultDataSources(),
   };
@@ -41,7 +41,7 @@ export function loadConfig(): AppConfig {
       defaultProvider: saved.defaultProvider ?? base.defaultProvider,
       step0: saved.step0 ?? base.step0,                    // 旧结构（routing）缺这些字段 → 回落默认
       agents: { ...base.agents, ...(saved.agents ?? {}) },
-      search: { ...base.search, ...(saved.search ?? {}) },
+      search: migrateSearch(base.search, saved.search),
       vision: saved.vision ?? base.vision,
       dataSources: mergeDataSources(saved.dataSources),
     };
@@ -51,6 +51,15 @@ export function loadConfig(): AppConfig {
   } catch {
     return defaultConfig();
   }
+}
+
+// 合并检索配置并做一次性迁移：本次新增 maxQueries/maxSources/时间范围 UI 之前的旧配置里，
+// freshness 从未可设、恒为旧默认；识别「无 maxQueries 字段」的旧配置，把 freshness 升到新默认（近3年）。
+// 存过一次新配置后带 maxQueries，此后用户的时间范围选择（含「不限」）原样保留、不再被覆盖。
+function migrateSearch(base: SearchConfig, saved?: Partial<SearchConfig>): SearchConfig {
+  const merged: SearchConfig = { ...base, ...(saved ?? {}) };
+  if (saved && saved.maxQueries == null) merged.freshness = base.freshness;
+  return merged;
 }
 
 // 合并数据源配置：保留用户已存的（含 Key / 自定义源），并补齐尚未出现过的内置源，顺序内置在前。
