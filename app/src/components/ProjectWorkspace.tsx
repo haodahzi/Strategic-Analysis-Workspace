@@ -2,11 +2,9 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { Analysis, QItem, Stage } from "../types";
 import PhaseRail from "./PhaseRail";
 import ReportProgress from "./ReportProgress";
-import QuestionList from "./QuestionList";
 import NegotiationDesk from "./NegotiationDesk";
 import ProjectReport from "./ProjectReport";
 import MaterialsInput from "./MaterialsInput";
-import { generateChecklist } from "../llm/checklist";
 import { addAttachment, getRun, removeAttachment, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
 
 const STAGE_CLASS: Record<Stage, string> = { 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
@@ -23,11 +21,9 @@ function seedQuestions(a: Analysis): QItem[] {
 export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Analysis; onUpdate: (a: Analysis) => void }) {
   const isDeal = (analysis.focus ?? "").includes("项目");
   const isCompany = (analysis.focus ?? "").includes("企业");
-  // 洽谈清单只对项目分析有意义（#11）；两轴总览已删（#4）
+  // 洽谈清单收归到「洽谈中」一处（NegotiationDesk），调研前不再单开「洽谈清单」tab。
   const PHASE_TABS: Record<Stage, { key: string; label: string }[]> = {
-    调研前: isDeal
-      ? [{ key: "deep", label: "深度分析" }, { key: "questions", label: "洽谈清单" }]
-      : [{ key: "deep", label: "深度分析" }],
+    调研前: [{ key: "deep", label: "深度分析" }],
     洽谈中: [{ key: "desk", label: "对照问题 · 记录 · 导入" }],
     洽谈后: [{ key: "report", label: "项目报告 · 定调" }],
   };
@@ -38,8 +34,6 @@ export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Ana
   });
   const [questions, setQuestions] = useState<QItem[]>(() => seedQuestions(analysis));
   const [notes, setNotes] = useState("");
-  const [genLoading, setGenLoading] = useState(false);
-  const [genErr, setGenErr] = useState("");
 
   // #2 可编辑分析：订阅 run 拿本单资料（materials/attachments），编辑基础信息 + 资料后可仅保存或重跑
   const run = useSyncExternalStore(
@@ -76,24 +70,6 @@ export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Ana
 
   const pickPhase = (s: Stage) => { setPhase(s); setTab(PHASE_TABS[s][0].key); };
   const tabs = PHASE_TABS[phase];
-
-  const genChecklist = async () => {
-    setGenLoading(true); setGenErr("");
-    try {
-      const input = {
-        industry: analysis.industry, ourRole: analysis.ourRole, focus: analysis.focus ?? "行业深度分析",
-        company: analysis.company, counterparty: analysis.counterparty,
-      };
-      const items = await generateChecklist(input, getRun(analysis.id).realReport ?? "");
-      const now = Date.now().toString(36);
-      const add: QItem[] = items.map((it, i) => ({ id: `q-gen-${now}-${i}`, text: it.text, intent: it.intent, dealBreaker: it.dealBreaker }));
-      setQuestions((cur) => [...cur, ...add]);
-    } catch (e) {
-      setGenErr((e as Error).message.slice(0, 140));
-    } finally {
-      setGenLoading(false);
-    }
-  };
 
   return (
     <div className="pw">
@@ -157,13 +133,7 @@ export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Ana
 
       <div className="pw-body">
         {phase === "调研前" && tab === "deep" && (
-          <ReportProgress analysis={analysis} onBack={isDeal ? () => setTab("questions") : undefined} />
-        )}
-        {phase === "调研前" && tab === "questions" && (
-          <div className="dash">
-            <QuestionList items={questions} onChange={setQuestions} mode="编辑" onGenerate={() => void genChecklist()} generating={genLoading} />
-            {genErr && <div className="set-hint" style={{ color: "var(--danger,#c0392b)", marginTop: 8 }}>生成失败：{genErr}（可先到设置为「起草」配置真实模型，或手动加条目）</div>}
-          </div>
+          <ReportProgress analysis={analysis} />
         )}
         {phase === "洽谈中" && tab === "desk" && (
           <div className="dash">

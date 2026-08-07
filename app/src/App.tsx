@@ -120,7 +120,8 @@ export default function App() {
               ? <div className="dash"><div className="set-hint">还没有在办分析，点左侧「✚ 新建分析」开始。</div></div>
               : sampleOn
                 ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
-                : <ProjectWorkspace analysis={project} onUpdate={updateAnalysis} />
+                // key={project.id}：换项目即重挂载，避免洽谈清单 / 记录 / phase 等本地状态串到别的项目
+                : <ProjectWorkspace key={project.id} analysis={project} onUpdate={updateAnalysis} />
           )}
           {items !== null && view === "reports" && <ReportLibrary />}
           {items !== null && view === "settings" && <Settings />}

@@ -86,11 +86,24 @@ export function makeClient(cfg: ProviderConfig, fetchImpl: typeof fetch = fetch)
   return {
     async send(req: ChatRequest): Promise<LLMResult> {
       const spec = buildHttp(cfg, req);
-      const res = await fetchImpl(spec.url, {
-        method: "POST",
-        headers: spec.headers,
-        body: JSON.stringify(spec.body),
-      });
+      // 请求超时保护：某些模型 / 网络下连接会挂死，await 永不返回 → 流水线该步一直「进行中」卡住不动。
+      // 150s 无响应即中止，转成可重试的报错（用户可点「继续」从该步接着跑）。
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 150000);
+      let res: Response;
+      try {
+        res = await fetchImpl(spec.url, {
+          method: "POST",
+          headers: spec.headers,
+          body: JSON.stringify(spec.body),
+          signal: ctrl.signal,
+        });
+      } catch (e) {
+        if ((e as Error)?.name === "AbortError") throw new Error(`${cfg.label} 请求超时（150s 无响应）——网络或该模型响应过慢，点「继续」重试或换一款模型`);
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
       if (!res.ok) {
         const detail = await res.text().catch(() => "");
         throw new Error(`${cfg.label} ${res.status} ${detail.slice(0, 200)}`);
