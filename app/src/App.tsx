@@ -7,7 +7,7 @@ import Settings from "./components/Settings";
 import NewAnalysis from "./components/NewAnalysis";
 import ProjectWorkspace from "./components/ProjectWorkspace";
 import ReportLibrary from "./components/ReportLibrary";
-import { hydrateRuns, setMaterials, startRun } from "./llm/pipelineStore";
+import { deleteRun, hydrateRuns, setMaterials, startRun } from "./llm/pipelineStore";
 import { clearUnread, getUnread, subscribeUnread } from "./llm/unread";
 
 type View = "dashboard" | "project" | "settings" | "new" | "reports";
@@ -54,6 +54,17 @@ export default function App() {
   // #2：编辑分析基础信息后更新并持久化（useEffect 会把 items 存本机）
   const updateAnalysis = (a: Analysis) => setItems((xs) => (xs ?? []).map((x) => (x.id === a.id ? a : x)));
 
+  // 删除一份在办分析：清列表 + 清生成状态；若删的是当前项，切到下一份或回总览。已存报告库的成品保留。
+  const deleteAnalysis = (id: string) => {
+    const a = list.find((x) => x.id === id);
+    if (!window.confirm(`删除「${a?.name ?? "该分析"}」？此操作不可撤销，该分析的生成内容会一并清除（已存入报告库的成品保留）。`)) return;
+    const rest = list.filter((x) => x.id !== id);
+    setItems(rest);
+    deleteRun(id);
+    clearUnread(id);
+    if (pid === id) { setPid(rest[0]?.id ?? ""); setView(rest.length ? "project" : "dashboard"); }
+  };
+
   const createAnalysis = (a: Analysis, materials: string) => {
     setItems((xs) => [a, ...(xs ?? [])]);
     setPid(a.id);
@@ -98,16 +109,18 @@ export default function App() {
 
           <div className="nav-group">在办分析 · {list.length}</div>
           {list.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={"nav-proj" + (view === "project" && pid === p.id ? " active" : "")}
-              onClick={() => openProject(p.id, false)}
-            >
-              {unread.has(p.id) && <span className="nav-dot" title="已完成 · 未读" />}
-              <span className="nav-proj-name">{p.name}</span>
-              <span className={"st-chip mini " + STAGE_CLASS[p.stage]}>{p.stage}</span>
-            </button>
+            <div key={p.id} className="nav-proj-row">
+              <button
+                type="button"
+                className={"nav-proj" + (view === "project" && pid === p.id ? " active" : "")}
+                onClick={() => openProject(p.id, false)}
+              >
+                {unread.has(p.id) && <span className="nav-dot" title="已完成 · 未读" />}
+                <span className="nav-proj-name">{p.name}</span>
+                <span className={"st-chip mini " + STAGE_CLASS[p.stage]}>{p.stage}</span>
+              </button>
+              <button type="button" className="nav-proj-del" title="删除该分析" onClick={() => deleteAnalysis(p.id)}>×</button>
+            </div>
           ))}
         </aside>
 
@@ -121,7 +134,7 @@ export default function App() {
               : sampleOn
                 ? <IndustryReport project={project.hasIndustryReport ? project : suanli} onBack={() => setSampleOn(false)} />
                 // key={project.id}：换项目即重挂载，避免洽谈清单 / 记录 / phase 等本地状态串到别的项目
-                : <ProjectWorkspace key={project.id} analysis={project} onUpdate={updateAnalysis} />
+                : <ProjectWorkspace key={project.id} analysis={project} onUpdate={updateAnalysis} onDelete={() => deleteAnalysis(project.id)} />
           )}
           {items !== null && view === "reports" && <ReportLibrary />}
           {items !== null && view === "settings" && <Settings />}

@@ -18,7 +18,7 @@ function seedQuestions(a: Analysis): QItem[] {
   }));
 }
 
-export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Analysis; onUpdate: (a: Analysis) => void }) {
+export default function ProjectWorkspace({ analysis, onUpdate, onDelete }: { analysis: Analysis; onUpdate: (a: Analysis) => void; onDelete: () => void }) {
   const isDeal = (analysis.focus ?? "").includes("项目");
   const isCompany = (analysis.focus ?? "").includes("企业");
   // 洽谈清单收归到「洽谈中」一处（NegotiationDesk），调研前不再单开「洽谈清单」tab。
@@ -85,7 +85,12 @@ export default function ProjectWorkspace({ analysis, onUpdate }: { analysis: Ana
             <span className={"st-chip " + STAGE_CLASS[analysis.stage]}>当前：{analysis.stage}</span>
           </div>
         </div>
-        {!editing && <button type="button" className="app-btn ghost dark" onClick={openEdit}>编辑基础信息 / 资料</button>}
+        {!editing && (
+          <div className="pw-head-btns">
+            <button type="button" className="app-btn ghost dark" onClick={openEdit}>编辑基础信息 / 资料</button>
+            <button type="button" className="app-btn ghost pw-del" title="删除该分析" onClick={onDelete}>删除</button>
+          </div>
+        )}
       </div>
 
       {editing && (

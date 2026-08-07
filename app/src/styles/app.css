@@ -35,6 +35,15 @@ body{font-family:var(--sans);background:#e9e5dc;color:var(--ink)}
 .nav-proj:hover{background:rgba(255,255,255,.05)}
 .nav-proj.active{background:rgba(255,255,255,.06);border-left-color:var(--gold);color:#fff}
 .nav-proj-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 在办分析删除：默认隐形，悬停行内才淡出一个 × */
+.nav-proj-row{display:flex;align-items:center}
+.nav-proj-row .nav-proj{flex:1;min-width:0;width:auto}
+.nav-proj-del{flex-shrink:0;background:transparent;border:none;color:#8a8478;cursor:pointer;font-size:16px;line-height:1;padding:4px 7px;border-radius:3px;opacity:0;transition:opacity .12s,color .12s}
+.nav-proj-row:hover .nav-proj-del{opacity:.55}
+.nav-proj-del:hover{opacity:1;color:#d9694f}
+/* 工作区头部按钮组 + 简化的删除按钮 */
+.pw-head-btns{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.pw-del{color:#c0503a}
 .nav-dot{width:7px;height:7px;border-radius:50%;background:#2ecc71;flex-shrink:0;box-shadow:0 0 0 2px rgba(46,204,113,.22)}
 
 .app-main{overflow-y:auto;overflow-x:hidden;min-width:0;background:#e9e5dc;overscroll-behavior:contain}

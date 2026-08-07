@@ -104,6 +104,13 @@ export function removeAttachment(id: string, name: string) {
   patch(id, { attachments: getRun(id).attachments.filter((x) => x.name !== name) });
 }
 
+// 删除整份分析的运行状态（配合「删除在办分析」）：从内存与落盘一并移除。
+export function deleteRun(id: string) {
+  runs.delete(id);
+  listeners.delete(id);
+  persistSoon();
+}
+
 // 手写备注 + 附件正文合并成喂给模型的材料（附件原文只在这里进模型，不在前台展示）
 function effectiveMaterials(s: RunState): string {
   return [s.materials.trim(), ...s.attachments.map((a) => `【附件：${a.name}】\n${a.text}`)].filter(Boolean).join("\n\n");
