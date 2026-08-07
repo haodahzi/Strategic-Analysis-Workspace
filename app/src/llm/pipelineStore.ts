@@ -10,7 +10,7 @@ import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
 import { saveReport } from "./reportLib";
 import { markUnread } from "./unread";
-import { SearchHit, buildQueryGenRequest, gatherSources, parseQueries, queriesFor, searchEnabled, sourcesBlock } from "./search";
+import { SearchHit, buildQueryGenRequest, gatherSources, parseAliases, parseQueries, queriesFor, searchEnabled, sourcesBlock, subjectTerms } from "./search";
 import { kvGet, kvSet } from "../data/persist";
 
 export type RunStatus = "待执行" | "进行中" | "完成";
@@ -125,18 +125,19 @@ async function sendComplete(client: LLMClient, req: ChatRequest, maxRounds = 5):
 
 // B1：检索词生成——主路径用「规划」模型产出互不重复、覆盖不同角度的检索式；
 // mock / 非真实 provider / 调用失败 / 产出过少（视为异常）时，回退硬化模板。均按 maxQueries 收口。
-async function generateQueries(cfg: AppConfig, input: PipelineInput, fetchImpl: Awaited<ReturnType<typeof getLlmFetch>>): Promise<string[]> {
+async function generateQueries(cfg: AppConfig, input: PipelineInput, fetchImpl: Awaited<ReturnType<typeof getLlmFetch>>): Promise<{ queries: string[]; aliases: string[] }> {
   const max = Math.min(15, Math.max(1, Math.round(cfg.search.maxQueries || 10)));
   const pick = cfg.agents["规划"];
   const prov = providerById(cfg, pick.provider);
   if (prov.id !== "mock") {
     try {
       const r = await makeClient(prov, fetchImpl).send(buildQueryGenRequest(input, pick.model, max));
-      const qs = parseQueries(r.text, max);
-      if (qs.length >= 3) return qs;   // 太少视为异常 → 兜底
+      const queries = parseQueries(r.text, max);
+      const aliases = parseAliases(r.text);           // 模型顺手补的别名，供相关性判定
+      if (queries.length >= 3) return { queries, aliases };   // 太少视为异常 → 兜底
     } catch { /* 回退模板 */ }
   }
-  return queriesFor(input).slice(0, max);
+  return { queries: queriesFor(input).slice(0, max), aliases: [] };
 }
 
 // 启动 / 续跑一份深度分析。异步循环活在 store 里，组件卸载也继续。resume=从已完成的步接着跑（#6）。
@@ -173,9 +174,9 @@ async function runPipeline(id: string, input: PipelineInput, resume: boolean): P
     if (s.id === "research" && searchEnabled(cfg)) {
       try {
         patch(id, { progress: "生成检索词…" });
-        const queries = await generateQueries(cfg, input, fetchImpl);
+        const { queries, aliases } = await generateQueries(cfg, input, fetchImpl);
         patch(id, { progress: `联网检索 ${queries.length} 个角度…` });
-        const hits = await gatherSources(cfg, input, queries);
+        const hits = await gatherSources(cfg, input, queries, subjectTerms(input, aliases));
         patch(id, { progress: "" });
         if (hits.length) { patch(id, { sources: hits }); ctx.materials = [materials, sourcesBlock(hits)].filter(Boolean).join("\n\n"); }
       } catch { patch(id, { progress: "" }); /* 检索失败不阻断 */ }

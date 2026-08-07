@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildQueryGenRequest, classifyDomain, coreTitle, freshnessScore, latestYear, parseHits, parseQueries,
-  queriesFor, referencesMd, scoreHit, searchEnabled, searchRequest, sourcesBlock,
+  buildQueryGenRequest, classifyDomain, coreTitle, freshnessScore, latestYear, matchesSubject, parseAliases,
+  parseHits, parseQueries, queriesFor, referencesMd, scoreHit, searchEnabled, searchRequest, sourcesBlock, subjectTerms,
 } from "./search";
 import { defaultConfig } from "../config/store";
 
@@ -129,6 +129,35 @@ describe("B4 新鲜度分档（根治 2021 老数据与 2026 同分）", () => {
     const stale = { title: "市场规模", url: "https://www.yicai.com/b", content: "据某研究院2020年报告 规模超6500亿元" };
     expect(scoreHit(fresh, "市场 规模", { now, timeRange: "threeYears" }))
       .toBeGreaterThan(scoreHit(stale, "市场 规模", { now, timeRange: "threeYears" }));
+  });
+});
+
+describe("P0 相关性门槛（主体名 + 模型补的别名）", () => {
+  it("parseAliases：解析「别名：…」行，逗号 / 顿号分隔；无 / 缺行则空", () => {
+    expect(parseAliases("别名：DeepSeek、深度求索、幻方DeepSeek\n深度求索 简介")).toEqual(["DeepSeek", "深度求索", "幻方DeepSeek"]);
+    expect(parseAliases("别名：无\n算力租赁 规模")).toEqual([]);
+    expect(parseAliases("算力租赁 规模\n算力租赁 政策")).toEqual([]);   // 没有别名行
+  });
+
+  it("subjectTerms：企业=公司名+别名，行业=行业名+别名，去重", () => {
+    expect(subjectTerms({ industry: "AI", ourRole: "", focus: "企业画像", company: "深度求索" }, ["DeepSeek"]))
+      .toEqual(["深度求索", "DeepSeek"]);
+    expect(subjectTerms({ industry: "算力租赁", ourRole: "", focus: "行业深度分析" }, []))
+      .toEqual(["算力租赁"]);
+  });
+
+  it("matchesSubject：命中主体名 / 别名（去空格大小写归一）才算相关，治理「别家公司」噪音", () => {
+    const terms = ["深度求索", "DeepSeek"];
+    expect(matchesSubject({ title: "DeepSeek 紧急声明", url: "u", content: "…" }, terms)).toBe(true);
+    expect(matchesSubject({ title: "深度求索 人才库", url: "u", content: "…" }, terms)).toBe(true);
+    expect(matchesSubject({ title: "浩瀚深度(688292)三季报", url: "u", content: "净利润下降" }, terms)).toBe(false);
+    expect(matchesSubject({ title: "任意", url: "u", content: "x" }, [])).toBe(true);   // 无词表 → 不过滤
+  });
+
+  it("buildQueryGenRequest：要求先给别名行（用户往往说不出别名，交给模型补）", () => {
+    const req = buildQueryGenRequest({ industry: "AI", ourRole: "", focus: "企业画像", company: "深度求索" }, "m1", 10);
+    expect(req.messages[0].content).toContain("别名");
+    expect(req.system).toContain("别名");
   });
 });
 

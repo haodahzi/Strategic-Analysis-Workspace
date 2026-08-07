@@ -76,18 +76,50 @@ export function buildQueryGenRequest(input: PipelineInput, model: string, max: n
     ? `每条都带上行业词「${input.industry}」以消歧同名公司。` : "";
   const user =
     `研究主体：「${subj}」（${kind}${isCo && input.industry ? "，行业：" + input.industry : ""}）。\n` +
-    `设计最多 ${max} 条中文检索式，供搜索引擎为这份研究取真实资料。要求：\n` +
+    `第一行先用「别名：」列出该主体的常见别名 / 简称 / 中英文名 / 曾用名${isCo ? " / 股票代码 / 母公司或核心产品名" : ""}（逗号分隔；确无别名写「别名：无」）——用于判定检索结果是否确实在讲本主体。\n` +
+    `然后设计最多 ${max} 条中文检索式，供搜索引擎为这份研究取真实资料。要求：\n` +
     `1) 每条覆盖一个不同角度、互不重复、不要近义改写；可参考这些角度：${angles}。\n` +
-    `2) 每条 2–6 个关键词、空格分隔，不加标点、不加编号、不加解释。\n` +
+    `2) 每条 2–6 个关键词、空格分隔，不加标点 / 编号 / 解释；可混用主体名与其别名（如中英文名）以覆盖不同来源。\n` +
     `3) ${dedup}优先能取到一手 / 权威来源的措辞。\n` +
     `4) 若真正不同的角度不足 ${max} 个，就少给几条——不要为凑数写重复或注水的检索式。\n` +
-    `每行一条，只输出检索式本身。`;
+    `第一行是别名，其后每行一条检索式、只输出检索式本身。`;
   return {
     model,
-    system: "你是检索策略师：为研究主体设计互不重复、覆盖不同角度的中文检索式，每行一条，只输出检索词本身、不加编号或解释。",
+    system: "你是检索策略师：先给出研究主体的别名，再设计互不重复、覆盖不同角度的中文检索式，每行一条、不加编号或解释。",
     messages: [{ role: "user", content: user }],
     maxTokens: 500,
   };
+}
+
+// 从模型产出里解析「别名：…」行（供相关性判定；用户往往说不出别名，交给模型补）。
+export function parseAliases(text: string): string[] {
+  for (const raw of (text || "").replace(/\r/g, "").split("\n")) {
+    const m = /^\s*(?:别名|别称|简称|alias(?:es)?)\s*[:：]\s*(.+)$/i.exec(raw.trim());
+    if (m) {
+      const body = m[1].trim();
+      if (/^(无|没有|none|n\/?a|-|—)$/i.test(body)) return [];
+      return body.split(/[，,、;；/|]+/).map((x) => x.trim()).filter((x) => x.length >= 2).slice(0, 8);
+    }
+  }
+  return [];
+}
+
+// 相关性判定用的主体词表：主体名 + 模型补的别名（项目再加对方名）。用于砍「通用词命中别家」的噪音。
+export function subjectTerms(input: PipelineInput, aliases: string[] = []): string[] {
+  const f = input.focus || "";
+  const primary = f.includes("企业") ? (input.company || input.industry) : input.industry;
+  const extra = f.includes("项目") && input.counterparty ? [input.counterparty] : [];
+  const seen = new Set<string>();
+  return [primary, ...extra, ...aliases]
+    .map((s) => (s || "").trim())
+    .filter((s) => s.length >= 2 && !seen.has(s.toLowerCase()) && seen.add(s.toLowerCase()));
+}
+
+// 一条命中是否确实讲的是本主体（标题/正文含任一主体词，去空格大小写归一）。
+export function matchesSubject(hit: SearchHit, terms: string[]): boolean {
+  if (!terms.length) return true;
+  const x = `${hit.title} ${hit.content}`.replace(/\s+/g, "").toLowerCase();
+  return terms.some((t) => { const n = t.replace(/\s+/g, "").toLowerCase(); return n.length >= 2 && x.includes(n); });
 }
 
 // 解析模型产出：去编号 / 项目符号 / 引号、丢空行与整句解释、规范化去重、上限 max（不足不补）。
@@ -153,7 +185,7 @@ const LOW_DOMAINS = ["sohu.com", "baijiahao.baidu.com", "toutiao.com", "zaker.co
 // T0 官方监管统计 / 交易所与信披 / 企业一手源（全免费、网页可达）——.gov.cn 覆盖绝大多数官方源。
 const T0_DOMAINS = [".gov.cn", "sse.com.cn", "szse.cn", "bse.cn", "neeq.com.cn", "cninfo.com.cn", "hkexnews.hk", "sec.gov"];
 // T1 免费：财经媒体 / 行业协会 / 智库 / 国际免费快讯（免费、网页可达）。
-const T1_FREE_DOMAINS = [".edu.cn", "yicai.com", "stcn.com", "cs.com.cn", "cnstock.com", "zqrb.cn", "21jingji.com", "eeo.com.cn", "financialnews.com.cn", "nbd.com.cn", "xinhuanet.com", "people.com.cn", "chinadaily.com.cn", "reuters.com", "cass.cn", "cciee.org.cn", "csia.net.cn", "caam.org.cn", "cpcif.org.cn", "isc.org.cn", "csia.org.cn", "ic-ceca.org.cn", "ccsa.org.cn", "semi.org"];
+const T1_FREE_DOMAINS = [".edu.cn", ".ac.cn", "yicai.com", "stcn.com", "cs.com.cn", "cnstock.com", "zqrb.cn", "21jingji.com", "eeo.com.cn", "financialnews.com.cn", "nbd.com.cn", "xinhuanet.com", "people.com.cn", "chinadaily.com.cn", "reuters.com", "cass.cn", "cciee.org.cn", "csia.net.cn", "caam.org.cn", "cpcif.org.cn", "isc.org.cn", "csia.org.cn", "ic-ceca.org.cn", "ccsa.org.cn", "semi.org"];
 // T1 付费：权威但正文付费——摘要还能用，轻加权、不顶格。
 const T1_PAID_DOMAINS = ["caixin.com", "bloomberg.com", "wsj.com", "ft.com"];
 
@@ -212,6 +244,7 @@ export function scoreHit(hit: SearchHit, query: string, opts: ScoreOpts = {}): n
 // B2b 质量线：重排后低于此分的直接丢——冷门题材宁少勿滥，不硬填满 maxSources。
 export const SCORE_FLOOR = 0;
 const CONCURRENCY = 4;   // 有界并发：N 可达 15，顺序跑会明显拖慢「资料」步
+const REL_MIN = 6;       // 命中主体的够这么多，就丢掉跑题的；不够则回退补足，避免冷门 / 别名主体空手
 
 export function queryBudget(cfg: AppConfig): number { return Math.min(15, Math.max(1, Math.round(cfg.search.maxQueries || 10))); }
 export function sourceCap(cfg: AppConfig): number { return Math.min(50, Math.max(10, Math.round(cfg.search.maxSources || 50))); }
@@ -238,7 +271,7 @@ export function coreTitle(title: string): string {
 
 // 跑多条查询（并发）→ 去重（URL + 核心标题）→ 按质量分重排 → 丢弃低于质量线者 → 上限 maxSources。
 // queries：B1 由调用方（模型主路径）传入；缺省则回退硬化模板。均按 maxQueries 收口。
-export async function gatherSources(cfg: AppConfig, input: PipelineInput, queries?: string[]): Promise<SearchHit[]> {
+export async function gatherSources(cfg: AppConfig, input: PipelineInput, queries?: string[], terms?: string[]): Promise<SearchHit[]> {
   const budget = queryBudget(cfg);
   const qs = (queries?.length ? queries : queriesFor(input)).slice(0, budget);
   const now = new Date();
@@ -264,7 +297,15 @@ export async function gatherSources(cfg: AppConfig, input: PipelineInput, querie
   // 达标线以上者优先；若砍完为空（冷门题材），回退到「非文库」保底，仍不收文库垃圾源
   const kept = scored.filter((s) => s.score >= SCORE_FLOOR);
   const nonJunk = scored.filter((s) => classifyDomain(s.hit.url) !== "junk");
-  const use = kept.length ? kept : (nonJunk.length ? nonJunk : scored);
+  const base = kept.length ? kept : (nonJunk.length ? nonJunk : scored);
+  // 相关性门槛：命中主体名 / 别名者优先；够数（≥REL_MIN）就把跑题的丢掉——治理「通用词命中别家公司」的噪音；
+  // 不够则回退把跑题的补回来，避免冷门 / 别名主体空手。
+  const ts = terms ?? [];
+  let use = base;
+  if (ts.length) {
+    const rel = base.filter((s) => matchesSubject(s.hit, ts));
+    use = rel.length >= REL_MIN ? rel : rel.concat(base.filter((s) => !matchesSubject(s.hit, ts)));
+  }
   return use.slice(0, sourceCap(cfg)).map((s) => s.hit);   // 上限是天花板、不是保底
 }
 
