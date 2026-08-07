@@ -10,7 +10,15 @@ function inline(s: string): string {
   t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, txt, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${txt}</a>`);
   t = t.replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>");
   t = t.replace(/`([^`]+?)`/g, "<code>$1</code>");
+  // 数据源角标 [1] / [12] → 上标尾注（小、右上角、不干扰正文）；已转成 <a> 的链接不含裸 [n]，不误伤。
+  t = t.replace(/\[(\d{1,3})\]/g, '<sup class="cite">[$1]</sup>');
   return t;
+}
+
+// 剥掉标题开头泄漏的框架序号（〇 / 一 / 二… + 空格 / 、，或 ①②③）——只留干净的自动序号。
+// 约束：CJK 序号须跟分隔符，避免误伤「三大风险」这类正常标题。
+function stripFrameOrdinal(s: string): string {
+  return s.replace(/^\s*(?:[①-⑳]|[〇零一二三四五六七八九十]{1,3}[、.．\s])\s*/, "").trim() || s.trim();
 }
 
 
@@ -258,6 +266,21 @@ function renderGroups(rows: string[]): string {
   return `${cap ? `<div class="grp-cap">${inline(cap)}</div>` : ""}<div class="groups">${cards}</div>`;
 }
 
+// 盈利公式 / 等式——```formula：每行一个等式（居中、放大、可用 **加粗** 高亮最关键的量），
+//   末尾 `~ 一句点睛` 作为注脚。把公式从段落里拎出来单独展示。
+function renderFormula(rows: string[]): string {
+  const eqs: string[] = [];
+  let cap = "";
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("~")) { cap = line.replace(/^~+\s*/, ""); continue; }
+    eqs.push(`<div class="formula-eq">${inline(line)}</div>`);
+  }
+  if (!eqs.length) return "";
+  return `<div class="formula">${eqs.join("")}${cap ? `<div class="formula-cap">${inline(cap)}</div>` : ""}</div>`;
+}
+
 // 驱动树（方案②三支柱：无连线，结论作横梁压在多根支柱上，最不易糊）——```drivers
 //   首行 = 结论横梁；其后每行 = 一根支柱「名称 | 一句支撑说明」。
 function renderDrivers(rows: string[]): string {
@@ -342,6 +365,7 @@ export function mdToHouseHtml(md: string): string {
       else if (lang === "chk") out.push(renderChk(body));
       else if (lang === "groups") out.push(renderGroups(body));
       else if (lang === "drivers") out.push(renderDrivers(body));
+      else if (lang === "formula") out.push(renderFormula(body));
       else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
       continue;
     }
@@ -349,7 +373,7 @@ export function mdToHouseHtml(md: string): string {
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
     if (h) {
       flushAll();
-      const lvl = h[1].length, title = inline(h[2]);
+      const lvl = h[1].length, title = inline(stripFrameOrdinal(h[2]));
       if (lvl <= 2) {
         const num = String(chapterIdx + 1).padStart(2, "0");   // 章序号 01 / 02…（标题保持素净：灰序号 + 黑标题 + 黑下线）
         chapterIdx++; secIdx = 0;

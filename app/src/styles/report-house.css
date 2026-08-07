@@ -174,6 +174,15 @@ hr{border:none;border-top:1px solid var(--border2);margin:26px 0}
    ### 子序号 0X.1：灰、等宽、克制。 */
 .sec-t .sec-n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink3);margin-right:7px}
 
+/* 数据源角标：上标尾注（小、右上角、灰、不干扰正文） */
+sup.cite{font-family:var(--mono);font-size:.66em;font-weight:600;color:var(--ink3);vertical-align:super;line-height:0;margin-left:1px}
+
+/* 盈利公式 / 等式：从段落拎出、居中放大、上下细线，关键量高亮 */
+.formula{text-align:center;margin:22px 0;padding:18px 6px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.formula-eq{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink);line-height:1.9;letter-spacing:.5px}
+.formula-eq strong{color:var(--red);font-weight:700}
+.formula-cap{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:1px;margin-top:8px}
+
 /* ===== MROW（指标条 · 迷你条形图）===== */
 .mrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border2)}
 .mrow-name{font-size:12px;color:var(--ink);min-width:190px;flex-shrink:0}
@@ -260,7 +269,7 @@ hr{border:none;border-top:1px solid var(--border2);margin:26px 0}
   .sub-tag{break-after:avoid;font-size:8pt}
   p{font-size:10.3pt;margin-bottom:7px;orphans:2;widows:2}
   .md-list li{font-size:10.3pt}
-  .card,.anno,.insight,.quote,.foot,.verdict,.chain-col,.tl-item,.flowrow,.flowdiag,.what-item,.mrow,.chk-row,.biz-block,.v-item,.grp,.drv,.drv-col{break-inside:avoid}
+  .card,.anno,.insight,.quote,.foot,.verdict,.chain-col,.tl-item,.flowrow,.flowdiag,.what-item,.mrow,.chk-row,.biz-block,.v-item,.grp,.drv,.drv-col,.formula{break-inside:avoid}
   .g2,.g3,.g4,.what-grid{gap:9px;margin:9px 0}
   .card{padding:11px 13px}.card-val{font-size:20pt}
   .anno p,.insight p{font-size:9.3pt;line-height:1.5}

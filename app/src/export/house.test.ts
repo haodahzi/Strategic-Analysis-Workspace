@@ -16,11 +16,35 @@ describe("房子样式渲染（#7/#15）", () => {
   });
 
   it("多个 ## 章自动递增序号 01/02/03…（标题素净、不上色）", () => {
-    const h = mdToHouseHtml("## 一\n## 二\n## 三");
+    const h = mdToHouseHtml("## 甲\n## 乙\n## 丙");
     expect(h).toContain('class="ch-n">01</div>');
     expect(h).toContain('class="ch-n">02</div>');
     expect(h).toContain('class="ch-n">03</div>');
     expect(h).not.toContain('class="chapter c-');   // 标题不带轮转色
+  });
+
+  it("标题剥掉泄漏的框架序号（〇 / 一 / ①），但不误伤「三大风险」这类正常标题", () => {
+    const h = mdToHouseHtml("## 一 公司概况：背靠幻方\n### ① 基本信息\n## 三大风险");
+    expect(h).toContain('class="ch-title">公司概况：背靠幻方');   // 「一 」被剥
+    expect(h).not.toContain('一 公司概况');
+    expect(h).toContain('基本信息');
+    expect(h).not.toContain('① 基本信息');                        // 「①」被剥
+    expect(h).toContain('class="ch-title">三大风险');             // 「三大」不被误伤
+  });
+
+  it("数据源角标 [n] 渲染成上标尾注 sup.cite（不再和正文一样大）", () => {
+    const h = mdToHouseHtml("模型比肩 o1[8][9]，成本更低。");
+    expect(h).toContain('<sup class="cite">[8]</sup>');
+    expect(h).toContain('<sup class="cite">[9]</sup>');
+    expect(h).not.toContain("o1[8]");                             // 裸 [8] 已被包成上标
+  });
+
+  it("```formula 盈利公式：居中成行、**加粗**高亮关键量、~ 注脚", () => {
+    const h = mdToHouseHtml("```formula\n利润 ＝（单价 × **利用率**）－ 折旧\n~ 利用率是最致命的变量\n```");
+    expect(h).toContain('class="formula"');
+    expect(h).toContain('class="formula-eq"');
+    expect(h).toContain("<strong>利用率</strong>");
+    expect(h).toContain('class="formula-cap">利用率是最致命的变量</div>');
   });
 
   it("列表渲染为 md-list", () => {
@@ -142,8 +166,8 @@ describe("房子样式渲染（#7/#15）", () => {
     const h = mdToHouseHtml(md);
     expect(h).toContain('class="g2"');                       // 带标题的开栏也渲染成卡片
     expect(h).toContain('class="card-val gold">197亿</div>');
-    expect(h).toContain('class="ch-title">一、行业本质');    // 后续两章各自独立、序号保留
-    expect(h).toContain('class="ch-title">二、需求侧');
+    expect(h).toContain('class="ch-title">行业本质');    // 泄漏的「一、」被剥掉，只留干净标题
+    expect(h).toContain('class="ch-title">需求侧');
     expect(h).not.toContain("md-pre");                       // 绝不串成一个 <pre>
   });
 
