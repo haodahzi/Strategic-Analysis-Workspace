@@ -53,6 +53,13 @@ describe("房子样式渲染（#7/#15）", () => {
     expect((h.match(/<li>/g) ?? []).length).toBe(2);
   });
 
+  it("有序列表 1. 2. 渲染成带编号 <ol>（参考资料 [n] 才对得上）", () => {
+    const h = mdToHouseHtml("1. [甲](https://a.com)\n2. [乙](https://b.com)");
+    expect(h).toContain('<ol class="md-list md-ol">');
+    expect((h.match(/<li>/g) ?? []).length).toBe(2);
+    expect(h).toContain('href="https://a.com"');
+  });
+
   it("「- **标签**：一句」形式的列表自动排成要点卡 what-grid（少大段文字主力）", () => {
     const h = mdToHouseHtml("- **期限**：大卡主流 3+2\n- **押付**：卖方市场押三付一\n- **违约**：低于承诺按 80% 赔付");
     expect(h).toContain('class="what-grid"');

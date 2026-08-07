@@ -298,6 +298,7 @@ export function mdToHouseHtml(md: string): string {
   const out: string[] = [];
   let para: string[] = [];
   let list: string[] | null = null;
+  let listOrdered = false;   // 当前列表是否有序（1. 2. …）→ 渲染成 <ol> 显编号，正文 [n] 才对得上
   let quote: string[] | null = null;
   let chapterIdx = 0;   // ## 章计数：给章节标题轮转强调色 + 自动序号
   let secIdx = 0;       // ### 小节计数（每章重置）：子序号 0X.1 / 0X.2
@@ -307,13 +308,14 @@ export function mdToHouseHtml(md: string): string {
   const LABEL_ITEM = /^\s*\*\*([^*]+?)\*\*\s*[:：]\s*(.+)$/;
   const flushList = () => {
     if (!list) return;
-    const items = list; list = null;
+    const items = list; const ordered = listOrdered; list = null; listOrdered = false;
     const parsed = items.map((t) => LABEL_ITEM.exec(t));
-    if (items.length >= 2 && items.length <= 8 && parsed.every(Boolean)) {
+    if (!ordered && items.length >= 2 && items.length <= 8 && parsed.every(Boolean)) {
       const cards = parsed.map((m, i) => `<div class="what-item c-${CYCLE_COLORS[i % CYCLE_COLORS.length]}"><div class="what-label">${inline(m![1].trim())}</div><div class="what-text">${inline(m![2].trim())}</div></div>`).join("");
       out.push(`<div class="what-grid">${cards}</div>`);
     } else {
-      out.push(`<ul class="md-list">${items.map((t) => `<li>${inline(t)}</li>`).join("")}</ul>`);
+      const tag = ordered ? "ol" : "ul";   // 有序列表用 <ol> 显编号（参考资料 1. 2. → 正文 [n] 可循）
+      out.push(`<${tag} class="md-list${ordered ? " md-ol" : ""}">${items.map((t) => `<li>${inline(t)}</li>`).join("")}</${tag}>`);
     }
   };
   const flushQuote = () => { if (quote) { out.push(renderQuote(quote.join(" "))); quote = null; } };
@@ -389,8 +391,9 @@ export function mdToHouseHtml(md: string): string {
     const bq = /^>\s?(.*)$/.exec(line);
     if (bq) { flushPara(); flushList(); (quote ??= []).push(bq[1]); continue; }
 
-    const li = /^[-*]\s+(.*)$/.exec(line) ?? /^\d+[.、)]\s+(.*)$/.exec(line);
-    if (li) { flushPara(); flushQuote(); (list ??= []).push(li[1]); continue; }
+    const liU = /^[-*]\s+(.*)$/.exec(line);
+    const liO = liU ? null : /^\d+[.、)]\s+(.*)$/.exec(line);
+    if (liU || liO) { flushPara(); flushQuote(); if (!list) { list = []; listOrdered = !!liO; } list.push((liU ?? liO)![1]); continue; }
 
     flushList(); flushQuote(); para.push(line);
   }
