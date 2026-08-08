@@ -69,7 +69,12 @@ export default function ProjectWorkspace({ analysis, onUpdate, onDelete }: { ana
     }
   };
 
-  const pickPhase = (s: Stage) => { setPhase(s); setTab(PHASE_TABS[s][0].key); };
+  // 点主轴任一段＝把本单「状态」推进到该阶段：本地视图切换 + 落盘 analysis.stage，
+  // 让侧栏、总览「阶段分布 / 卡片状态」、工作区头部「当前：」四处同步。
+  const pickPhase = (s: Stage) => {
+    setPhase(s); setTab(PHASE_TABS[s][0].key);
+    if (s !== analysis.stage) onUpdate({ ...analysis, stage: s, updatedAt: new Date().toISOString().slice(0, 10) });
+  };
   const tabs = PHASE_TABS[phase];
 
   return (

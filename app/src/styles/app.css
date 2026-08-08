@@ -62,8 +62,10 @@ body{font-family:var(--sans);background:#e9e5dc;color:var(--ink)}
 .dash-sub{font-size:12px;color:var(--ink3);margin-top:5px}
 .sec-head{font-family:var(--serif);font-size:15px;font-weight:600;margin:30px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 
-.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
 .kpi{background:#fff;border:1px solid var(--border2);padding:16px 18px}
+.kpi-btn{cursor:pointer;text-align:left;font:inherit;color:inherit;transition:border-color .15s,box-shadow .15s}
+.kpi-btn:hover{border-color:var(--gold);box-shadow:0 1px 6px rgba(0,0,0,.06)}
 .kpi-n{font-family:var(--serif);font-size:30px;font-weight:700;line-height:1}
 .kpi-l{font-size:12px;color:var(--ink2);margin-top:6px;font-weight:500}
 .kpi-x{font-size:10px;color:var(--ink3);margin-top:4px;line-height:1.4}

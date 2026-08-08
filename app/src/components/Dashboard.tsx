@@ -48,11 +48,11 @@ export default function Dashboard({ items, onOpen, onOpenReports }: { items: Ana
           </div>
           <div className="kpi-l">阶段分布</div>
         </div>
-        <div className="kpi">
+        <button type="button" className="kpi kpi-btn" onClick={onOpenReports} title="打开报告库">
           <div className="kpi-n">{reports.length}</div>
-          <div className="kpi-l">报告库</div>
+          <div className="kpi-l">报告库 →</div>
           <div className="kpi-x">已排版成品 · 可查看 / 导出 PDF</div>
-        </div>
+        </button>
       </div>
 
       {/* 在办分析（每次分析＝对一个业务项目的评估） */}
@@ -64,7 +64,7 @@ export default function Dashboard({ items, onOpen, onOpenReports }: { items: Ana
               <div>
                 <div className="proj-name">{p.name}</div>
                 <div className="proj-meta">
-                  <span className="role-badge">我方：{p.ourRole}</span>
+                  {p.ourRole && <span className="role-badge">我方：{p.ourRole}</span>}
                   <span className="ind-badge">{p.industry}</span>
                   <span className={"st-chip " + STAGE_CLASS[p.stage]}>{p.stage}</span>
                 </div>
@@ -75,7 +75,6 @@ export default function Dashboard({ items, onOpen, onOpenReports }: { items: Ana
             <StageProgress stage={p.stage} />
 
             <div className="proj-facts">
-              <span>前提假设 <strong>{p.assumptions}</strong></span>
               <span>交付物 <strong>{p.deliverables.length}</strong></span>
             </div>
 
@@ -97,28 +96,6 @@ export default function Dashboard({ items, onOpen, onOpenReports }: { items: Ana
           </div>
         ))}
       </div>
-
-      {/* 报告库（一键排版成品） */}
-      <div className="sec-head">
-        报告库 · 已排版成品
-        {onOpenReports && reports.length > 0 && (
-          <button type="button" className="app-btn ghost" style={{ marginLeft: 12 }} onClick={onOpenReports}>全部 {reports.length} 篇 →</button>
-        )}
-      </div>
-      {reports.length === 0 ? (
-        <div className="set-hint">还没有报告——在某个分析的「深度分析」里生成定稿并点「一键排版」，即会存入报告库。</div>
-      ) : (
-        <div className="rl-list">
-          {reports.slice(0, 6).map((r) => (
-            <div key={r.id} className="rl-item">
-              <button type="button" className="rl-open" onClick={onOpenReports}>
-                <span className="rl-title">{r.title}</span>
-                <span className="rl-meta">{r.focus} · {r.subject}</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
