@@ -68,10 +68,10 @@ export function buildQueryGenRequest(input: PipelineInput, model: string, max: n
   const subj = isCo ? (input.company || input.industry) : input.industry;
   const kind = isCo ? "公司" : isDeal ? "项目 / 交易" : "行业";
   const angles = isCo
-    ? "公司简介与主营、营收与财务、实控人与股东、主要客户与订单集中度、竞争对手与行业地位、诉讼与处罚与合规、技术与研发与产品、产能与在建、融资、一手源（年报 / 公告 / 官网）"
+    ? "公司简介与主营、营收与财务、实控人与股东、主要客户与订单集中度、竞争对手与行业地位、诉讼与处罚与合规、技术与研发与产品、产能与在建、融资、一手源（年报 / 招股书 / 公告 / 券商研报）"
     : isDeal
-      ? "行业准入与政策门槛、资质牌照与合规红线、对方背景与资质、投资成本与回收、风险与违约案例、交易结构与合作模式、市场规模与现状、一手源（部委规定 / 公告）"
-      : "市场规模与增速、产业链上中下游、竞争格局与集中度、政策与监管、技术与路线、需求与下游应用、商业模式、龙头企业、一手源（统计公报 / 协会 / 白皮书）";
+      ? "行业准入与政策门槛、资质牌照与合规红线、对方背景与资质、投资成本与回收、风险与违约案例、交易结构与合作模式、市场规模与现状、一手源（部委规定 / 统计公报 / 券商研报）"
+      : "市场规模与增速、产业链上中下游、竞争格局与集中度、政策与监管、技术与路线、需求与下游应用、商业模式、龙头企业、一手源（统计局 / 信通院 / 券商研报 / 行业协会白皮书）";
   const dedup = isCo && input.industry && input.industry !== subj
     ? `每条都带上行业词「${input.industry}」以消歧同名公司。` : "";
   const user =
@@ -180,12 +180,16 @@ export async function webSearch(cfg: AppConfig, query: string): Promise<SearchHi
 
 // 文库转存 / 内容农场 / 纯 UGC：研报被二次上传、常付费墙，几乎无法引用 → 枪毙（保底：砍完为空则回退）。
 const JUNK_DOMAINS = ["docin.com", "doc88.com", "book118.com", "renrendoc.com", "taodocs.com", "wenku.baidu.com", "doc.mbalib.com", "360doc.com", "xzbu.com", "wenmi.com", "yjbys.com"];
-// 门户 / 自媒体号 / 泛 UGC：质量参差，作兜底但降权（含东财「财富号」——"域名不决定质量"的典型）。
-const LOW_DOMAINS = ["sohu.com", "baijiahao.baidu.com", "toutiao.com", "zaker.com", "k.sina", "blog.", "bbs.", "tieba.baidu.com", "zhihu.com", "csdn.net", "jianshu.com", "163.com/dy", "caifuhao.eastmoney.com"];
+// 门户 / 自媒体号 / 泛 UGC / 卖报告的内容农场：质量参差，作兜底但降权（含东财「财富号」——"域名不决定质量"的典型）。
+const LOW_DOMAINS = ["sohu.com", "baijiahao.baidu.com", "toutiao.com", "zaker.com", "k.sina", "blog.", "bbs.", "tieba.baidu.com", "zhihu.com", "csdn.net", "jianshu.com", "163.com/dy", "caifuhao.eastmoney.com",
+  // 卖行业报告的内容农场 / 聚合站（SEO 页多、原创少，曾大量灌进参考资料）——降权，让一手源与主流媒体浮上来
+  "chinabaogao.com", "chinabgao.com", "chinairn.com"];
 // T0 官方监管统计 / 交易所与信披 / 企业一手源（全免费、网页可达）——.gov.cn 覆盖绝大多数官方源。
 const T0_DOMAINS = [".gov.cn", "sse.com.cn", "szse.cn", "bse.cn", "neeq.com.cn", "cninfo.com.cn", "hkexnews.hk", "sec.gov"];
 // T1 免费：财经媒体 / 行业协会 / 智库 / 国际免费快讯（免费、网页可达）。
-const T1_FREE_DOMAINS = [".edu.cn", ".ac.cn", "yicai.com", "stcn.com", "cs.com.cn", "cnstock.com", "zqrb.cn", "21jingji.com", "eeo.com.cn", "financialnews.com.cn", "nbd.com.cn", "xinhuanet.com", "people.com.cn", "chinadaily.com.cn", "reuters.com", "cass.cn", "cciee.org.cn", "csia.net.cn", "caam.org.cn", "cpcif.org.cn", "isc.org.cn", "csia.org.cn", "ic-ceca.org.cn", "ccsa.org.cn", "semi.org"];
+const T1_FREE_DOMAINS = [".edu.cn", ".ac.cn", "yicai.com", "stcn.com", "cs.com.cn", "cnstock.com", "zqrb.cn", "21jingji.com", "eeo.com.cn", "financialnews.com.cn", "nbd.com.cn", "xinhuanet.com", "people.com.cn", "chinadaily.com.cn", "reuters.com", "cass.cn", "cciee.org.cn", "csia.net.cn", "caam.org.cn", "cpcif.org.cn", "isc.org.cn", "csia.org.cn", "ic-ceca.org.cn", "ccsa.org.cn", "semi.org",
+  // 深度财经 / 科技 / 垂直 / 官方媒体（原创报道优先，作一手 / 权威源候选）
+  "caijing.com.cn", "jjckb.cn", "wallstreetcn.com", "thepaper.cn", "jiemian.com", "36kr.com", "huxiu.com", "tmtpost.com", "chinaventure.com.cn", "cyzone.cn", "semi-insights.com", "esmchina.com", "cnr.cn", "china.com.cn", "youth.cn", "nfnews.com", "bjnews.com.cn", "ithome.com"];
 // T1 付费：权威但正文付费——摘要还能用，轻加权、不顶格。
 const T1_PAID_DOMAINS = ["caixin.com", "bloomberg.com", "wsj.com", "ft.com"];
 

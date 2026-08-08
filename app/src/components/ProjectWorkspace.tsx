@@ -5,7 +5,7 @@ import ReportProgress from "./ReportProgress";
 import NegotiationDesk from "./NegotiationDesk";
 import ProjectReport from "./ProjectReport";
 import MaterialsInput from "./MaterialsInput";
-import { addAttachment, getRun, removeAttachment, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
+import { addAttachment, getRun, removeAttachment, setAnalysisQuestions, setMaterials, startRun, subscribe } from "../llm/pipelineStore";
 
 const STAGE_CLASS: Record<Stage, string> = { 调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post" };
 
@@ -32,14 +32,15 @@ export default function ProjectWorkspace({ analysis, onUpdate, onDelete }: { ana
     const t = new URLSearchParams(window.location.search).get("tab");
     return t && PHASE_TABS[analysis.stage].some((x) => x.key === t) ? t : PHASE_TABS[analysis.stage][0].key;
   });
-  const [questions, setQuestions] = useState<QItem[]>(() => seedQuestions(analysis));
   const [notes, setNotes] = useState("");
 
-  // #2 可编辑分析：订阅 run 拿本单资料（materials/attachments），编辑基础信息 + 资料后可仅保存或重跑
+  // #2 可编辑分析：订阅 run 拿本单资料（materials/attachments/洽谈清单），编辑基础信息 + 资料后可仅保存或重跑
   const run = useSyncExternalStore(
     useCallback((cb: () => void) => subscribe(analysis.id, cb), [analysis.id]),
     useCallback(() => getRun(analysis.id), [analysis.id]),
   );
+  // 洽谈清单从落盘的 run 读（按项目持久化，切走再切回不丢）；run 里没有则用前提假设种子。
+  const questions = run.questions.length ? run.questions : seedQuestions(analysis);
   const [editing, setEditing] = useState(false);
   const [eName, setEName] = useState(analysis.name);
   const [eIndustry, setEIndustry] = useState(analysis.industry);
@@ -142,7 +143,7 @@ export default function ProjectWorkspace({ analysis, onUpdate, onDelete }: { ana
         )}
         {phase === "洽谈中" && tab === "desk" && (
           <div className="dash">
-            <NegotiationDesk analysis={analysis} questions={questions} onQuestions={setQuestions} notes={notes} onNotes={setNotes} />
+            <NegotiationDesk analysis={analysis} questions={questions} onQuestions={(next) => setAnalysisQuestions(analysis.id, next)} notes={notes} onNotes={setNotes} />
           </div>
         )}
         {phase === "洽谈后" && tab === "report" && (

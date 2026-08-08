@@ -293,6 +293,110 @@ function renderDrivers(rows: string[]): string {
   return `<div class="drv"><div class="drv-beam">${inline(beam)}</div><div class="drv-ticks">${ticks}</div><div class="drv-pillars">${cols}</div></div>`;
 }
 
+// Harvey balls 定性评级——```harvey：可选 # 标题；每行 名称 | 档位(0–4) | 一句说明。档位→圆的填充比例。
+function renderHarvey(rows: string[]): string {
+  let cap = "";
+  const items: string[] = [];
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = /^#\s+(.*)$/.exec(line);
+    if (h && !items.length) { cap = h[1]; continue; }
+    const c = line.split("|").map((x) => x.trim());
+    const lvl = Math.max(0, Math.min(4, Math.round(parseFloat(c[1] ?? "") || 0)));
+    items.push(`<div class="hv-row"><span class="hv-name">${inline(c[0] ?? "")}</span><span class="hv-ball" style="--pct:${lvl * 25}"></span><span class="hv-note">${inline(c[2] ?? "")}</span></div>`);
+  }
+  return `${cap ? `<div class="hv-cap">${inline(cap)}</div>` : ""}<div class="harvey">${items.join("")}</div>`;
+}
+
+// 2×2 矩阵——```quad：可选 # 标题；x: 左→右 轴说明；y: 下→上 轴说明；tl/tr/bl/br: 象限名 | 条目。
+function renderQuad(rows: string[]): string {
+  let cap = "", xax = "", yax = "";
+  const q: Record<string, { t: string; items: string }> = {};
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = /^#\s+(.*)$/.exec(line);
+    if (h && !cap) { cap = h[1]; continue; }
+    const m = /^(x|y|tl|tr|bl|br)\s*[:：|]\s*(.+)$/i.exec(line);
+    if (!m) continue;
+    const key = m[1].toLowerCase(), val = m[2].trim();
+    if (key === "x") xax = val;
+    else if (key === "y") yax = val;
+    else { const c = val.split("|").map((x) => x.trim()); q[key] = { t: c[0] ?? "", items: c[1] ?? "" }; }
+  }
+  const cell = (k: string) => { const v = q[k]; return `<div class="quad-cell">${v ? `<div class="qc-t">${inline(v.t)}</div><div class="qc-items">${inline(v.items)}</div>` : ""}</div>`; };
+  const axes = [xax ? `<span>X：${inline(xax)}</span>` : "", yax ? `<span>Y：${inline(yax)}</span>` : ""].filter(Boolean).join("");
+  return `${cap ? `<div class="quad-cap">${inline(cap)}</div>` : ""}<div class="quad-grid">${cell("tl")}${cell("tr")}${cell("bl")}${cell("br")}</div>${axes ? `<div class="quad-axes">${axes}</div>` : ""}`;
+}
+
+// 瀑布图（桥接）——```waterfall：可选 # 标题；每行 名称 | 数值（带 +/- 为增减；base/total 为绝对基准）| 类型(可选)。
+function renderWaterfall(rows: string[]): string {
+  let cap = "";
+  const bars: { name: string; val: number; type: string }[] = [];
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = /^#\s+(.*)$/.exec(line);
+    if (h && !bars.length) { cap = h[1]; continue; }
+    const c = line.split("|").map((x) => x.trim());
+    const val = parseFloat((c[1] ?? "").replace(/[^\d.+-]/g, "")) || 0;
+    const type = (c[2] ?? "").toLowerCase() || (/^(起|期初|合计|总|净|终|base|total)/.test(c[0] ?? "") ? "total" : "");
+    bars.push({ name: c[0] ?? "", val, type });
+  }
+  let run = 0;
+  const segs = bars.map((b) => {
+    if (b.type === "base" || b.type === "total") { run = b.val; return { ...b, s: 0, e: b.val }; }
+    const s = run; run += b.val; return { ...b, s, e: run };
+  });
+  const maxV = Math.max(1, ...segs.map((x) => Math.max(Math.abs(x.s), Math.abs(x.e))));
+  const rowsHtml = segs.map((x) => {
+    const lo = Math.max(0, Math.min(x.s, x.e)), hi = Math.max(x.s, x.e);
+    const cls = x.type === "base" || x.type === "total" ? "wf-tot" : x.val >= 0 ? "wf-up" : "wf-down";
+    const disp = x.type === "base" || x.type === "total" ? String(x.val) : (x.val >= 0 ? "+" : "") + x.val;
+    return `<div class="wf-row"><span class="wf-name">${inline(x.name)}</span><div class="wf-track"><div class="wf-bar ${cls}" style="margin-left:${((lo / maxV) * 100).toFixed(1)}%;width:${Math.max(1, ((hi - lo) / maxV) * 100).toFixed(1)}%"></div></div><span class="wf-val">${inline(disp)}</span></div>`;
+  }).join("");
+  return `${cap ? `<div class="wf-cap">${inline(cap)}</div>` : ""}<div class="wf">${rowsHtml}</div>`;
+}
+
+// 折线图——```line：可选 # 标题；可选 `x | 标签1 | 标签2…`；每行 系列名 | v1 | v2 | …；可选 ~ 注脚。
+function renderLine(rows: string[]): string {
+  let cap = "", foot = "";
+  let xLabels: string[] = [];
+  const series: { name: string; vals: number[] }[] = [];
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^#\s+/.test(line)) { cap = line.replace(/^#\s+/, ""); continue; }
+    if (line.startsWith("~")) { foot = line.replace(/^~+\s*/, ""); continue; }
+    const c = line.split("|").map((x) => x.trim());
+    if (/^x$/i.test(c[0])) { xLabels = c.slice(1); continue; }
+    const vals = c.slice(1).map((v) => parseFloat(v.replace(/[^\d.+-]/g, "")) || 0);
+    if (vals.length) series.push({ name: c[0] ?? "", vals });
+  }
+  if (!series.length) return "";
+  const n = Math.max(...series.map((s) => s.vals.length));
+  const all = series.flatMap((s) => s.vals);
+  const maxV = Math.max(...all), minV = Math.min(0, ...all);
+  const W = 640, H = 240, PL = 46, PR = 14, PT = 16, PB = 30;
+  const xAt = (i: number) => PL + (n <= 1 ? 0 : (i / (n - 1)) * (W - PL - PR));
+  const yAt = (v: number) => H - PB - ((v - minV) / ((maxV - minV) || 1)) * (H - PT - PB);
+  const COLORS = ["#1a6050", "#9a6c00", "#1a3f72", "#b03020"];
+  const plot = series.map((s, si) => {
+    const col = COLORS[si % COLORS.length];
+    const pts = s.vals.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(" ");
+    const dots = s.vals.map((v, i) => `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(v).toFixed(1)}" r="2.6" fill="${col}"/>`).join("");
+    return `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2"/>${dots}`;
+  }).join("");
+  const xlab = xLabels.map((l, i) => `<text x="${xAt(i).toFixed(1)}" y="${H - 10}" text-anchor="middle" font-size="10" fill="#8a847c">${escapeHtml(l)}</text>`).join("");
+  const legend = series.map((s, si) => `<span class="ln-lg"><i style="background:${COLORS[si % COLORS.length]}"></i>${inline(s.name)}</span>`).join("");
+  return `${cap ? `<div class="ln-cap">${inline(cap)}</div>` : ""}<div class="lnchart"><svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg">` +
+    `<line x1="${PL}" y1="${H - PB}" x2="${W - PR}" y2="${H - PB}" stroke="#ddd8ce"/><line x1="${PL}" y1="${PT}" x2="${PL}" y2="${H - PB}" stroke="#ddd8ce"/>` +
+    `<text x="8" y="${(PT + 6).toFixed(1)}" font-size="10" fill="#8a847c">${escapeHtml(String(Math.round(maxV)))}</text>` +
+    `<text x="8" y="${(H - PB).toFixed(1)}" font-size="10" fill="#8a847c">${escapeHtml(String(Math.round(minV)))}</text>` +
+    `${plot}${xlab}</svg><div class="ln-legend">${legend}</div>${foot ? `<div class="ln-foot">${inline(foot)}</div>` : ""}</div>`;
+}
+
 export function mdToHouseHtml(md: string): string {
   const lines = md.replace(/\r/g, "").split("\n");
   const out: string[] = [];
@@ -368,6 +472,10 @@ export function mdToHouseHtml(md: string): string {
       else if (lang === "groups") out.push(renderGroups(body));
       else if (lang === "drivers") out.push(renderDrivers(body));
       else if (lang === "formula") out.push(renderFormula(body));
+      else if (lang === "harvey") out.push(renderHarvey(body));
+      else if (lang === "quad" || lang === "matrix") out.push(renderQuad(body));
+      else if (lang === "waterfall" || lang === "bridge") out.push(renderWaterfall(body));
+      else if (lang === "line") out.push(renderLine(body));
       else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
       continue;
     }

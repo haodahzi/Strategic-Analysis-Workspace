@@ -5,6 +5,7 @@ import {
   buildDigestRequest, buildStageRequest, chunkText, mockReport, mockStageOutput,
 } from "./pipeline";
 import { AppConfig, ChatRequest, LLMClient } from "./types";
+import { QItem } from "../types";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
@@ -28,6 +29,7 @@ export interface RunState {
   attachments: Attachment[];   // 上传的 PDF / 文本提取出的正文
   sources: SearchHit[];        // 联网检索到的来源（供正文引用 + 文末参考文献）
   progress: string;            // 当前步的细粒度进度（如分块精读 3/8 段）
+  questions: QItem[];          // 洽谈清单（按项目落盘，切走再切回不丢）
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -35,7 +37,7 @@ const runs = new Map<string, RunState>();
 const listeners = new Map<string, Set<() => void>>();
 
 function empty(): RunState {
-  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "", attachments: [], sources: [], progress: "" };
+  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "", attachments: [], sources: [], progress: "", questions: [] };
 }
 
 // 惰性初始化并返回稳定引用（配合 useSyncExternalStore）
@@ -65,8 +67,8 @@ function persistSoon() {
 function serializeRuns(): string {
   const obj: Record<string, unknown> = {};
   for (const [id, s] of runs) {
-    if (!s.started && !s.materials && !s.attachments.length) continue;   // 空壳不落
-    obj[id] = { started: s.started, done: s.done, status: s.status, outputs: s.outputs, realReport: s.realReport, materials: s.materials, attachments: s.attachments, sources: s.sources };
+    if (!s.started && !s.materials && !s.attachments.length && !s.questions.length) continue;   // 空壳不落
+    obj[id] = { started: s.started, done: s.done, status: s.status, outputs: s.outputs, realReport: s.realReport, materials: s.materials, attachments: s.attachments, sources: s.sources, questions: s.questions };
   }
   return JSON.stringify(obj);
 }
@@ -89,6 +91,7 @@ export async function hydrateRuns(): Promise<void> {
         status: s.status ?? {}, outputs: s.outputs ?? [],
         realReport: s.realReport ?? null,
         materials: s.materials ?? "", attachments: s.attachments ?? [], sources: s.sources ?? [],
+        questions: s.questions ?? [],
       });
       notify(id);
     }
@@ -103,6 +106,8 @@ export function addAttachment(id: string, a: Attachment) {
 export function removeAttachment(id: string, name: string) {
   patch(id, { attachments: getRun(id).attachments.filter((x) => x.name !== name) });
 }
+// 洽谈清单按项目落盘（切走再切回不丢）。
+export function setAnalysisQuestions(id: string, questions: QItem[]) { patch(id, { questions }); }
 
 // 删除整份分析的运行状态（配合「删除在办分析」）：从内存与落盘一并移除。
 export function deleteRun(id: string) {

@@ -259,6 +259,42 @@ describe("房子样式渲染（#7/#15）", () => {
     expect(h).toContain("<b>场景碎片化</b><small>商用嵌入酒店/办公/车</small>");
   });
 
+  it("```harvey 定性评级：档位 → 圆填充比例（--pct）", () => {
+    const h = mdToHouseHtml("```harvey\n# 三维打分\n技术壁垒 | 4 | 最高\n国产化 | 2 | 中等\n```");
+    expect(h).toContain('class="harvey"');
+    expect(h).toContain('class="hv-cap">三维打分</div>');
+    expect(h).toContain('style="--pct:100"');   // 4 档 → 满
+    expect(h).toContain('style="--pct:50"');     // 2 档 → 半
+    expect(h).toContain("技术壁垒");
+  });
+
+  it("```quad 2×2 矩阵：四象限恒渲染 + 轴说明", () => {
+    const h = mdToHouseHtml("```quad\n# 定位\nx: 成本低 → 成本高\ny: 价值低 → 价值高\ntl: 高价值低成本 | 甲、乙\nbr: 低价值高成本 | 丁\n```");
+    expect(h).toContain('class="quad-grid"');
+    expect((h.match(/class="quad-cell"/g) ?? []).length).toBe(4);
+    expect(h).toContain('class="qc-t">高价值低成本</div>');
+    expect(h).toContain("X：成本低 → 成本高");
+    expect(h).toContain("Y：价值低 → 价值高");
+  });
+
+  it("```waterfall 瀑布：增减色 + base/total 绝对基准", () => {
+    const h = mdToHouseHtml("```waterfall\n毛利 | 100 | base\n运维 | -30\n获客 | -20\n净利 | 50 | total\n```");
+    expect(h).toContain('class="wf"');
+    expect(h).toContain('class="wf-bar wf-tot"');   // base / total
+    expect(h).toContain('class="wf-bar wf-down"');  // 负增减
+    expect(h).toContain('class="wf-val">-30</span>');
+    expect(h).toContain('class="wf-val">100</span>');
+  });
+
+  it("```line 折线：多系列 polyline + 图例 + x 标签", () => {
+    const h = mdToHouseHtml("```line\n# 市场规模\nx | 2022 | 2023 | 2024\n规模 | 100 | 160 | 240\n增速 | 66 | 60 | 50\n```");
+    expect(h).toContain('class="lnchart"');
+    expect((h.match(/<polyline /g) ?? []).length).toBe(2);   // 两条系列
+    expect(h).toContain("<svg");
+    expect(h).toContain("2023");                              // x 标签
+    expect(h).toContain('class="ln-lg"');                    // 图例
+  });
+
   it("表格合计行：首列 **加粗** → tr-bold；普通行仍是 <tr>", () => {
     const h = mdToHouseHtml("| 项 | 值 |\n| --- | --- |\n| 收入 | 100 |\n| **合计** | 130 |");
     expect(h).toContain('<tr class="tr-bold">');

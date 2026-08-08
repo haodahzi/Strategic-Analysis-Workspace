@@ -39,6 +39,15 @@ describe("联网检索辅助（纯函数）", () => {
     expect(classifyDomain("https://finance.eastmoney.com/a/1.html")).toBe("mid");
   });
 
+  it("classifyDomain（一手源提质）：主流财经 / 科技媒体→t1；卖报告农场→low", () => {
+    expect(classifyDomain("https://wallstreetcn.com/articles/1")).toBe("t1");
+    expect(classifyDomain("https://36kr.com/p/1")).toBe("t1");
+    expect(classifyDomain("https://www.thepaper.cn/newsDetail_1")).toBe("t1");
+    expect(classifyDomain("https://www.jiemian.com/article/1.html")).toBe("t1");
+    expect(classifyDomain("https://www.chinairn.com/news/1.shtml")).toBe("low");
+    expect(classifyDomain("https://www.chinabaogao.com/x")).toBe("low");
+  });
+
   it("scoreHit：有明确原始机构归因的低档域名，反超无归因无日期的高档域名（责任主体 > 域名）", () => {
     const attributedLow = { title: "存储芯片国内市场规模", url: "https://caifuhao.eastmoney.com/news/1", content: "据智研咨询发布的2025年报告，国内市场规模超过6500亿元。" };
     const bareHigh = { title: "某栏目页", url: "https://www.gov.cn/x", content: "一句没有数据、没有日期、没有归因的话。" };

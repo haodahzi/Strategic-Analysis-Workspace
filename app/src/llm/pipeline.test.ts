@@ -39,6 +39,7 @@ describe("多智能体报告流水线", () => {
     expect(req.messages[0].content).toContain("drivers");
     expect(req.messages[0].content).toContain("formula");   // ⑨ 盈利公式路由
     expect(req.messages[0].content).toContain("枚举");       // 枚举→组件的密度规则
+    expect(req.messages[0].content).toContain("来源优先级");   // 一手源引导（C）
   });
 
   it("buildStageRequest：起草 / 定稿步注入框架全文 + 结构纪律（严格按章节顺序、不漏节）", () => {
