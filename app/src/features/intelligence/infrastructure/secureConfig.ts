@@ -22,6 +22,7 @@ export interface SecureSaveResult {
 }
 
 let activeSecretStore: SecretStore = createBrowserSecretStore();
+let secretStateUncertain = false;
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -47,6 +48,11 @@ export function setActiveSecretStore(store: SecretStore): void {
   activeSecretStore = store;
 }
 
+export function resetSecureConfigForTests(): void {
+  activeSecretStore = createBrowserSecretStore();
+  secretStateUncertain = false;
+}
+
 export function getCachedSecret(providerId: ProviderId): string | undefined {
   return getRuntimeSecret(providerId);
 }
@@ -66,7 +72,16 @@ function containsLegacySecretField(raw: string): boolean {
 
 export async function bootstrapSecureConfig(store: SecretStore): Promise<SecureSaveResult> {
   if (store.persistence === "session-only") {
-    replaceRuntimeSecrets(new Map());
+    const legacy = readLegacyConfig();
+    const legacySecrets = legacy ? secretsFrom(legacy.config) : new Map<ProviderId, string>();
+    const needsLegacyRedaction = legacy ? containsLegacySecretField(legacy.raw) : false;
+    try {
+      if (needsLegacyRedaction) saveConfigOrThrow(legacy!.config);
+    } catch {
+      replaceRuntimeSecrets(new Map());
+      throw new Error("secure configuration could not be initialized");
+    }
+    replaceRuntimeSecrets(legacySecrets);
     return { storage: "session-only" };
   }
 
@@ -121,13 +136,15 @@ export async function saveConfigSecurely(
     for (const providerId of KNOWN_PROVIDER_IDS) {
       const previous = getRuntimeSecret(providerId) ?? "";
       const proposed = next.get(providerId) ?? "";
-      if (previous === proposed) continue;
+      if (!secretStateUncertain && previous === proposed) continue;
       if (proposed) await store.set(providerId, proposed);
       else await store.delete(providerId);
     }
   } catch {
+    secretStateUncertain = true;
     throw new Error("secure configuration could not be saved");
   }
+  secretStateUncertain = false;
 
   const previous = new Map<ProviderId, string>();
   for (const providerId of KNOWN_PROVIDER_IDS) {
@@ -139,6 +156,7 @@ export async function saveConfigSecurely(
     saveConfigOrThrow(draft);
   } catch {
     replaceRuntimeSecrets(previous);
+    secretStateUncertain = true;
     throw new Error("secure configuration could not be saved");
   }
   return { storage: store.persistence === "native" ? "persistent-native" : "session-only" };

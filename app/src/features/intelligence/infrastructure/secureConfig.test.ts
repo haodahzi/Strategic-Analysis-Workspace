@@ -10,6 +10,7 @@ import {
   createBrowserSecretStore,
   createNativeSecretStore,
   getCachedSecret,
+  resetSecureConfigForTests,
   saveConfigSecurely,
   type SecretStore,
 } from "./secureConfig";
@@ -56,6 +57,7 @@ describe("secure provider configuration", () => {
     storage = new MemoryStorage();
     Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true });
     resetRuntimeSecretsForTests();
+    resetSecureConfigForTests();
   });
 
   it("migrates all legacy secrets before writing one fully redacted config", async () => {
@@ -121,6 +123,35 @@ describe("secure provider configuration", () => {
     expect(storage.writes).toHaveLength(0);
   });
 
+  it("rewrites every credential after a partial secret-operation failure", async () => {
+    const credentials = new Map<ProviderId, string>();
+    let rejectOpenAiUpdate = false;
+    const store = fakeStore({
+      set: vi.fn(async (providerId, secret) => {
+        if (rejectOpenAiUpdate && providerId === "openai" && secret === "new-openai") {
+          throw new Error("partial write failure");
+        }
+        credentials.set(providerId, secret);
+      }),
+      delete: vi.fn(async (providerId) => { credentials.delete(providerId); }),
+    });
+    const committed = withSecret("claude", "old-claude");
+    committed.providers.find((provider) => provider.id === "openai")!.apiKey = "old-openai";
+    await saveConfigSecurely(committed, store);
+
+    const partial = withSecret("claude", "new-claude");
+    partial.providers.find((provider) => provider.id === "openai")!.apiKey = "new-openai";
+    rejectOpenAiUpdate = true;
+    await expect(saveConfigSecurely(partial, store)).rejects.toThrow();
+    expect(credentials.get("claude")).toBe("new-claude");
+    expect(getCachedSecret("claude")).toBe("old-claude");
+
+    rejectOpenAiUpdate = false;
+    await saveConfigSecurely(committed, store);
+    expect(credentials.get("claude")).toBe("old-claude");
+    expect(credentials.get("openai")).toBe("old-openai");
+  });
+
   it("rolls cache back when redacted localStorage persistence fails", async () => {
     const store = fakeStore();
     await saveConfigSecurely(withSecret("claude", "committed"), store);
@@ -151,6 +182,21 @@ describe("secure provider configuration", () => {
     expect(getCachedSecret("kimi")).toBeUndefined();
     expect(loadConfig().providers.find((provider) => provider.id === "kimi")?.apiKey).toBeUndefined();
     expect(storage.getItem(CONFIG_STORAGE_KEY)).toBe(raw);
+  });
+
+  it("moves browser legacy secrets into the current session and redacts localStorage", async () => {
+    const raw = JSON.stringify(withSecret("openai", "browser-legacy-secret"));
+    storage.seed(CONFIG_STORAGE_KEY, raw);
+    const nativeInvoke = vi.fn().mockRejectedValue(new Error("must never run"));
+    createNativeSecretStore(nativeInvoke);
+
+    const result = await bootstrapSecureConfig(createBrowserSecretStore());
+
+    expect(result).toEqual({ storage: "session-only" });
+    expect(nativeInvoke).not.toHaveBeenCalled();
+    expect(getCachedSecret("openai")).toBe("browser-legacy-secret");
+    expect(storage.getItem(CONFIG_STORAGE_KEY)).not.toContain("apiKey");
+    expect(storage.getItem(CONFIG_STORAGE_KEY)).not.toContain("browser-legacy-secret");
   });
 
   it("maps all native commands to the exact request envelope", async () => {

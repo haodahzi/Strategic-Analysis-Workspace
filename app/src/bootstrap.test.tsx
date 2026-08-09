@@ -182,6 +182,30 @@ describe("application bootstrap", () => {
     expect(render).toHaveBeenCalledTimes(1);
   });
 
+  it("does not bypass a browser secure-bootstrap failure", async () => {
+    const bootstrap = vi.fn()
+      .mockRejectedValueOnce(new Error("legacy secret could not be redacted"))
+      .mockResolvedValueOnce({ storage: "session-only" });
+    const render = vi.fn();
+    const completion = bootstrapApplication({
+      detectTauri: () => false,
+      createBrowserSecrets: () => secretStore("session-only"),
+      bootstrapSecure: bootstrap,
+      render,
+    });
+
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1));
+    const failure = render.mock.calls[0][0];
+    expect(failure.type).toBe(SecureBootstrapFailure);
+    expect(JSON.stringify(failure.props)).not.toContain("legacy secret could not be redacted");
+
+    failure.props.retry();
+    const coordinator = await completion;
+    expect(bootstrap).toHaveBeenCalledTimes(2);
+    expect(coordinator.getSnapshot()).toEqual({ status: "unavailable" });
+    expect(render.mock.calls[1][0].props.children.type).toBe(App);
+  });
+
   it("tree creation has no startup side effect", () => {
     const coordinator: IntelligenceBootCoordinator = {
       start: vi.fn(),

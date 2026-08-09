@@ -101,15 +101,6 @@ export async function bootstrapApplication(
         render(createApplicationTree(coordinator));
         resolve(coordinator);
       } catch {
-        if (!native) {
-          const secrets = createBrowserSecretStore();
-          setActiveSecretStore(secrets);
-          const coordinator = createUnavailableIntelligenceBootCoordinator();
-          await coordinator.start();
-          render(createApplicationTree(coordinator));
-          resolve(coordinator);
-          return;
-        }
         render(<SecureBootstrapFailure retry={() => void attempt()} />);
       } finally {
         running = false;
