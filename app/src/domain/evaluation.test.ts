@@ -16,21 +16,21 @@ describe("战略契合度评分", () => {
 
 describe("商业可行性 = 三项均值", () => {
   it("市场/条件/模式平均", () => {
-    expect(commercialScore({ market: 8, terms: 6, model: 7, txStructure: "", note: "" })).toBe(7);
+    expect(commercialScore({ market: 8, marketNote: "", terms: 6, termsNote: "", model: 7, modelNote: "", txStructure: "" })).toBe(7);
   });
 });
 
 describe("客商资信", () => {
   it("单家 = 五类均值；红线家封顶 ≤2", () => {
-    const clean = { name: "甲", scores: [8, 8, 8, 8, 8], redLine: false, redLineNote: "", note: "" };
+    const clean = { name: "甲", type: "客户", scores: [8, 8, 8, 8, 8], redLine: false, redLineNote: "", note: "" };
     expect(merchantScore(clean)).toBe(8);
-    const bad = { name: "乙", scores: [9, 9, 9, 9, 9], redLine: true, redLineNote: "失信", note: "" };
+    const bad = { name: "乙", type: "供应商", scores: [9, 9, 9, 9, 9], redLine: true, redLineNote: "失信", note: "" };
     expect(merchantScore(bad)).toBe(2);
   });
   it("多家无红线取平均；有红线家拉低并可枚举", () => {
     const credit = { merchants: [
-      { name: "甲", scores: [8, 8, 8, 8, 8], redLine: false, redLineNote: "", note: "" },
-      { name: "乙", scores: [6, 6, 6, 6, 6], redLine: false, redLineNote: "", note: "" },
+      { name: "甲", type: "客户", scores: [8, 8, 8, 8, 8], redLine: false, redLineNote: "", note: "" },
+      { name: "乙", type: "供应商", scores: [6, 6, 6, 6, 6], redLine: false, redLineNote: "", note: "" },
     ] };
     expect(creditScore(credit)).toBe(7);
     credit.merchants[1].redLine = true;                       // 乙触红线 → 封顶2
@@ -78,10 +78,11 @@ describe("经济效益测算", () => {
 });
 
 describe("风险可控性", () => {
-  it("可控性均值；未受控翻单项封顶 ≤4", () => {
+  it("可控性均值；未受控翻单项封顶 ≤4；空列表为 0", () => {
+    expect(riskScore({ items: [] })).toBe(0);
     const items = [
-      { kind: "政策性风险", control: 8, measure: "", dealBreaker: false },
-      { kind: "客商信用风险（含回款）", control: 8, measure: "", dealBreaker: false },
+      { desc: "政策变动", control: 8, measure: "", dealBreaker: false },
+      { desc: "回款风险", control: 8, measure: "", dealBreaker: false },
     ];
     expect(riskScore({ items })).toBe(8);
     items[1].dealBreaker = true; items[1].control = 3;         // 翻单项且未受控(<6)
@@ -93,7 +94,7 @@ describe("五维雷达 + 综合分", () => {
   it("五轴齐全、等权综合", () => {
     const ev = emptyEvaluation();
     ev.strategy.fitType = "主业范围内";                         // 8
-    ev.commercial = { market: 6, terms: 6, model: 6, txStructure: "", note: "" };  // 6
+    ev.commercial = { market: 6, marketNote: "", terms: 6, termsNote: "", model: 6, modelNote: "", txStructure: "" };  // 6
     const axes = radarAxes(ev);
     expect(axes.map((a) => a.label)).toEqual(["战略契合度", "商业可行性", "主要客商资信", "经济效益", "风险可控性"]);
     expect(axes[0].value).toBe(8);

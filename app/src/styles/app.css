@@ -356,7 +356,7 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 @keyframes fade{from{opacity:.5}to{opacity:1}}
 
 .ev-overview{display:grid;grid-template-columns:1fr 340px;gap:26px;align-items:start}
-.ev-ov-right{position:sticky;top:8px}
+.ev-ov-right{position:sticky;top:8px;margin-top:42px}   /* 下移，让雷达标题与左侧「项目情况·定调」灰线齐平 */
 .ev-verdict-pick{display:flex;gap:8px;margin:6px 0 4px}
 .radar-wrap{display:flex;justify-content:center;padding:6px 0}
 .radar-svg{max-width:100%;height:auto}
@@ -413,8 +413,29 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 .ev-risk-top{display:flex;align-items:center;gap:14px;margin-bottom:7px}
 .ev-risk-kind{flex:1;font-size:13px;font-weight:600;color:var(--ink)}
 .ev-risk-db{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);white-space:nowrap}
+.ev-risk-top .key-input{flex:1}
+.ev-risk-add{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.ev-chip{font-size:11px;padding:4px 10px;border:1px dashed var(--border);background:#fff;color:var(--ink2);cursor:pointer;border-radius:2px}
+.ev-chip:hover{border-color:var(--gold);color:var(--ink)}
 
-@media(max-width:900px){.ev-overview{grid-template-columns:1fr}.ev-merchant-body{grid-template-columns:1fr}.ev-fit{grid-template-columns:1fr}}
+/* 商业可行性：每项一个填写框 */
+.ev-comm-item{padding:8px 0;border-bottom:1px solid var(--border2)}
+.ev-comm-note{margin-top:6px;min-height:40px}
+
+/* 客商资信：左右切换 chips + 详情 */
+.ev-mcht-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.ev-mcht-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;background:#fff;border:1px solid var(--border2);cursor:pointer;font-size:12px;color:var(--ink2);border-radius:2px}
+.ev-mcht-chip.on{border-color:var(--teal);background:#eef6f2;color:var(--ink);font-weight:600}
+.ev-mcht-chip.redline{border-color:#e2b7ad}
+.ev-mcht-chip.redline::before{content:"⚠";color:var(--red)}
+.ev-mcht-chip.add{border-style:dashed;color:var(--ink3)}
+.ev-mcht-chip-s{font-family:var(--serif);font-weight:700;color:var(--teal)}
+.ev-merchant-top .set-select{width:150px}
+.ev-qcc-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:2px 0 8px}
+.ev-qcc-bar .set-hint{flex:1;min-width:180px}
+.app-btn.disabled{opacity:.55;pointer-events:none}
+
+@media(max-width:900px){.ev-overview{grid-template-columns:1fr}.ev-ov-right{margin-top:0}.ev-merchant-body{grid-template-columns:1fr}.ev-fit{grid-template-columns:1fr}}
 .pr-vb-tag{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--ink2);margin-bottom:6px}
 .pr-vb-reason{width:100%;font-size:13px;line-height:1.6;border:none;background:none;resize:vertical;min-height:44px;color:var(--ink);font-family:var(--sans)}
 .pr-card{background:#fff;border:1px solid var(--border2);padding:16px 18px;display:flex;flex-direction:column;gap:14px}

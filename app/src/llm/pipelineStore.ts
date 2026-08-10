@@ -6,7 +6,7 @@ import {
 } from "./pipeline";
 import { AppConfig, ChatRequest, LLMClient } from "./types";
 import { QItem } from "../types";
-import { Evaluation, emptyEvaluation } from "../domain/evaluation";
+import { Evaluation, emptyEvaluation, normalizeEvaluation } from "../domain/evaluation";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
@@ -95,7 +95,7 @@ export async function hydrateRuns(): Promise<void> {
         realReport: s.realReport ?? null,
         materials: s.materials ?? "", attachments: s.attachments ?? [], sources: s.sources ?? [],
         questions: s.questions ?? [],
-        evaluation: s.evaluation ?? emptyEvaluation(), evalTouched: !!s.evalTouched,
+        evaluation: s.evaluation ? normalizeEvaluation(s.evaluation) : emptyEvaluation(), evalTouched: !!s.evalTouched,
       });
       notify(id);
     }

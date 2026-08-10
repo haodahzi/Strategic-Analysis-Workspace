@@ -4,7 +4,7 @@
 // 每个 stage 是用户可见的「子任务」，各自可路由不同模型；审查宜换一家/一款互查。
 import { AgentRole, ChatRequest } from "./types";
 import {
-  Evaluation, EXPENSE_KEYS, EXPENSE_LABEL, CREDIT_DIMS,
+  Evaluation, CreditParseResult, EXPENSE_KEYS, EXPENSE_LABEL, CREDIT_DIMS,
   activeMerchants, merchantScore, creditRedLines, computeEconomics,
   radarAxes, strategyScore, commercialScore, economicsScore, compositeScore,
 } from "../domain/evaluation";
@@ -218,22 +218,54 @@ function econTable(ev: Evaluation): string {
 
 // 六维评价要点（喂模型的事实，勿改分值）
 function evalFacts(ev: Evaluation): string {
+  const c = ev.commercial;
   const scoreline = radarAxes(ev).map((a) => `${a.label} ${a.value}`).join(" · ") + ` → 综合 ${compositeScore(ev)}`;
   const strat = ev.strategy.fitType ? `${ev.strategy.fitType}（${strategyScore(ev.strategy)}分）${ev.strategy.note ? "：" + ev.strategy.note : ""}` : "未评";
-  const comm = `市场前景 ${ev.commercial.market} / 商务条件 ${ev.commercial.terms} / 模式可执行 ${ev.commercial.model} → ${commercialScore(ev.commercial)}${ev.commercial.note ? "；" + ev.commercial.note : ""}`;
+  const comm = `市场前景 ${c.market}（${c.marketNote || "—"}）/ 商务条件 ${c.terms}（${c.termsNote || "—"}）/ 模式可执行 ${c.model}（${c.modelNote || "—"}）→ ${commercialScore(c)}`;
   const ms = activeMerchants(ev.credit);
-  const credit = ms.length ? ms.map((m) => `· ${m.name || "客商"}（${merchantScore(m)}分${m.redLine ? "·⚠红线：" + (m.redLineNote || "触发") : ""}）：${CREDIT_DIMS.map((d, i) => `${d.slice(0, 4)}${m.scores[i]}`).join("/")}${m.note ? "；" + m.note : ""}`).join("\n") : "未录核心客商";
+  const credit = ms.length ? ms.map((m) => `· ${m.name || "客商"}${m.type ? `〔${m.type}〕` : ""}（${merchantScore(m)}分${m.redLine ? "·⚠红线：" + (m.redLineNote || "触发") : ""}）：${CREDIT_DIMS.map((d, i) => `${d.slice(0, 4)}${m.scores[i]}`).join("/")}${m.note ? "；" + m.note : ""}`).join("\n") : "未录核心客商";
   const redlines = creditRedLines(ev.credit);
-  const risks = ev.risk.items.filter((i) => i.kind.trim()).map((i) => `· ${i.kind}：可控性${i.control}${i.dealBreaker ? "·翻单项" : ""}${i.measure ? "，控制：" + i.measure : ""}`).join("\n");
+  const risks = ev.risk.items.filter((i) => i.desc.trim()).map((i) => `· ${i.desc}：可控性${i.control}${i.dealBreaker ? "·翻单项" : ""}${i.measure ? "，控制：" + i.measure : ""}`).join("\n") || "（未列风险）";
   return [
+    ev.brief.trim() ? `项目简介：${ev.brief.trim()}` : "",
     `五维分：${scoreline}`,
     `战略契合度：${strat}`,
     `商业可行性：${comm}`,
-    `交易结构：${ev.commercial.txStructure.trim() || "（未填，用 dealflow 据实画）"}`,
+    `交易结构：${c.txStructure.trim() || "（未填，用 dealflow 据实画）"}`,
     `客商资信：\n${credit}`,
     redlines.length ? `⚠触红线客商：${redlines.map((m) => m.name || "客商").join("、")}——需重点提示` : "",
     `风险可控性：\n${risks}`,
   ].filter(Boolean).join("\n");
+}
+
+// 企查查/工商信用报告「智能解析」：把报告正文按客商资信 5 类抽成分值 + 评分依据 + 红线判定。
+export function buildCreditParseRequest(name: string, reportText: string, model: string): ChatRequest {
+  const user =
+    `下面是「${name || "该客商"}」的企查查 / 工商信用报告正文。请按客商资信 5 类维度逐项打分（0–10 整数）并给一句评分依据，最后判定是否触红线。` +
+    `\n5 类维度（顺序固定）：${CREDIT_DIMS.map((d, i) => `${i + 1}.${d}`).join("；")}` +
+    `\n评分锚点：主体资格看存续 / 成立年限 / 实缴 / 规模 / 变更；股东控制看股权清晰度 / 实控人 / 关联风险；偿债与履约信用看被执行 / 失信 / 终本 / 限高 / 欠税 / 冻结（有则大幅扣分）；法律风险看诉讼（被告合同纠纷权重高）/ 行政处罚；经营合规看资质许可 / 纳税信用 / 经营异常。` +
+    `\n红线（命中即判「是」）：失信被执行 / 终本无财产 / 破产 / 控制人股权冻结 / 经营异常吊销或注销。` +
+    `\n严格按以下格式输出，每行一项、共 6 行，别加多余文字：\n主体资格与存续稳定性 | 分值 | 依据\n股东与控制结构 | 分值 | 依据\n偿债能力与履约信用 | 分值 | 依据\n法律风险与商业诚信 | 分值 | 依据\n经营合规与资质 | 分值 | 依据\n红线 | 是/否 | 命中的具体项（否则留空）` +
+    `\n\n只据报告中的事实，报告未体现的项给中性分（5）并在依据里注明「报告未体现」。报告正文：\n${reportText.slice(0, 12000)}`;
+  return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 1500 };
+}
+
+export function parseCreditReport(text: string): CreditParseResult {
+  const scores = [0, 0, 0, 0, 0], evidence = ["", "", "", "", ""];
+  let redLine = false, redLineNote = "";
+  for (const raw of text.split(/\r?\n/)) {
+    const c = raw.split("|").map((x) => x.trim());
+    if (c.length < 2) continue;
+    const label = c[0].replace(/^\d+[.、)]\s*/, "").replace(/[*#]/g, "").trim();
+    if (/红线/.test(label)) { redLine = /^(是|有|y|yes|true)/i.test(c[1]); redLineNote = (c[2] ?? "").trim(); continue; }
+    const idx = CREDIT_DIMS.findIndex((d) => label.includes(d.slice(0, 4)) || d.includes(label.slice(0, 3)));
+    if (idx >= 0) {
+      const v = parseFloat((c[1] ?? "").replace(/[^\d.]/g, ""));
+      if (!isNaN(v)) scores[idx] = Math.max(0, Math.min(10, Math.round(v)));
+      evidence[idx] = (c[2] ?? "").trim();
+    }
+  }
+  return { scores, evidence, redLine, redLineNote };
 }
 
 // 组装「一键导出项目报告」的模型请求（纯函数、可单测）。走「定稿」主笔。
@@ -259,24 +291,28 @@ export function buildProjectReportRequest(inp: ProjectReportInput, ctx: ProjectR
 export function mockProjectReport(inp: ProjectReportInput, ctx: ProjectReportCtx): string {
   const ev = ctx.evaluation;
   const next = ev.verdict === "继续推进" ? "推动公司内部决策、深入探讨要不要做；补齐关键尽调" : "暂缓推进；待关键前提确认 / 条件成熟后再启动";
+  const c = ev.commercial;
   const ms = activeMerchants(ev.credit);
   const redlines = creditRedLines(ev.credit);
-  const risks = ev.risk.items.filter((i) => i.kind.trim());
+  const risks = ev.risk.items.filter((i) => i.desc.trim());
   const out: string[] = [`> 结论：${ev.verdict} —— ${ev.verdictReason.trim() || "（补一句定调理由）"}`, ""];
-  out.push(`## 项目情况`, radarBlock(ev), "", `本项目「${inp.name}」${inp.counterparty ? `，对方「${inp.counterparty}」` : ""}。项目背景、业务概要与意义——请补充（可先在「调研前·深度分析」生成研究底稿）。`, "");
+  out.push(`## 项目情况`, radarBlock(ev), "", ev.brief.trim() || `本项目「${inp.name}」${inp.counterparty ? `，对方「${inp.counterparty}」` : ""}。项目简介（业务模式 / 关键客户 / 盈利模式 / 核心壁垒或价值）——请补充。`, "");
   out.push(`## 战略契合度`, ev.strategy.fitType ? `档位：**${ev.strategy.fitType}**（${strategyScore(ev.strategy)}/10）。${ev.strategy.note || ""}` : "未评（0/10）——需选定契合档位。", "");
-  out.push(`## 商业可行性`, `市场前景 ${ev.commercial.market} / 商务条件 ${ev.commercial.terms} / 模式可执行 ${ev.commercial.model} → ${commercialScore(ev.commercial)}/10。${ev.commercial.note || ""}`, "");
-  if (ev.commercial.txStructure.trim()) out.push(`交易结构：${ev.commercial.txStructure.trim()}`, "");
+  out.push(`## 商业可行性`, `市场前景 ${c.market}/10${c.marketNote ? `——${c.marketNote}` : ""}；商务条件合理性 ${c.terms}/10${c.termsNote ? `——${c.termsNote}` : ""}；模式可执行性 ${c.model}/10${c.modelNote ? `——${c.modelNote}` : ""}。综合 ${commercialScore(c)}/10。`, "");
+  if (c.txStructure.trim()) out.push(`交易结构：${c.txStructure.trim()}`, "");
   out.push(`## 客商资信`);
   if (ms.length) for (const m of ms) {
-    out.push(`### ${m.name || "核心客商"}（${merchantScore(m)}/10）${m.redLine ? " ⚠红线" : ""}`, CREDIT_DIMS.map((d, i) => `- ${d}：${m.scores[i]}/10`).join("\n"));
+    out.push(`### ${m.name || "核心客商"}${m.type ? `〔${m.type}〕` : ""}（${merchantScore(m)}/10）${m.redLine ? " ⚠红线" : ""}`, CREDIT_DIMS.map((d, i) => `- ${d}：${m.scores[i]}/10`).join("\n"));
     if (m.redLine) out.push(`> 风险：触红线——${m.redLineNote || "重点提示"}`);
     if (m.note.trim()) out.push(m.note.trim());
     out.push("");
   } else out.push("未录入核心客商——需补。", "");
   out.push(`## 经济效益`, econTable(ev), "", `目标净利率 ${ev.economics.targetNetMargin}%，经济效益评分 ${economicsScore(ev.economics)}/10。`, "");
-  out.push(`## 风险可控性`, `| 风险 | 可控性(0–10) | 控制措施 |`, `| --- | --- | --- |`);
-  for (const i of risks) out.push(`| ${i.kind}${i.dealBreaker ? "（翻单项）" : ""} | ${i.control} | ${i.measure.trim() || "需补"} |`);
+  out.push(`## 风险可控性`);
+  if (risks.length) {
+    out.push(`| 风险描述 | 可控性(0–10) | 风险控制 |`, `| --- | --- | --- |`);
+    for (const i of risks) out.push(`| ${i.desc}${i.dealBreaker ? "（翻单项）" : ""} | ${i.control} | ${i.measure.trim() || "需补"} |`);
+  } else out.push("未列出实质性风险。");
   out.push("");
   if (redlines.length) out.push(`> 风险：客商 ${redlines.map((m) => m.name || "客商").join("、")} 触红线，需重点核。`, "");
   out.push(`## 立项结论`, "", "```verdict", `定调 | ${ev.verdict}`, `五维 | ${radarAxes(ev).map((a) => a.label + " " + a.value).join("；")}`, `下一步 | ${next}`, "```");

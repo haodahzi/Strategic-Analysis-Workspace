@@ -2,17 +2,18 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { Analysis, QItem } from "../types";
 import {
   Evaluation, EvalVerdict, ExpenseKey, ExpenseRow, Merchant,
-  FIT_TYPES, FIT_SCORE, CREDIT_DIMS, CREDIT_HINT, EXPENSE_KEYS, EXPENSE_LABEL, RISK_KINDS,
-  emptyMerchant, strategyScore, commercialScore, merchantScore, creditScore, creditRedLines,
+  MERCHANT_TYPES, RISK_KINDS, FIT_TYPES, FIT_SCORE, CREDIT_DIMS, CREDIT_HINT, EXPENSE_KEYS, EXPENSE_LABEL,
+  emptyMerchant, emptyRiskItem, strategyScore, commercialScore, merchantScore, creditScore, creditRedLines,
   computeEconomics, economicsScore, riskScore, radarAxes, compositeScore, financeCost,
 } from "../domain/evaluation";
 import Radar from "./Radar";
 import { openExternal } from "../sources/browser";
+import { extractPdfText } from "../lib/pdf";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "../llm/adapters";
 import { getLlmFetch } from "../llm/runtime";
 import { getRun, sendComplete, setEvaluation, subscribe } from "../llm/pipelineStore";
-import { ProjectReportCtx, ProjectReportInput, buildProjectReportRequest, mockProjectReport } from "../llm/pipeline";
+import { ProjectReportCtx, ProjectReportInput, buildProjectReportRequest, buildCreditParseRequest, mockProjectReport, parseCreditReport } from "../llm/pipeline";
 import { houseDocFromMarkdown } from "../export/exporter";
 import { listReports, saveReport } from "../llm/reportLib";
 import ReportView from "./ReportView";
@@ -49,7 +50,7 @@ function Slider({ value, onChange }: { value: number; onChange: (v: number) => v
   );
 }
 
-// 洽谈后·六维评价工作区：项目情况(五维雷达+定调) / 战略契合度 / 商业可行性 / 客商资信 / 经济效益 / 风险可控性。
+// 洽谈后·六维评价工作区：项目情况(项目简介+定调+五维雷达) / 战略契合度 / 商业可行性 / 客商资信 / 经济效益 / 风险可控性。
 export default function ProjectReport({ analysis }: { analysis: Analysis }) {
   const run = useSyncExternalStore(
     useCallback((cb: () => void) => subscribe(analysis.id, cb), [analysis.id]),
@@ -59,11 +60,15 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
   const [tab, setTab] = useState("overview");
   const [gen, setGen] = useState<{ status: "idle" | "running" | "err"; msg?: string }>({ status: "idle" });
   const [houseView, setHouseView] = useState<{ title: string; doc: string } | null>(null);
+  const [mi, setMi] = useState(0);                                       // 当前选中的客商（左右切换）
+  const [parse, setParse] = useState<{ status: "idle" | "running" | "err"; msg?: string }>({ status: "idle" });
 
   const cfg = loadConfig();
   const agent = cfg.agents["定稿"];
   const prov = providerById(cfg, agent.provider);
   const realMode = prov.id !== "mock";
+  const parseAgent = cfg.agents["资料"];
+  const parseProv = providerById(cfg, parseAgent.provider);
 
   const update = (patch: Partial<Evaluation>) => setEvaluation(analysis.id, { ...ev, ...patch });
   const ec = ev.economics;
@@ -89,7 +94,7 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
         const fetchImpl = await getLlmFetch();
         md = await sendComplete(makeClient(prov, fetchImpl), buildProjectReportRequest(inp, ctx, agent.model), 5);
         if (!md.trim()) throw new Error("模型返回为空——可到「设置」为「定稿」换一款模型后重试");
-        md = md.replace(/^\s*#\s+.*\r?\n+/, "");   // 去掉正文里重复的报告大标题（封面已有），避免被编成 01 章
+        md = md.replace(/^\s*#\s+.*\r?\n+/, "");
       } else md = mockProjectReport(inp, ctx);
       const refs = [
         ...run.attachments.map((a) => (a.url ? `[${a.name}](${a.url})（上传 / 抓取）` : `${a.name}（上传材料）`)),
@@ -104,13 +109,38 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
   const saved = listReports().find((r) => r.analysisId === analysis.id && r.focus === REPORT_FOCUS);
   const openSaved = () => { if (saved) setHouseView({ title: saved.title, doc: houseDocFromMarkdown(saved.markdown, { title: saved.title, badges }) }); };
 
-  // —— 客商 ——
-  const setMerchant = (i: number, m: Merchant) => update({ credit: { merchants: ev.credit.merchants.map((x, k) => (k === i ? m : x)) } });
-  const addMerchant = () => update({ credit: { merchants: [...ev.credit.merchants, emptyMerchant()] } });
-  const delMerchant = (i: number) => update({ credit: { merchants: ev.credit.merchants.filter((_, k) => k !== i) } });
+  // —— 客商（左右切换 master-detail）——
+  const merchants = ev.credit.merchants;
+  const si = Math.max(0, Math.min(mi, merchants.length - 1));
+  const m = merchants[si];
+  const setMerchant = (i: number, mm: Merchant) => update({ credit: { merchants: merchants.map((x, k) => (k === i ? mm : x)) } });
+  const addMerchant = () => { update({ credit: { merchants: [...merchants, emptyMerchant()] } }); setMi(merchants.length); };
+  const delMerchant = (i: number) => { if (merchants.length <= 1) return; update({ credit: { merchants: merchants.filter((_, k) => k !== i) } }); setMi(Math.max(0, i - 1)); };
   const redlines = creditRedLines(ev.credit);
 
-  // —— 经济效益：费用行 ——
+  // 企查查报告智能解析（PDF/TXT → 提取正文 → 模型按 5 类抽分与依据 → 回填该客商）
+  const importCredit = async (i: number, file: File) => {
+    setParse({ status: "running", msg: "提取报告正文…" });
+    try {
+      const text = /\.pdf$/i.test(file.name) ? await extractPdfText(file) : await file.text();
+      if (!text.trim()) throw new Error("没提取到文字（可能是扫描件 / 图片版 PDF，换文本版或手动填分）");
+      if (parseProv.id === "mock") throw new Error("无 Key，无法智能解析——到「设置」为「资料」配置模型后再试；也可手动填分");
+      setParse({ status: "running", msg: "模型解析中…（按 5 类维度抽分与依据）" });
+      const fetchImpl = await getLlmFetch();
+      const res = await makeClient(parseProv, fetchImpl).send(buildCreditParseRequest(merchants[i].name, text, parseAgent.model));
+      const p = parseCreditReport(res.text);
+      const note = CREDIT_DIMS.map((d, k) => (p.evidence[k] ? `${d.slice(0, 4)}：${p.evidence[k]}` : "")).filter(Boolean).join("；");
+      const cur = getRun(analysis.id).evaluation.credit.merchants[i];
+      setMerchant(i, { ...cur, scores: p.scores, note: note || cur.note, redLine: p.redLine || cur.redLine, redLineNote: p.redLineNote || cur.redLineNote });
+      setParse({ status: "idle", msg: "" });
+    } catch (e) { setParse({ status: "err", msg: (e as Error).message.slice(0, 180) }); }
+  };
+
+  // —— 风险（增删列表）——
+  const addRisk = (desc = "") => update({ risk: { items: [...ev.risk.items, emptyRiskItem(desc)] } });
+  const setRisk = (i: number, patch: Partial<Evaluation["risk"]["items"][number]>) => update({ risk: { items: ev.risk.items.map((x, k) => (k === i ? { ...x, ...patch } : x)) } });
+  const delRisk = (i: number) => update({ risk: { items: ev.risk.items.filter((_, k) => k !== i) } });
+
   const setExpense = (k: ExpenseKey, row: ExpenseRow) => setEcon({ expenses: { ...ec.expenses, [k]: row } });
   const econRows = computeEconomics(ec);
 
@@ -145,13 +175,6 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
         <div className="ev-pane ev-overview">
           <div className="ev-ov-left">
             <div className="sec-head">项目情况 · 定调</div>
-            <div className="pw-meta" style={{ marginBottom: 12 }}>
-              {analysis.ourRole && <span className="role-badge">我方：{analysis.ourRole}</span>}
-              {analysis.industry && <span className="ind-badge">{analysis.industry}</span>}
-              {analysis.counterparty && <span className="ind-badge">对方：{analysis.counterparty}</span>}
-              {analysis.focus && <span className="ind-badge">类型：{analysis.focus}</span>}
-              <span className="st-chip st-post">状态：{analysis.stage}</span>
-            </div>
             <div className="ev-verdict-pick">
               {(["继续推进", "暂缓"] as EvalVerdict[]).map((v) => (
                 <button key={v} type="button" className={"pr-vbtn wide v-" + v + (ev.verdict === v ? " on" : "")} onClick={() => pickVerdict(v)}>{v}</button>
@@ -161,6 +184,9 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
               <div className="pr-vb-tag">定调 · {ev.verdict === "继续推进" ? "推向公司内部决策 · 深入探讨要不要做" : "暂缓 · 各种原因不再推进"}</div>
               <textarea className="pr-vb-reason" value={ev.verdictReason} onChange={(e) => update({ verdictReason: e.target.value })} />
             </div>
+            <label className="fld" style={{ marginTop: 14 }}><span>项目简介（一段话：业务模式 · 关键客户 · 盈利模式 · 核心壁垒或关键价值）</span>
+              <textarea className="nd-extra" rows={5} value={ev.brief} placeholder="一段话讲清这单是什么：怎么做的业务、卖给谁 / 从谁进货、靠什么赚钱、护城河或关键价值在哪…" onChange={(e) => update({ brief: e.target.value })} />
+            </label>
             <div className="set-hint">五维分值由后面 5 个 tab 填写自动汇总；看报告的人综合评估，不设及格线。</div>
           </div>
           <div className="ev-ov-right">
@@ -198,51 +224,73 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
       {tab === "commercial" && (
         <div className="ev-pane">
           <div className="sec-head">商业可行性 · {commercialScore(ev.commercial)}/10</div>
-          {([["market", "市场前景（需求 / 成长性）"], ["terms", "商务条件合理性（价格 / 账期 / 权责）"], ["model", "模式可执行性（可复制 / 壁垒 / 落地）"]] as [keyof typeof ev.commercial, string][]).map(([k, label]) => (
-            <div key={k as string} className="ev-line"><span className="ev-line-l">{label}</span>
-              <Slider value={ev.commercial[k] as number} onChange={(v) => update({ commercial: { ...ev.commercial, [k]: v } })} />
+          {([["market", "marketNote", "市场前景（需求 / 成长性）"], ["terms", "termsNote", "商务条件合理性（价格 / 账期 / 权责）"], ["model", "modelNote", "模式可执行性（可复制 / 壁垒 / 落地）"]] as [keyof typeof ev.commercial, keyof typeof ev.commercial, string][]).map(([k, nk, label]) => (
+            <div key={k as string} className="ev-comm-item">
+              <div className="ev-line"><span className="ev-line-l">{label}</span>
+                <Slider value={ev.commercial[k] as number} onChange={(v) => update({ commercial: { ...ev.commercial, [k]: v } })} />
+              </div>
+              <textarea className="nd-extra ev-comm-note" value={ev.commercial[nk] as string} placeholder="该项依据 / 判断…" onChange={(e) => update({ commercial: { ...ev.commercial, [nk]: e.target.value } })} />
             </div>
           ))}
           <label className="fld" style={{ marginTop: 12 }}><span>交易结构（货 / 单 / 资金怎么走，导出报告据此画链路图）</span>
             <textarea className="nd-extra" value={ev.commercial.txStructure} placeholder="各方出什么 / 拿什么、资金 / 货物 / 合同 / 发票流向与结算方式（预付 / 赊销 / 带款提货）…" onChange={(e) => update({ commercial: { ...ev.commercial, txStructure: e.target.value } })} />
           </label>
-          <label className="fld"><span>判断说明</span>
-            <textarea className="nd-extra" value={ev.commercial.note} placeholder="市场与商务条件的关键判断、依据与不确定性…" onChange={(e) => update({ commercial: { ...ev.commercial, note: e.target.value } })} />
-          </label>
         </div>
       )}
 
-      {/* ④ 客商资信 */}
+      {/* ④ 客商资信（左右切换 + 企查查智能解析） */}
       {tab === "credit" && (
         <div className="ev-pane">
           <div className="sec-head">客商资信 · {creditScore(ev.credit)}/10</div>
           {redlines.length > 0 && (
-            <div className="ev-redline-banner">⚠ 触红线客商：{redlines.map((m) => m.name || "未命名客商").join("、")} —— 该家资信封顶 ≤2 并计入平均，请重点核。</div>
+            <div className="ev-redline-banner">⚠ 触红线客商：{redlines.map((x) => x.name || "未命名客商").join("、")} —— 该家资信封顶 ≤2 并计入平均，请重点核。</div>
           )}
-          {ev.credit.merchants.map((m, i) => (
-            <div key={i} className={"ev-merchant" + (m.redLine ? " redline" : "")}>
+          <div className="ev-mcht-chips">
+            {merchants.map((x, i) => (
+              <button key={i} type="button" className={"ev-mcht-chip" + (i === si ? " on" : "") + (x.redLine ? " redline" : "")} onClick={() => setMi(i)}>
+                {x.name || `客商${i + 1}`}{x.type ? ` · ${x.type}` : ""}<span className="ev-mcht-chip-s">{merchantScore(x)}</span>
+              </button>
+            ))}
+            <button type="button" className="ev-mcht-chip add" onClick={addMerchant}>+ 加客商</button>
+          </div>
+
+          {m && (
+            <div className={"ev-merchant" + (m.redLine ? " redline" : "")}>
               <div className="ev-merchant-top">
-                <input className="key-input" value={m.name} placeholder="核心客商名称" onChange={(e) => setMerchant(i, { ...m, name: e.target.value })} />
+                <input className="key-input" value={m.name} placeholder="核心客商名称" onChange={(e) => setMerchant(si, { ...m, name: e.target.value })} />
+                <select className="set-select" value={m.type} onChange={(e) => setMerchant(si, { ...m, type: e.target.value })}>
+                  <option value="">客商类型…</option>
+                  {MERCHANT_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}
+                </select>
                 <span className="ev-merchant-score">{merchantScore(m)}/10</span>
-                <button type="button" className="app-btn ghost" disabled={!m.name.trim()} onClick={() => void openExternal(`https://www.qcc.com/web/search?key=${encodeURIComponent(m.name.trim())}`, m.name.trim() || "企查查")}>企查查查询 ↗</button>
-                {ev.credit.merchants.length > 1 && <button type="button" className="ql-del" onClick={() => delMerchant(i)}>删</button>}
+                {merchants.length > 1 && <button type="button" className="ql-del" onClick={() => delMerchant(si)}>删</button>}
               </div>
+
+              <div className="ev-qcc-bar">
+                <button type="button" className="app-btn ghost" disabled={!m.name.trim()} onClick={() => void openExternal(`https://www.qcc.com/web/search?key=${encodeURIComponent(m.name.trim())}`, m.name.trim() || "企查查")}>企查查查询 ↗</button>
+                <label className={"app-btn" + (parse.status === "running" ? " disabled" : "")}>
+                  {parse.status === "running" ? "解析中…" : "导入企查查报告 · 智能解析"}
+                  <input type="file" accept=".pdf,.txt" style={{ display: "none" }} disabled={parse.status === "running"} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCredit(si, f); e.currentTarget.value = ""; }} />
+                </label>
+                <span className="set-hint">在企查查下载该客商报告(PDF)，导入后自动抽取 5 类评分与依据、命中失信/终本等自动勾红线。</span>
+              </div>
+              {parse.status !== "idle" && <div className="set-hint" style={{ margin: "2px 0 6px" }}>{parse.status === "err" ? <span className="pr-export-err">解析失败：{parse.msg}</span> : parse.msg}</div>}
+
               <div className="ev-merchant-body">
                 <div className="ev-merchant-dims">
                   {CREDIT_DIMS.map((d, di) => (
                     <div key={d} className="ev-line"><span className="ev-line-l" title={CREDIT_HINT[d]}>{d}</span>
-                      <Slider value={m.scores[di]} onChange={(v) => setMerchant(i, { ...m, scores: m.scores.map((x, k) => (k === di ? v : x)) })} />
+                      <Slider value={m.scores[di]} onChange={(v) => setMerchant(si, { ...m, scores: m.scores.map((x, k) => (k === di ? v : x)) })} />
                     </div>
                   ))}
                 </div>
                 <div className="ev-merchant-radar"><Radar axes={CREDIT_DIMS.map((d, di) => ({ label: d.slice(0, 4), value: m.scores[di] }))} size={220} /></div>
               </div>
-              <label className="ev-redline-toggle"><input type="checkbox" checked={m.redLine} onChange={(e) => setMerchant(i, { ...m, redLine: e.target.checked })} /> 触红线（失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销）</label>
-              {m.redLine && <input className="key-input wide" value={m.redLineNote} placeholder="红线具体：如「列入失信被执行人，金额 XXX 万」" onChange={(e) => setMerchant(i, { ...m, redLineNote: e.target.value })} />}
-              <input className="key-input wide" value={m.note} placeholder="备注：工商 / 股权穿透 / 资信查询要点…" onChange={(e) => setMerchant(i, { ...m, note: e.target.value })} />
+              <label className="ev-redline-toggle"><input type="checkbox" checked={m.redLine} onChange={(e) => setMerchant(si, { ...m, redLine: e.target.checked })} /> 触红线（失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销）</label>
+              {m.redLine && <input className="key-input wide" value={m.redLineNote} placeholder="红线具体：如「列入失信被执行人，金额 XXX 万」" onChange={(e) => setMerchant(si, { ...m, redLineNote: e.target.value })} />}
+              <textarea className="nd-extra" value={m.note} placeholder="评分依据 / 备注：工商 · 股权穿透 · 涉诉 · 资质等要点（智能解析会自动填这里）" onChange={(e) => setMerchant(si, { ...m, note: e.target.value })} />
             </div>
-          ))}
-          <button type="button" className="pr-add" onClick={addMerchant}>+ 加核心客商</button>
+          )}
         </div>
       )}
 
@@ -267,8 +315,7 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
                 <tr><td>销售毛利</td>{ec.grossProfit.map((v, i) => (<td key={i}><input className="key-input mini" type="number" value={v} onChange={(e) => setEcon({ grossProfit: setArr(ec.grossProfit, i, toNum(e.target.value)) })} /></td>))}</tr>
                 {EXPENSE_KEYS.map((k) => {
                   const row = ec.expenses[k];
-                  const isFin = k === "finance";
-                  const finAuto = isFin && ec.financeAuto;
+                  const finAuto = k === "finance" && ec.financeAuto;
                   return (
                     <tr key={k} className="ev-exp-row">
                       <td>
@@ -283,9 +330,8 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
                         )}
                       </td>
                       {ec.years.map((_, i) => {
-                        const val = econRows[i].expenseBreak[k];
                         if (finAuto) return <td key={i} className="ev-cell-auto">{n1(financeCost(ec, i) ?? 0)}</td>;
-                        if (row.mode === "pct") return <td key={i} className="ev-cell-auto">{n1(val)}</td>;
+                        if (row.mode === "pct") return <td key={i} className="ev-cell-auto">{n1(econRows[i].expenseBreak[k])}</td>;
                         return <td key={i}><input className="key-input mini" type="number" value={row.amounts[i]} onChange={(e) => setExpense(k, { ...row, amounts: setArr(row.amounts, i, toNum(e.target.value)) })} /></td>;
                       })}
                     </tr>
@@ -309,15 +355,22 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
       {tab === "risk" && (
         <div className="ev-pane">
           <div className="sec-head">风险可控性 · {riskScore(ev.risk)}/10</div>
-          <div className="set-hint" style={{ marginBottom: 10 }}>逐类评「可控性」（越高越可控）+ 控制措施；勾「翻单项」＝错了就能推翻这单，未受控（可控性&lt;6）会把总分封顶 ≤4。</div>
+          <div className="set-hint" style={{ marginBottom: 10 }}>有就写、没有就删——不用为了写而写。每条＝风险描述 + 风险控制；可控性用于打分，未受控（&lt;6）的翻单项会把总分封顶 ≤4。</div>
+          <div className="ev-risk-add">
+            <span className="set-hint">快速添加：</span>
+            {RISK_KINDS.map((k) => (<button key={k} type="button" className="ev-chip" onClick={() => addRisk(k)}>+ {k}</button>))}
+            <button type="button" className="ev-chip" onClick={() => addRisk("")}>+ 自定义</button>
+          </div>
+          {ev.risk.items.length === 0 && <div className="set-hint" style={{ marginTop: 12 }}>暂无风险条目——点上面按需添加。</div>}
           {ev.risk.items.map((it, i) => (
-            <div key={i} className="ev-risk">
+            <div className="ev-risk" key={i}>
               <div className="ev-risk-top">
-                <span className="ev-risk-kind">{it.kind || RISK_KINDS[i] || "风险"}</span>
-                <Slider value={it.control} onChange={(v) => update({ risk: { items: ev.risk.items.map((x, k) => (k === i ? { ...x, control: v } : x)) } })} />
-                <label className="ev-risk-db"><input type="checkbox" checked={it.dealBreaker} onChange={(e) => update({ risk: { items: ev.risk.items.map((x, k) => (k === i ? { ...x, dealBreaker: e.target.checked } : x)) } })} /> 翻单项</label>
+                <input className="key-input" value={it.desc} placeholder="风险描述：具体是什么风险…" onChange={(e) => setRisk(i, { desc: e.target.value })} />
+                <Slider value={it.control} onChange={(v) => setRisk(i, { control: v })} />
+                <label className="ev-risk-db"><input type="checkbox" checked={it.dealBreaker} onChange={(e) => setRisk(i, { dealBreaker: e.target.checked })} /> 翻单项</label>
+                <button type="button" className="ql-del" onClick={() => delRisk(i)}>删</button>
               </div>
-              <input className="key-input wide" value={it.measure} placeholder="控制措施 / 缓释手段（如：预付比例、担保 / 抵押、分批放货、保险…）" onChange={(e) => update({ risk: { items: ev.risk.items.map((x, k) => (k === i ? { ...x, measure: e.target.value } : x)) } })} />
+              <textarea className="nd-extra" value={it.measure} placeholder="风险控制：缓释手段（预付比例 / 担保 / 抵押 / 分批放货 / 保险 / 条款…）" onChange={(e) => setRisk(i, { measure: e.target.value })} />
             </div>
           ))}
         </div>

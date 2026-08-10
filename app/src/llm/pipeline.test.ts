@@ -4,6 +4,7 @@ import {
   buildChecklistRequest, parseChecklist, mockChecklist,
   chunkText, buildDigestRequest,
   PROJECT_REPORT_FRAME, buildProjectReportRequest, mockProjectReport,
+  buildCreditParseRequest, parseCreditReport,
   ProjectReportCtx, ProjectReportInput,
 } from "./pipeline";
 import { emptyEvaluation } from "../domain/evaluation";
@@ -12,8 +13,8 @@ const prInp: ProjectReportInput = { name: "白酒线下经销项目", industry: 
 const prCtx = (over: Partial<ProjectReportCtx> = {}): ProjectReportCtx => {
   const ev = emptyEvaluation();
   ev.strategy.fitType = "主业范围内";
-  ev.commercial = { market: 7, terms: 6, model: 6, txStructure: "资金→采购→分销", note: "" };
-  ev.credit.merchants = [{ name: "泸州老窖", scores: [9, 9, 8, 9, 9], redLine: false, redLineNote: "", note: "" }];
+  ev.commercial = { market: 7, marketNote: "名酒动销确定", terms: 6, termsNote: "账期需压", model: 6, modelNote: "渠道成熟", txStructure: "资金→采购→分销" };
+  ev.credit.merchants = [{ name: "泸州老窖", type: "供应商", scores: [9, 9, 8, 9, 9], redLine: false, redLineNote: "", note: "" }];
   ev.economics.revenue = [1000, 2000, 3000];
   ev.economics.grossProfit = [300, 600, 900];
   return { deepReport: "调研前定稿：命门是回款周期与货权。", materials: "已知：赊销 60 天", records: "- [要问对方·已核] 结算方式 → 带款提货", evaluation: ev, ...over };
@@ -117,11 +118,12 @@ describe("洽谈后 · 项目立项报告一键导出", () => {
 
   it("mockProjectReport：六章齐全 + 雷达 + 测算表 + 风险表 + verdict，暂缓/继续推进下一步不同", () => {
     const ev = emptyEvaluation(); ev.verdict = "继续推进";
+    ev.risk.items = [{ desc: "回款风险", control: 4, measure: "预付+担保", dealBreaker: true }];
     const go = mockProjectReport(prInp, prCtx({ evaluation: ev }));
     for (const h of ["## 项目情况", "## 战略契合度", "## 商业可行性", "## 客商资信", "## 经济效益", "## 风险可控性", "## 立项结论"]) expect(go).toContain(h);
     expect(go).toContain("```radar");
     expect(go).toContain("业务净利润");                          // 测算表
-    expect(go).toContain("| 风险 | 可控性(0–10) | 控制措施 |");
+    expect(go).toContain("| 风险描述 | 可控性(0–10) | 风险控制 |");
     expect(go).toContain("```verdict");
     expect(go).toContain("公司内部决策");
     const evHold = emptyEvaluation(); evHold.verdict = "暂缓";
@@ -132,11 +134,36 @@ describe("洽谈后 · 项目立项报告一键导出", () => {
 
   it("mockProjectReport：客商触红线 → 单独重点提示", () => {
     const ev = emptyEvaluation();
-    ev.credit.merchants = [{ name: "风险客商", scores: [9, 9, 9, 9, 9], redLine: true, redLineNote: "失信被执行", note: "" }];
+    ev.credit.merchants = [{ name: "风险客商", type: "客户", scores: [9, 9, 9, 9, 9], redLine: true, redLineNote: "失信被执行", note: "" }];
     const md = mockProjectReport(prInp, prCtx({ evaluation: ev }));
     expect(md).toContain("⚠红线");
     expect(md).toContain("失信被执行");
     expect(md).toContain("触红线");
+  });
+});
+
+describe("企查查报告智能解析", () => {
+  it("buildCreditParseRequest：走资料 system，含 5 类维度与固定输出格式", () => {
+    const req = buildCreditParseRequest("某公司", "企查查报告正文……", "m1");
+    expect(req.model).toBe("m1");
+    expect(req.system).toContain("尽调");
+    expect(req.messages[0].content).toContain("偿债能力与履约信用");
+    expect(req.messages[0].content).toContain("红线 | 是/否");
+  });
+  it("parseCreditReport：解析 5 类分值 + 依据 + 红线判定", () => {
+    const out = [
+      "主体资格与存续稳定性 | 8 | 存续经营，成立12年",
+      "股东与控制结构 | 7 | 实控人清晰",
+      "偿债能力与履约信用 | 2 | 2条被执行",
+      "法律风险与商业诚信 | 4 | 多起买卖合同纠纷（被告）",
+      "经营合规与资质 | 8 | 纳税A级",
+      "红线 | 是 | 列入失信被执行人",
+    ].join("\n");
+    const r = parseCreditReport(out);
+    expect(r.scores).toEqual([8, 7, 2, 4, 8]);
+    expect(r.redLine).toBe(true);
+    expect(r.redLineNote).toContain("失信");
+    expect(r.evidence[2]).toContain("被执行");
   });
 });
 
