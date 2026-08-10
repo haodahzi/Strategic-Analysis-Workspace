@@ -1,6 +1,6 @@
 # 对标企业情报基础设施验收协议
 
-验收日期：2026-08-09
+验收日期：2026-08-10
 
 功能分支：`feature/competitive-intelligence`
 
@@ -51,17 +51,17 @@ Rust 验收固定使用项目要求的 Rust/Cargo 1.77.2；Cargo.lock 必须纳�
 
 若任一门禁失败，先添加失败回归测试并修复，再重新执行完整门禁。
 
-### 2026-08-09 最终执行记录
+### 2026-08-10 最终执行记录
 
 | 门禁 | 结果 | 记录 |
 | --- | --- | --- |
 | `npm ci` | 通过 | 安装 154 个包；依赖审计报告 7 个既有/传递漏洞，本计划未执行破坏性 `audit fix --force`。 |
-| 最终前端完整测试 | 通过 | 14 个文件，79/79，退出码 0。 |
-| 浏览器 legacy 脱敏与失败重试聚焦测试 | 通过 | `secureConfig.test.ts` 9/9，`bootstrap.test.tsx` 9/9。 |
+| 最终前端完整测试 | 通过 | 18 个文件，162/162，退出码 0。 |
+| 凭据迁移、脱敏与失败重试聚焦测试 | 通过 | `secureConfig.test.ts` 15/15，`bootstrap.test.tsx` 9/9。 |
 | TypeScript 类型检查 | 通过 | `npm run typecheck` 退出码 0。 |
-| Vite 生产构建 | 通过 | 80 个模块完成转换，退出码 0。 |
-| Rust 1.77.2 完整测试 | 通过 | `cargo test --offline`，40/40，退出码 0。 |
-| Rust 1.77.2 check / fmt | 通过 | `cargo check --offline` 与 `cargo fmt -- --check` 退出码均为 0。 |
+| Vite 生产构建 | 通过 | 87 个模块完成转换，退出码 0。 |
+| Rust 1.77.2 完整测试 | 通过 | `cargo test --locked`，40/40，退出码 0。 |
+| Rust 1.77.2 check / fmt | 通过 | `cargo check --locked` 与 `cargo fmt -- --check` 退出码均为 0。 |
 | 招聘范围排除 | 通过 | `rg -n "招聘\|岗位\|recruitment" app/src app/src-tauri` 无匹配。 |
 | API Key/localStorage 静态检查 | 通过 | `rg -n "apiKey.*localStorage\|localStorage.*apiKey" app/src` 无匹配。 |
 | `Cargo.lock` | 通过 | 已被 Git 跟踪。 |

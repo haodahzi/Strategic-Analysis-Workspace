@@ -108,10 +108,24 @@ export function saveConfig(config: AppConfig): void {
   }
 }
 
+function isUsableSavedConfig(value: unknown): value is Partial<AppConfig> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const providers = (value as { providers?: unknown }).providers;
+  return providers === undefined || (Array.isArray(providers) && providers.every(
+    (provider) => provider !== null && typeof provider === "object" && !Array.isArray(provider),
+  ));
+}
+
 export function readLegacyConfig(): { raw: string; config: AppConfig } | null {
   if (typeof localStorage === "undefined") return null;
   const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
-  return raw ? { raw, config: mergeSaved(JSON.parse(raw) as Partial<AppConfig>, true) } : null;
+  if (!raw) return null;
+  try {
+    const saved = JSON.parse(raw) as unknown;
+    return isUsableSavedConfig(saved) ? { raw, config: mergeSaved(saved, true) } : null;
+  } catch {
+    return null;
+  }
 }
 
 export function getRuntimeSecret(providerId: ProviderId): string | undefined {

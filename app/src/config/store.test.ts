@@ -49,7 +49,10 @@ describe("redacted configuration persistence", () => {
 });
 
 describe("配置持久化 · 数据源", () => {
-  beforeEach(() => { (globalThis as unknown as { localStorage: MemLS }).localStorage = new MemLS(); });
+  beforeEach(() => {
+    Object.defineProperty(globalThis, "localStorage", { value: new MemoryStorage(), configurable: true });
+    resetRuntimeSecretsForTests();
+  });
 
   it("默认带出全部内置数据源且默认启用", () => {
     const ds = loadConfig().dataSources;
@@ -70,13 +73,16 @@ describe("配置持久化 · 数据源", () => {
   });
 
   it("旧配置（无 dataSources 字段）加载后自动补齐内置源", () => {
-    (globalThis as unknown as { localStorage: MemLS }).localStorage.setItem("dw.config.v1", JSON.stringify({ defaultProvider: "mock" }));
+    (globalThis as unknown as { localStorage: MemoryStorage }).localStorage.setItem("dw.config.v1", JSON.stringify({ defaultProvider: "mock" }));
     expect(loadConfig().dataSources.length).toBeGreaterThanOrEqual(4);
   });
 });
 
 describe("配置持久化 · 检索（B 升级）", () => {
-  beforeEach(() => { (globalThis as unknown as { localStorage: MemLS }).localStorage = new MemLS(); });
+  beforeEach(() => {
+    Object.defineProperty(globalThis, "localStorage", { value: new MemoryStorage(), configurable: true });
+    resetRuntimeSecretsForTests();
+  });
 
   it("默认检索：条数 10、召回上限 50、时间范围近 3 年", () => {
     const s = loadConfig().search;
@@ -86,7 +92,7 @@ describe("配置持久化 · 检索（B 升级）", () => {
   });
 
   it("旧配置（有 search 但无 maxQueries）一次性把时间范围升到近 3 年，其它字段保留", () => {
-    (globalThis as unknown as { localStorage: MemLS }).localStorage.setItem(
+    (globalThis as unknown as { localStorage: MemoryStorage }).localStorage.setItem(
       "dw.config.v1",
       JSON.stringify({ defaultProvider: "mock", search: { provider: "bocha", apiKey: "k", baseUrl: "b", maxResults: 10, preferDomains: [], freshness: "noLimit" } }),
     );

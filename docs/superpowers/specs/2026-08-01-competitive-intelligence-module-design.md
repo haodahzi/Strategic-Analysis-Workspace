@@ -116,9 +116,9 @@ interface IntelligenceHealth {
 | `list_recoverable_runs` | 无 | 返回状态仍为 `running` 的任务 ID |
 | `mark_run_interrupted` | `{ runId }` | 幂等地标记中断并写入 `APP_EXIT` |
 | `get_last_successful_sync` | 无 | 返回最近成功同步检查点或 `null` |
-| `set_provider_secret` | `{ providerId, value }` | 写入 Windows 原生凭据库 |
-| `get_provider_secret` | `{ providerId }` | 返回秘密或 `null`；仅供安全配置层使用 |
-| `delete_provider_secret` | `{ providerId }` | 幂等删除凭据 |
+| `set_provider_secret` | `{ request: { providerId, secret } }` | 写入 Windows 原生凭据库 |
+| `get_provider_secret` | `{ request: { providerId } }` | 返回秘密或 `null`；仅供安全配置层使用 |
+| `delete_provider_secret` | `{ request: { providerId } }` | 幂等删除凭据 |
 
 TypeScript 使用 camelCase，Rust 结构以 serde rename 统一。IPC 错误对用户层归一化；秘密、完整数据库路径细节和 HTTP 正文不进入可见错误。
 

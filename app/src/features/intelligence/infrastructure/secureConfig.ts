@@ -7,7 +7,7 @@ import {
   saveConfigOrThrow,
 } from "../../../config/store";
 
-export const KNOWN_PROVIDER_IDS = ["claude", "openai", "deepseek", "zhipu", "kimi"] as const;
+export const KNOWN_PROVIDER_IDS = ["claude", "openai", "deepseek", "zhipu", "kimi", "ali"] as const;
 type KnownProviderId = (typeof KNOWN_PROVIDER_IDS)[number];
 
 export interface SecretStore {

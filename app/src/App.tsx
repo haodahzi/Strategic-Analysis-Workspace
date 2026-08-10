@@ -145,7 +145,7 @@ export default function App({ intelligenceBoot = fallbackIntelligenceBoot }: App
         </aside>
 
         <main className="app-main">
-          {items === null && <div className="dash"><div className="set-hint">正在载入本机数据…</div></div>}
+          {items === null && view !== "intelligence" && <div className="dash"><div className="set-hint">正在载入本机数据…</div></div>}
           {items !== null && view === "dashboard" && <Dashboard items={list} onOpen={openProject} onOpenReports={() => setView("reports")} />}
           {items !== null && view === "new" && <NewAnalysis onCreate={createAnalysis} onCancel={() => setView("dashboard")} />}
           {items !== null && view === "project" && (
@@ -157,7 +157,7 @@ export default function App({ intelligenceBoot = fallbackIntelligenceBoot }: App
                 : <ProjectWorkspace key={project.id} analysis={project} onUpdate={updateAnalysis} onDelete={() => deleteAnalysis(project.id)} />
           )}
           {items !== null && view === "reports" && <ReportLibrary />}
-          {items !== null && view === "intelligence" && (
+          {view === "intelligence" && (
             <IntelligenceFeature
               boot={intelligenceSnapshot}
               onRetry={() => { void intelligenceBoot.retry(); }}

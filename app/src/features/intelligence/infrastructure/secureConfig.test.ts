@@ -199,6 +199,60 @@ describe("secure provider configuration", () => {
     expect(storage.getItem(CONFIG_STORAGE_KEY)).not.toContain("browser-legacy-secret");
   });
 
+  it("migrates and reloads the Ali provider through the native credential store", async () => {
+    const raw = JSON.stringify(withSecret("ali", "legacy-ali-secret"));
+    storage.seed(CONFIG_STORAGE_KEY, raw);
+    const credentials = new Map<ProviderId, string>();
+    const store = fakeStore({
+      get: vi.fn(async (providerId) => credentials.get(providerId)),
+      set: vi.fn(async (providerId, secret) => { credentials.set(providerId, secret); }),
+      delete: vi.fn(async (providerId) => { credentials.delete(providerId); }),
+    });
+
+    await bootstrapSecureConfig(store);
+    expect(credentials.get("ali")).toBe("legacy-ali-secret");
+    expect(getCachedSecret("ali")).toBe("legacy-ali-secret");
+    expect(storage.getItem(CONFIG_STORAGE_KEY)).not.toContain("apiKey");
+
+    resetRuntimeSecretsForTests();
+    await bootstrapSecureConfig(store);
+    expect(getCachedSecret("ali")).toBe("legacy-ali-secret");
+  });
+
+  it("saves and deletes the Ali provider through the native credential store", async () => {
+    const credentials = new Map<ProviderId, string>();
+    const store = fakeStore({
+      get: vi.fn(async (providerId) => credentials.get(providerId)),
+      set: vi.fn(async (providerId, secret) => { credentials.set(providerId, secret); }),
+      delete: vi.fn(async (providerId) => { credentials.delete(providerId); }),
+    });
+
+    await saveConfigSecurely(withSecret("ali", "new-ali-secret"), store);
+    expect(credentials.get("ali")).toBe("new-ali-secret");
+    expect(getCachedSecret("ali")).toBe("new-ali-secret");
+
+    const cleared = withSecret("ali", "");
+    await saveConfigSecurely(cleared, store);
+    expect(credentials.has("ali")).toBe(false);
+    expect(getCachedSecret("ali")).toBeUndefined();
+  });
+
+  it.each([
+    ["malformed JSON", "{"],
+    ["null JSON", "null"],
+    ["non-array providers", JSON.stringify({ providers: {} })],
+    ["invalid provider entry", JSON.stringify({ providers: [null] })],
+  ])("treats %s as absent during native and browser secure bootstrap", async (_label, raw) => {
+    for (const store of [fakeStore(), createBrowserSecretStore()]) {
+      storage.seed(CONFIG_STORAGE_KEY, raw);
+      resetRuntimeSecretsForTests();
+      await expect(bootstrapSecureConfig(store)).resolves.toEqual({
+        storage: store.persistence === "native" ? "persistent-native" : "session-only",
+      });
+      expect(getCachedSecret("ali")).toBeUndefined();
+    }
+  });
+
   it("maps all native commands to the exact request envelope", async () => {
     const nativeInvoke = vi.fn()
       .mockResolvedValueOnce("stored-secret")

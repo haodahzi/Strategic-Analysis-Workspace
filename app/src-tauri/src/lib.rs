@@ -14,20 +14,36 @@ const INJECT_JS: &str = include_str!("inject.js");
 // 抓取回传（单页正文）：注入脚本调用，把正文以事件广播给主窗口（前端 listen('source-grab')）。
 #[tauri::command]
 fn grab_page(app: tauri::AppHandle, name: String, url: String, text: String) -> Result<(), String> {
-    app.emit("source-grab", serde_json::json!({ "name": name, "url": url, "text": text }))
-        .map_err(|e| e.to_string())
+    app.emit(
+        "source-grab",
+        serde_json::json!({ "name": name, "url": url, "text": text }),
+    )
+    .map_err(|e| e.to_string())
 }
 
 // 抓取回传（本页研报候选清单）：注入脚本采集原始候选，交主窗口（前端 scrape.ts 打分成清单）。
 #[tauri::command]
-fn grab_reports(app: tauri::AppHandle, source: String, page_url: String, items: serde_json::Value) -> Result<(), String> {
-    app.emit("source-reports", serde_json::json!({ "source": source, "pageUrl": page_url, "items": items }))
-        .map_err(|e| e.to_string())
+fn grab_reports(
+    app: tauri::AppHandle,
+    source: String,
+    page_url: String,
+    items: serde_json::Value,
+) -> Result<(), String> {
+    app.emit(
+        "source-reports",
+        serde_json::json!({ "source": source, "pageUrl": page_url, "items": items }),
+    )
+    .map_err(|e| e.to_string())
 }
 
 // 键名白名单：仅允许字母/数字/点/短横/下划线，杜绝路径穿越
 fn safe_key(key: &str) -> Result<String, String> {
-    if !key.is_empty() && key.len() <= 128 && key.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) {
+    if !key.is_empty()
+        && key.len() <= 128
+        && key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+    {
         Ok(key.to_string())
     } else {
         Err("非法存储键名".into())
@@ -35,7 +51,11 @@ fn safe_key(key: &str) -> Result<String, String> {
 }
 
 fn kv_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let d = app.path().app_data_dir().map_err(|e| e.to_string())?.join("kv");
+    let d = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("kv");
     std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
     Ok(d)
 }
@@ -76,16 +96,18 @@ fn open_external(url: String) -> Result<(), String> {
 // 杜绝第三方站点经内置浏览器越权读取任意本地文件。返回原始字节（前端得到 ArrayBuffer）。
 #[tauri::command]
 fn read_download(app: tauri::AppHandle, path: String) -> Result<tauri::ipc::Response, String> {
-    let canon = std::fs::canonicalize(std::path::PathBuf::from(&path)).map_err(|e| e.to_string())?;
+    let canon =
+        std::fs::canonicalize(std::path::PathBuf::from(&path)).map_err(|e| e.to_string())?;
     let roots = [
         app.path().download_dir().ok(),
         app.path().app_cache_dir().ok(),
         std::env::temp_dir().canonicalize().ok(),
     ];
-    let ok = roots
-        .iter()
-        .flatten()
-        .any(|r| std::fs::canonicalize(r).map(|rc| canon.starts_with(rc)).unwrap_or(false));
+    let ok = roots.iter().flatten().any(|r| {
+        std::fs::canonicalize(r)
+            .map(|rc| canon.starts_with(rc))
+            .unwrap_or(false)
+    });
     if !ok {
         return Err("只允许读取下载 / 缓存目录内的文件".into());
     }
@@ -95,7 +117,13 @@ fn read_download(app: tauri::AppHandle, path: String) -> Result<tauri::ipc::Resp
 
 // 打开信息源内置浏览器窗口。label=source-<id>，重复打开则聚焦；建窗强制在主线程执行以免卡死。
 #[tauri::command]
-async fn open_source_browser(app: tauri::AppHandle, url: String, label: String, title: String, name: String) -> Result<(), String> {
+async fn open_source_browser(
+    app: tauri::AppHandle,
+    url: String,
+    label: String,
+    title: String,
+    name: String,
+) -> Result<(), String> {
     if let Some(w) = app.get_webview_window(&label) {
         let _ = w.set_focus();
         return Ok(());
@@ -116,11 +144,17 @@ async fn open_source_browser(app: tauri::AppHandle, url: String, label: String, 
                 if let tauri::webview::DownloadEvent::Finished { path, success, .. } = event {
                     if success {
                         if let Some(p) = path {
-                            let name = p.file_name().and_then(|s| s.to_str()).map(String::from)
+                            let name = p
+                                .file_name()
+                                .and_then(|s| s.to_str())
+                                .map(String::from)
                                 .unwrap_or_else(|| "下载文件".into());
-                            let _ = dl_app.emit("source-download", serde_json::json!({
-                                "path": p.to_string_lossy(), "name": name
-                            }));
+                            let _ = dl_app.emit(
+                                "source-download",
+                                serde_json::json!({
+                                    "path": p.to_string_lossy(), "name": name
+                                }),
+                            );
                         }
                     }
                 }
