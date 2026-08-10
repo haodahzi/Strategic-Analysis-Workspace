@@ -6,13 +6,18 @@ import {
   PROJECT_REPORT_FRAME, buildProjectReportRequest, mockProjectReport,
   ProjectReportCtx, ProjectReportInput,
 } from "./pipeline";
+import { emptyEvaluation } from "../domain/evaluation";
 
 const prInp: ProjectReportInput = { name: "白酒线下经销项目", industry: "白酒经销", counterparty: "泸州老窖", ourRole: "客户方" };
-const prCtx = (over: Partial<ProjectReportCtx> = {}): ProjectReportCtx => ({
-  deepReport: "调研前定稿：命门是回款周期与货权。", materials: "已知：赊销 60 天", records: "- [要问对方·已核] 结算方式 → 带款提货",
-  verdict: "继续推进", verdictReason: "前期了解已达成", stance: "可做但需控回款", grounds: ["渠道成熟"], confidence: "中", falsifiers: ["回款失控则翻"], tx: "资金→采购→分销",
-  ...over,
-});
+const prCtx = (over: Partial<ProjectReportCtx> = {}): ProjectReportCtx => {
+  const ev = emptyEvaluation();
+  ev.strategy.fitType = "主业范围内";
+  ev.commercial = { market: 7, terms: 6, model: 6, txStructure: "资金→采购→分销", note: "" };
+  ev.credit.merchants = [{ name: "泸州老窖", scores: [9, 9, 8, 9, 9], redLine: false, redLineNote: "", note: "" }];
+  ev.economics.revenue = [1000, 2000, 3000];
+  ev.economics.grossProfit = [300, 600, 900];
+  return { deepReport: "调研前定稿：命门是回款周期与货权。", materials: "已知：赊销 60 天", records: "- [要问对方·已核] 结算方式 → 带款提货", evaluation: ev, ...over };
+};
 
 describe("多智能体报告流水线", () => {
   it("流水线为 规划→资料→起草→红队→定稿→验收 六步", () => {
@@ -83,22 +88,24 @@ describe("多智能体报告流水线", () => {
 });
 
 describe("洽谈后 · 项目立项报告一键导出", () => {
-  it("PROJECT_REPORT_FRAME：含四大重点章节，按需求剔除团队与推进计划", () => {
-    for (const k of ["项目基本情况", "商业模式", "经济效益", "风险分析及控制措施", "立项结论"]) expect(PROJECT_REPORT_FRAME).toContain(k);
+  it("PROJECT_REPORT_FRAME：六维章节齐全，按需求剔除团队与推进计划、采销计划", () => {
+    for (const k of ["项目情况", "战略契合度", "商业可行性", "客商资信", "经济效益", "风险可控性", "立项结论"]) expect(PROJECT_REPORT_FRAME).toContain(k);
     expect(PROJECT_REPORT_FRAME).not.toContain("团队");
     expect(PROJECT_REPORT_FRAME).not.toContain("推进计划");
+    expect(PROJECT_REPORT_FRAME).not.toContain("采销计划");
   });
 
-  it("buildProjectReportRequest：走定稿 system，注入框架 + 底稿 + 洽谈记录 + 定调，含组件路由", () => {
+  it("buildProjectReportRequest：走定稿 system，注入框架 + 雷达 + 测算表 + 底稿，含组件路由", () => {
     const req = buildProjectReportRequest(prInp, prCtx(), "m1");
     expect(req.model).toBe("m1");
     expect(req.system).toContain("主笔");                       // 定稿角色 system
     expect(req.messages[0].content).toContain("项目立项报告");
     expect(req.messages[0].content).toContain("命门是回款周期");   // 深度分析底稿喂入
     expect(req.messages[0].content).toContain("带款提货");         // 洽谈记录喂入
+    expect(req.messages[0].content).toContain("```radar");        // 五维雷达注入
+    expect(req.messages[0].content).toContain("营业收入");        // 经济测算表注入
     expect(req.messages[0].content).toContain("继续推进");         // 定调贯穿
-    expect(req.messages[0].content).toContain("dealflow");         // 交易结构链路图路由
-    expect(req.messages[0].content).toContain("formula");          // 盈利公式路由
+    expect(req.messages[0].content).toContain("dealflow");         // 交易结构路由
     expect(req.messages[0].content).toContain("verdict");          // 立项结论路由
   });
 
@@ -108,15 +115,28 @@ describe("洽谈后 · 项目立项报告一键导出", () => {
     expect(c).toContain("需补");
   });
 
-  it("mockProjectReport：五章齐全 + 风险控制表 + verdict 块，暂缓/继续推进下一步不同", () => {
-    const go = mockProjectReport(prInp, prCtx({ verdict: "继续推进" }));
-    for (const h of ["## 项目基本情况", "## 商业模式", "## 经济效益", "## 风险分析及控制措施", "## 立项结论"]) expect(go).toContain(h);
-    expect(go).toContain("| 风险 | 控制措施 |");
+  it("mockProjectReport：六章齐全 + 雷达 + 测算表 + 风险表 + verdict，暂缓/继续推进下一步不同", () => {
+    const ev = emptyEvaluation(); ev.verdict = "继续推进";
+    const go = mockProjectReport(prInp, prCtx({ evaluation: ev }));
+    for (const h of ["## 项目情况", "## 战略契合度", "## 商业可行性", "## 客商资信", "## 经济效益", "## 风险可控性", "## 立项结论"]) expect(go).toContain(h);
+    expect(go).toContain("```radar");
+    expect(go).toContain("业务净利润");                          // 测算表
+    expect(go).toContain("| 风险 | 可控性(0–10) | 控制措施 |");
     expect(go).toContain("```verdict");
     expect(go).toContain("公司内部决策");
-    const hold = mockProjectReport(prInp, prCtx({ verdict: "暂缓" }));
+    const evHold = emptyEvaluation(); evHold.verdict = "暂缓";
+    const hold = mockProjectReport(prInp, prCtx({ evaluation: evHold }));
     expect(hold).toContain("暂缓推进");
     expect(hold).toContain("白酒线下经销项目");
+  });
+
+  it("mockProjectReport：客商触红线 → 单独重点提示", () => {
+    const ev = emptyEvaluation();
+    ev.credit.merchants = [{ name: "风险客商", scores: [9, 9, 9, 9, 9], redLine: true, redLineNote: "失信被执行", note: "" }];
+    const md = mockProjectReport(prInp, prCtx({ evaluation: ev }));
+    expect(md).toContain("⚠红线");
+    expect(md).toContain("失信被执行");
+    expect(md).toContain("触红线");
   });
 });
 

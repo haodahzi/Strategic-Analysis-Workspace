@@ -2,6 +2,7 @@
 // 映射：# / ## → 章（编号）；### → 小节标题；#### → 副标签；> 引用 → 语义批注框（结论/风险/洞察）；
 // 表格 → 房子表格；- / 1. → 列表；--- → 分隔线。再由 buildHouseDoc 套封面/页脚成独立文档。
 import { escapeHtml } from "./build";
+import { RadarAxis, radarSvg } from "./radar";
 
 export interface HouseMeta { title: string; subtitle?: string; badges?: string[]; foot?: string; }
 
@@ -397,6 +398,23 @@ function renderLine(rows: string[]): string {
     `${plot}${xlab}</svg><div class="ln-legend">${legend}</div>${foot ? `<div class="ln-foot">${inline(foot)}</div>` : ""}</div>`;
 }
 
+// 雷达图——```radar：可选 # 标题；每行 轴名 | 分值(0–10)。五/六轴皆可（多维评价打分）。
+function renderRadar(rows: string[]): string {
+  let title = "";
+  const axes: RadarAxis[] = [];
+  for (const raw of rows) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = /^#\s+(.*)$/.exec(line);
+    if (h && !axes.length) { title = h[1].trim(); continue; }
+    const c = line.split("|").map((x) => x.trim());
+    const v = parseFloat((c[1] ?? "").replace(/[^\d.+-]/g, ""));
+    if (c[0] && !isNaN(v)) axes.push({ label: c[0], value: v });
+  }
+  if (axes.length < 3) return "";
+  return `<div class="radar-wrap">${radarSvg(axes, { title })}</div>`;
+}
+
 export function mdToHouseHtml(md: string): string {
   const lines = md.replace(/\r/g, "").split("\n");
   const out: string[] = [];
@@ -476,6 +494,7 @@ export function mdToHouseHtml(md: string): string {
       else if (lang === "quad" || lang === "matrix") out.push(renderQuad(body));
       else if (lang === "waterfall" || lang === "bridge") out.push(renderWaterfall(body));
       else if (lang === "line") out.push(renderLine(body));
+      else if (lang === "radar") out.push(renderRadar(body));
       else out.push(`<pre class="md-pre">${escapeHtml(body.join("\n"))}</pre>`);
       continue;
     }

@@ -6,6 +6,7 @@ import {
 } from "./pipeline";
 import { AppConfig, ChatRequest, LLMClient } from "./types";
 import { QItem } from "../types";
+import { Evaluation, emptyEvaluation } from "../domain/evaluation";
 import { loadConfig, providerById } from "../config/store";
 import { makeClient } from "./adapters";
 import { getLlmFetch } from "./runtime";
@@ -30,6 +31,8 @@ export interface RunState {
   sources: SearchHit[];        // 联网检索到的来源（供正文引用 + 文末参考文献）
   progress: string;            // 当前步的细粒度进度（如分块精读 3/8 段）
   questions: QItem[];          // 洽谈清单（按项目落盘，切走再切回不丢）
+  evaluation: Evaluation;      // 洽谈后·六维评价（按项目落盘）
+  evalTouched: boolean;        // 评价是否被编辑过（决定是否落盘）
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -37,7 +40,7 @@ const runs = new Map<string, RunState>();
 const listeners = new Map<string, Set<() => void>>();
 
 function empty(): RunState {
-  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "", attachments: [], sources: [], progress: "", questions: [] };
+  return { started: false, running: false, done: false, status: {}, outputs: [], report: null, realReport: null, err: "", materials: "", attachments: [], sources: [], progress: "", questions: [], evaluation: emptyEvaluation(), evalTouched: false };
 }
 
 // 惰性初始化并返回稳定引用（配合 useSyncExternalStore）
@@ -67,8 +70,8 @@ function persistSoon() {
 function serializeRuns(): string {
   const obj: Record<string, unknown> = {};
   for (const [id, s] of runs) {
-    if (!s.started && !s.materials && !s.attachments.length && !s.questions.length) continue;   // 空壳不落
-    obj[id] = { started: s.started, done: s.done, status: s.status, outputs: s.outputs, realReport: s.realReport, materials: s.materials, attachments: s.attachments, sources: s.sources, questions: s.questions };
+    if (!s.started && !s.materials && !s.attachments.length && !s.questions.length && !s.evalTouched) continue;   // 空壳不落
+    obj[id] = { started: s.started, done: s.done, status: s.status, outputs: s.outputs, realReport: s.realReport, materials: s.materials, attachments: s.attachments, sources: s.sources, questions: s.questions, evaluation: s.evalTouched ? s.evaluation : undefined, evalTouched: s.evalTouched };
   }
   return JSON.stringify(obj);
 }
@@ -92,6 +95,7 @@ export async function hydrateRuns(): Promise<void> {
         realReport: s.realReport ?? null,
         materials: s.materials ?? "", attachments: s.attachments ?? [], sources: s.sources ?? [],
         questions: s.questions ?? [],
+        evaluation: s.evaluation ?? emptyEvaluation(), evalTouched: !!s.evalTouched,
       });
       notify(id);
     }
@@ -108,6 +112,9 @@ export function removeAttachment(id: string, name: string) {
 }
 // 洽谈清单按项目落盘（切走再切回不丢）。
 export function setAnalysisQuestions(id: string, questions: QItem[]) { patch(id, { questions }); }
+
+// 洽谈后·六维评价按项目落盘。
+export function setEvaluation(id: string, evaluation: Evaluation) { patch(id, { evaluation, evalTouched: true }); }
 
 // 删除整份分析的运行状态（配合「删除在办分析」）：从内存与落盘一并移除。
 export function deleteRun(id: string) {
