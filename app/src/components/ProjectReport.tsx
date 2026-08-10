@@ -89,6 +89,7 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
         const fetchImpl = await getLlmFetch();
         md = await sendComplete(makeClient(prov, fetchImpl), buildProjectReportRequest(inp, ctx, agent.model), 5);
         if (!md.trim()) throw new Error("模型返回为空——可到「设置」为「定稿」换一款模型后重试");
+        md = md.replace(/^\s*#\s+.*\r?\n+/, "");   // 去掉正文里重复的报告大标题（封面已有），避免被编成 01 章
       } else md = mockProjectReport(inp, ctx);
       const refs = [
         ...run.attachments.map((a) => (a.url ? `[${a.name}](${a.url})（上传 / 抓取）` : `${a.name}（上传材料）`)),

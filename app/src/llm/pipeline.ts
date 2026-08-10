@@ -251,7 +251,7 @@ export function buildProjectReportRequest(inp: ProjectReportInput, ctx: ProjectR
     `\n\n【洽谈记录（带问题去核后的答案 / 未决项）】\n${ctx.records.trim() || "（无）"}` +
     `\n\n【定调】${ev.verdict}：${ev.verdictReason.trim() || "（未填）"}` +
     `\n\n用 markdown 输出，结论先行、结构化优先。${STRUCTURE_RULE} ${NEUTRALITY} ${MARKUP_HINT} ${CITE_HINT} ${SOURCE_HINT} ${LENGTH_HINT}` +
-    `\n特别注意：雷达代码块与经济测算表原样保留、数字不改；交易结构用 dealflow；结尾立项结论用 verdict；触红线的客商必须单独重点提示；全篇定调与「${ev.verdict}」一致。`;
+    `\n特别注意：不要写报告大标题（不要 # 一级标题——封面已有标题）；开篇摘要·定调用一句「> 结论：…」引用块（不编号），随后从「## 项目情况」开始逐章。把五维雷达代码块放在「## 项目情况」标题正下方、正文之前（正文文字会自动排在雷达左侧）。雷达代码块与经济测算表原样保留、数字不改；交易结构用 dealflow；结尾立项结论用 verdict；触红线的客商必须单独重点提示；全篇定调与「${ev.verdict}」一致。`;
   return { model, system: AGENT_SYS["定稿"], messages: [{ role: "user", content: user }], maxTokens: 8000 };
 }
 
@@ -262,8 +262,8 @@ export function mockProjectReport(inp: ProjectReportInput, ctx: ProjectReportCtx
   const ms = activeMerchants(ev.credit);
   const redlines = creditRedLines(ev.credit);
   const risks = ev.risk.items.filter((i) => i.kind.trim());
-  const out: string[] = [`# 项目立项报告 · ${inp.name}`, "", `> 结论：${ev.verdict} —— ${ev.verdictReason.trim() || "（补一句定调理由）"}`, ""];
-  out.push(`## 项目情况`, `${inp.counterparty ? `对方：${inp.counterparty}。` : ""}项目背景、业务概要与意义——请补充（可先在「调研前·深度分析」生成研究底稿）。`, "", radarBlock(ev), "");
+  const out: string[] = [`> 结论：${ev.verdict} —— ${ev.verdictReason.trim() || "（补一句定调理由）"}`, ""];
+  out.push(`## 项目情况`, radarBlock(ev), "", `本项目「${inp.name}」${inp.counterparty ? `，对方「${inp.counterparty}」` : ""}。项目背景、业务概要与意义——请补充（可先在「调研前·深度分析」生成研究底稿）。`, "");
   out.push(`## 战略契合度`, ev.strategy.fitType ? `档位：**${ev.strategy.fitType}**（${strategyScore(ev.strategy)}/10）。${ev.strategy.note || ""}` : "未评（0/10）——需选定契合档位。", "");
   out.push(`## 商业可行性`, `市场前景 ${ev.commercial.market} / 商务条件 ${ev.commercial.terms} / 模式可执行 ${ev.commercial.model} → ${commercialScore(ev.commercial)}/10。${ev.commercial.note || ""}`, "");
   if (ev.commercial.txStructure.trim()) out.push(`交易结构：${ev.commercial.txStructure.trim()}`, "");
