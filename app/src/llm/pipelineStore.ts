@@ -122,7 +122,7 @@ function effectiveMaterials(s: RunState): string {
 }
 
 // 长文本生成：命中输出上限就自动续写、拼接，直到写完或达轮数上限（#5 篇幅不再受单次 token 限制）。
-async function sendComplete(client: LLMClient, req: ChatRequest, maxRounds = 5): Promise<string> {
+export async function sendComplete(client: LLMClient, req: ChatRequest, maxRounds = 5): Promise<string> {
   const messages = [...req.messages];
   let full = "";
   for (let r = 0; r < maxRounds; r++) {

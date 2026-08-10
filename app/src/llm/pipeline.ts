@@ -164,6 +164,102 @@ export function buildStageRequest(stage: PipelineStage, ctx: PipelineCtx, model:
   return { model, system: AGENT_SYS[stage.role], messages: [{ role: "user", content: user }], maxTokens };
 }
 
+// ============ 洽谈后 · 项目立项报告（一键导出）============
+// 独立于「调研前 深度分析」的决策文档：面向公司内部决策者，讲清这单业务是什么、
+// 商业模式、经济效益、风险与控制，落到「继续推进 / 暂缓」的立项结论。
+// 按需求精简：团队安排与项目推进计划不写。以调研前深度分析为事实底稿。
+export const PROJECT_REPORT_FRAME =
+  "〇 摘要·定调（开篇一句话结论 + 本单定调「继续推进 / 暂缓」及一句理由，让读者先看到结论）｜" +
+  "一 项目基本情况（项目背景、业务概要、项目意义——≤300字，先讲清这单业务到底是什么、我方做什么、对方是谁）｜" +
+  "二 商业模式：①交易标的物（商品贸易：品牌 / 主营产品 / 市场定价区间；服务贸易：服务内容 / 市场定价区间）· ②业务类型与盈利模式（靠什么赚钱：量×价、成本结构、毛利来源；盈利公式用 formula 居中单独成行）· ③主要上下游客商（各核心客商简介 + 已知工商 / 资信 / 涉诉风险；查不到的标「需补」，绝不杜撰）· ④交易结构链路图（货流 / 单据流 / 资金流的流向与周期、货权转移点、结算方式[预付 / 赊销 / 带款提货]，用 dealflow 画中心辐射图）｜" +
+  "三 经济效益：①市场情况（所在行业发展与趋势研判，≤500字）· ②经济效益测算（采销计划、成本 / 收入 / 毛利、周期与回收；有数据用表格测算、无则标「需补」，绝不虚构数字）｜" +
+  "四 风险分析及控制措施（逐条「风险 → 控制措施」，用表格或分组块）：政策性风险 · 客商信用风险（含回款）· 交易标的物风险 · 市场风险 · 其他（汇率 / 授权 / 资质）｜" +
+  "五 立项结论（综合商业模式、经济效益、客商资信、风险控制，落到「继续推进 / 暂缓」的明确结论与下一步：继续推进＝推动公司内部决策、深入探讨要不要做、需补哪些尽调；暂缓＝因何暂缓、恢复条件；用 verdict 收口）";
+
+export interface ProjectReportInput { name: string; industry: string; counterparty?: string; ourRole?: string; }
+export interface ProjectReportCtx {
+  deepReport: string;     // 调研前 深度分析 定稿（事实底稿）
+  materials: string;      // 本单材料
+  records: string;        // 洽谈记录（问答 / 未决项）
+  verdict: string;        // 继续推进 / 暂缓
+  verdictReason: string;
+  stance: string;
+  grounds: string[];
+  confidence: string;
+  falsifiers: string[];
+  tx: string;             // 交易框架（据实录入）
+}
+
+// 组装「一键导出项目报告」的模型请求（纯函数、可单测）。走「定稿」主笔。
+export function buildProjectReportRequest(inp: ProjectReportInput, ctx: ProjectReportCtx, model: string): ChatRequest {
+  const subj = `本单「${inp.name}」${inp.counterparty ? ` · 对方「${inp.counterparty}」` : ""}${inp.industry ? ` · 行业「${inp.industry}」` : ""}`;
+  const g = ctx.grounds.filter((x) => x.trim());
+  const f = ctx.falsifiers.filter((x) => x.trim());
+  const user =
+    `${subj}。请写一份【项目立项报告】——面向公司内部决策者，客观讲清这单业务是什么、商业模式、经济效益、风险与控制，最后给出立项结论。` +
+    `\n【必须遵循的框架 · 章节与顺序照此；团队安排与推进计划不写】\n${PROJECT_REPORT_FRAME}` +
+    `\n\n【调研前·深度分析（事实底稿，据此提炼，勿照抄原文）】\n${ctx.deepReport.trim() || "（尚未生成深度分析——请据下方材料与洽谈记录，能写则写、缺口标「需补」，绝不虚构）"}` +
+    `\n\n【本单材料】\n${ctx.materials.trim() || "（无）"}` +
+    `\n\n【洽谈记录（带问题去核后的答案 / 未决项）】\n${ctx.records.trim() || "（无）"}` +
+    `\n\n【当前定调】${ctx.verdict}：${ctx.verdictReason.trim() || "（未填）"}` +
+    `\n【可行性判断】立场：${ctx.stance.trim() || "（未填）"}；把握度：${ctx.confidence}；依据：${g.join("；") || "（未填）"}；falsifiers：${f.join("；") || "（未填）"}` +
+    `\n【交易框架（据实录入）】\n${ctx.tx.trim() || "（未填）"}` +
+    `\n\n用 markdown 输出，结论先行、结构化优先。${STRUCTURE_RULE} ${NEUTRALITY} ${MARKUP_HINT} ${CITE_HINT} ${SOURCE_HINT} ${LENGTH_HINT}` +
+    `\n特别注意：「交易结构链路图」用 dealflow 画、「盈利公式」用 formula 居中、「经济效益测算」用表格、「风险分析及控制措施」用表格或分组块（每条：风险 | 控制措施）、结尾「立项结论」用 verdict；全篇定调要与「${ctx.verdict}」一致。`;
+  return { model, system: AGENT_SYS["定稿"], messages: [{ role: "user", content: user }], maxTokens: 8000 };
+}
+
+// 无真实模型（mock）时的兜底骨架：把已填字段落进框架、缺口标「需补」，保证「一键导出」始终能出一份文档。
+export function mockProjectReport(inp: ProjectReportInput, ctx: ProjectReportCtx): string {
+  const next = ctx.verdict === "继续推进"
+    ? "推动公司内部决策、深入探讨要不要做；补齐关键尽调与经济效益测算"
+    : "暂缓推进；待关键前提确认 / 条件成熟后再启动";
+  const g = ctx.grounds.filter((x) => x.trim());
+  return [
+    `# 项目立项报告 · ${inp.name}`,
+    ``,
+    `> 结论：${ctx.verdict} —— ${ctx.verdictReason.trim() || "（补一句定调理由）"}`,
+    ``,
+    `## 项目基本情况`,
+    `${inp.counterparty ? `对方：${inp.counterparty}。` : ""}项目背景、业务概要与意义——请补充；或先到「调研前 · 深度分析」生成研究底稿，再一键导出即为完整报告。`,
+    ``,
+    `## 商业模式`,
+    `### 交易标的物`,
+    `商品贸易：品牌 / 主营产品 / 市场定价区间；服务贸易：服务内容 / 定价区间——需补。`,
+    `### 业务类型与盈利模式`,
+    `靠什么赚钱：量×价、成本结构、毛利来源——需补。`,
+    `### 主要上下游客商`,
+    `各核心客商简介与工商 / 资信——需补。`,
+    `### 交易结构链路图`,
+    `${ctx.tx.trim() || "据实录入：货流 / 单据流 / 资金流、货权转移点、结算方式（预付 / 赊销 / 带款提货）——需补。"}`,
+    ``,
+    `## 经济效益`,
+    `### 市场情况`,
+    `所在行业发展与趋势——需补。`,
+    `### 经济效益测算`,
+    `采销计划、成本 / 收入 / 毛利、周期与回收——需补（有数据再据实测算，不虚构）。`,
+    ``,
+    `## 风险分析及控制措施`,
+    ``,
+    `| 风险 | 控制措施 |`,
+    `| --- | --- |`,
+    `| 政策性风险 | 需补 |`,
+    `| 客商信用风险（含回款） | 需补 |`,
+    `| 交易标的物风险 | 需补 |`,
+    `| 市场风险 | 需补 |`,
+    `| 其他（汇率 / 授权 / 资质） | 需补 |`,
+    ``,
+    `## 立项结论`,
+    ``,
+    "```verdict",
+    `定调 | ${ctx.verdict}`,
+    `理由 | ${ctx.verdictReason.trim() || "需补"}`,
+    `下一步 | ${next}`,
+    "```",
+    g.length ? `\n立场依据：${g.join("；")}。` : "",
+  ].join("\n");
+}
+
 // ——分块精读（map-reduce）：长材料切块逐块抽取，避免一坨塞进去被模型略读——
 // 按段落聚合到约 size 字一块；超长段落硬切。纯函数、可单测。
 export function chunkText(text: string, size = 6000): string[] {

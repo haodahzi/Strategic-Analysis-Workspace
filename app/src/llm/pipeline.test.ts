@@ -3,7 +3,16 @@ import {
   REPORT_PIPELINE, mockStageOutput, mockReport, buildStageRequest,
   buildChecklistRequest, parseChecklist, mockChecklist,
   chunkText, buildDigestRequest,
+  PROJECT_REPORT_FRAME, buildProjectReportRequest, mockProjectReport,
+  ProjectReportCtx, ProjectReportInput,
 } from "./pipeline";
+
+const prInp: ProjectReportInput = { name: "白酒线下经销项目", industry: "白酒经销", counterparty: "泸州老窖", ourRole: "客户方" };
+const prCtx = (over: Partial<ProjectReportCtx> = {}): ProjectReportCtx => ({
+  deepReport: "调研前定稿：命门是回款周期与货权。", materials: "已知：赊销 60 天", records: "- [要问对方·已核] 结算方式 → 带款提货",
+  verdict: "继续推进", verdictReason: "前期了解已达成", stance: "可做但需控回款", grounds: ["渠道成熟"], confidence: "中", falsifiers: ["回款失控则翻"], tx: "资金→采购→分销",
+  ...over,
+});
 
 describe("多智能体报告流水线", () => {
   it("流水线为 规划→资料→起草→红队→定稿→验收 六步", () => {
@@ -70,6 +79,44 @@ describe("多智能体报告流水线", () => {
     expect(rep.risks.some((r) => r.dealBreaker)).toBe(true);
     expect(rep.judgment.falsifiers.length).toBeGreaterThan(0);
     expect(rep.judgment.stance && rep.judgment.confidence && rep.judgment.grounds.length).toBeTruthy();
+  });
+});
+
+describe("洽谈后 · 项目立项报告一键导出", () => {
+  it("PROJECT_REPORT_FRAME：含四大重点章节，按需求剔除团队与推进计划", () => {
+    for (const k of ["项目基本情况", "商业模式", "经济效益", "风险分析及控制措施", "立项结论"]) expect(PROJECT_REPORT_FRAME).toContain(k);
+    expect(PROJECT_REPORT_FRAME).not.toContain("团队");
+    expect(PROJECT_REPORT_FRAME).not.toContain("推进计划");
+  });
+
+  it("buildProjectReportRequest：走定稿 system，注入框架 + 底稿 + 洽谈记录 + 定调，含组件路由", () => {
+    const req = buildProjectReportRequest(prInp, prCtx(), "m1");
+    expect(req.model).toBe("m1");
+    expect(req.system).toContain("主笔");                       // 定稿角色 system
+    expect(req.messages[0].content).toContain("项目立项报告");
+    expect(req.messages[0].content).toContain("命门是回款周期");   // 深度分析底稿喂入
+    expect(req.messages[0].content).toContain("带款提货");         // 洽谈记录喂入
+    expect(req.messages[0].content).toContain("继续推进");         // 定调贯穿
+    expect(req.messages[0].content).toContain("dealflow");         // 交易结构链路图路由
+    expect(req.messages[0].content).toContain("formula");          // 盈利公式路由
+    expect(req.messages[0].content).toContain("verdict");          // 立项结论路由
+  });
+
+  it("buildProjectReportRequest：无深度分析底稿时给出降级指引、不虚构", () => {
+    const c = buildProjectReportRequest(prInp, prCtx({ deepReport: "" }), "m1").messages[0].content;
+    expect(c).toContain("尚未生成深度分析");
+    expect(c).toContain("需补");
+  });
+
+  it("mockProjectReport：五章齐全 + 风险控制表 + verdict 块，暂缓/继续推进下一步不同", () => {
+    const go = mockProjectReport(prInp, prCtx({ verdict: "继续推进" }));
+    for (const h of ["## 项目基本情况", "## 商业模式", "## 经济效益", "## 风险分析及控制措施", "## 立项结论"]) expect(go).toContain(h);
+    expect(go).toContain("| 风险 | 控制措施 |");
+    expect(go).toContain("```verdict");
+    expect(go).toContain("公司内部决策");
+    const hold = mockProjectReport(prInp, prCtx({ verdict: "暂缓" }));
+    expect(hold).toContain("暂缓推进");
+    expect(hold).toContain("白酒线下经销项目");
   });
 });
 
