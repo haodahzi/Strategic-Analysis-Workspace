@@ -41,5 +41,7 @@ export function radarSvg(axes: RadarAxis[], opts: RadarOpts = {}): string {
   const dots = axes.map((a, i) => { const [x, y] = pt(i, (R * clampV(a.value)) / max); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${teal}"/>`; }).join("");
   const title = opts.title ? `<text x="${cx}" y="16" text-anchor="middle" font-size="13" font-weight="700" fill="${ink}" font-family="system-ui,-apple-system,sans-serif">${esc(opts.title)}</text>` : "";
 
-  return `<svg viewBox="0 0 ${size} ${size + 34}" width="${size}" height="${size + 34}" role="img" class="radar-svg" xmlns="http://www.w3.org/2000/svg">${title}${rings.join("")}${spokes.join("")}<polygon points="${dpoly}" fill="${fill}" stroke="${teal}" stroke-width="2" stroke-linejoin="round"/>${dots}${labels.join("")}</svg>`;
+  const padX = 68;                                                      // 左右留白，容下「风险可控性 / 主要客商资信」等轴标签，避免被裁切
+  const vbW = size + padX * 2, vbH = size + 34;
+  return `<svg viewBox="${-padX} 0 ${vbW} ${vbH}" width="${vbW}" height="${vbH}" role="img" class="radar-svg" xmlns="http://www.w3.org/2000/svg">${title}${rings.join("")}${spokes.join("")}<polygon points="${dpoly}" fill="${fill}" stroke="${teal}" stroke-width="2" stroke-linejoin="round"/>${dots}${labels.join("")}</svg>`;
 }
