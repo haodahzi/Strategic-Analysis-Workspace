@@ -1,12 +1,23 @@
 use keyring::Entry;
 use serde::Deserialize;
 
-const SERVICE: &str = "com.zhanlue.workbench.llm";
+const DEFAULT_SERVICE: &str = "com.zhanlue.workbench.llm";
 const INVALID_PROVIDER: &str = "invalid provider id";
 const INVALID_SECRET: &str = "secret must not be blank";
 const SECRET_READ_FAILED: &str = "secure credential read failed";
 const SECRET_WRITE_FAILED: &str = "secure credential write failed";
 const SECRET_DELETE_FAILED: &str = "secure credential delete failed";
+
+fn service_name(build_override: Option<&'static str>) -> &'static str {
+    match build_override {
+        Some(value) if !value.trim().is_empty() => value,
+        _ => DEFAULT_SERVICE,
+    }
+}
+
+fn credential_service() -> &'static str {
+    service_name(option_env!("WORKBENCH_CREDENTIAL_SERVICE"))
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BackendError {
@@ -24,7 +35,7 @@ struct NativeCredentialBackend;
 
 impl NativeCredentialBackend {
     fn entry(provider_id: &str) -> Result<Entry, BackendError> {
-        Entry::new(SERVICE, provider_id).map_err(|_| BackendError::Failed)
+        Entry::new(credential_service(), provider_id).map_err(|_| BackendError::Failed)
     }
 }
 
@@ -132,6 +143,16 @@ pub fn delete_provider_secret(request: ProviderSecretRequest) -> Result<(), Stri
 mod tests {
     use super::*;
     use std::cell::RefCell;
+
+    #[test]
+    fn credential_service_uses_default_or_non_blank_build_override() {
+        assert_eq!(service_name(None), "com.zhanlue.workbench.llm");
+        assert_eq!(
+            service_name(Some("com.zhanlue.workbench.intelligence-test.llm")),
+            "com.zhanlue.workbench.intelligence-test.llm"
+        );
+        assert_eq!(service_name(Some("   ")), "com.zhanlue.workbench.llm");
+    }
 
     struct FakeBackend {
         value: RefCell<Result<String, BackendError>>,
