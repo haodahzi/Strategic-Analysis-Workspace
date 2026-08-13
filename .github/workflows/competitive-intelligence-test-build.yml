@@ -1,0 +1,75 @@
+name: build-competitive-intelligence-test
+
+on:
+  push:
+    branches:
+      - "feature/competitive-intelligence"
+
+permissions:
+  contents: read
+
+env:
+  RUST_BACKTRACE: "1"
+  WORKBENCH_CREDENTIAL_SERVICE: "com.zhanlue.workbench.intelligence-test.llm"
+
+jobs:
+  build-windows-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Setup Rust 1.77.2
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.77.2
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "app/src-tauri -> target"
+
+      - name: Frontend tests
+        working-directory: app
+        run: npm test
+
+      - name: Frontend typecheck
+        working-directory: app
+        run: npm run typecheck
+
+      - name: Rust tests
+        working-directory: app/src-tauri
+        run: cargo test --locked
+
+      - name: Rust check
+        working-directory: app/src-tauri
+        run: cargo check --locked
+
+      - name: Rust format check
+        working-directory: app/src-tauri
+        run: cargo fmt -- --check
+
+      - name: Build isolated Windows installer
+        working-directory: app
+        run: npm run tauri build -- --config src-tauri/tauri.intelligence-test.conf.json
+
+      - name: Set artifact suffix
+        id: artifact_meta
+        shell: pwsh
+        run: '"short_sha=$($env:GITHUB_SHA.Substring(0, 7))" >> $env:GITHUB_OUTPUT'
+
+      - name: Upload Windows test installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: competitive-intelligence-windows-test-${{ steps.artifact_meta.outputs.short_sha }}
+          path: app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 30

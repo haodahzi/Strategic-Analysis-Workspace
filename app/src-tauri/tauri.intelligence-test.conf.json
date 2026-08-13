@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "StrategicAnalysisWorkbench-IntelligenceTest",
+  "identifier": "com.zhanlue.workbench.intelligence-test",
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"]
+  }
+}
