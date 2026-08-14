@@ -179,30 +179,32 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
 
       {/* ① 项目情况 */}
       {tab === "overview" && (
-        <div className="ev-pane ev-overview">
-          <div className="ev-ov-left">
-            <div className="sec-head">项目情况 · 定调</div>
-            <div className="ev-verdict-pick">
-              {(["继续推进", "暂缓"] as EvalVerdict[]).map((v) => (
-                <button key={v} type="button" className={"pr-vbtn wide v-" + v + (ev.verdict === v ? " on" : "")} onClick={() => pickVerdict(v)}>{v}</button>
-              ))}
-            </div>
-            <div className={"pr-verdict-banner v-" + ev.verdict}>
-              <div className="pr-vb-tag">定调 · {ev.verdict === "继续推进" ? "推向公司内部决策 · 深入探讨要不要做" : "暂缓 · 各种原因不再推进"}</div>
-              <textarea className="pr-vb-reason" value={ev.verdictReason} onChange={(e) => update({ verdictReason: e.target.value })} />
-            </div>
-            <label className="fld" style={{ marginTop: 14 }}><span>项目简介（一段话：业务模式 · 关键客户 · 盈利模式 · 核心壁垒或关键价值）</span>
-              <textarea className="nd-extra" rows={5} value={ev.brief} placeholder="一段话讲清这单是什么：怎么做的业务、卖给谁 / 从谁进货、靠什么赚钱、护城河或关键价值在哪…" onChange={(e) => update({ brief: e.target.value })} />
-            </label>
-            <div className="set-hint">五维分值由后面 5 个 tab 填写自动汇总；看报告的人综合评估，不设及格线。</div>
+        <div className="ev-pane">
+          <div className="sec-head">项目情况 · 定调</div>
+          <div className="ev-verdict-pick">
+            {(["继续推进", "暂缓"] as EvalVerdict[]).map((v) => (
+              <button key={v} type="button" className={"pr-vbtn wide v-" + v + (ev.verdict === v ? " on" : "")} onClick={() => pickVerdict(v)}>{v}</button>
+            ))}
           </div>
-          <div className="ev-ov-right">
-            <Radar axes={axes} title="项目五维评价（0–10）" />
-            <div className="ev-axis-list">
-              {axes.map((a) => (
-                <div key={a.label} className="ev-axis-row"><span>{a.label}</span><strong>{a.value}</strong></div>
-              ))}
-              <div className="ev-axis-row total"><span>综合（等权）</span><strong>{compositeScore(ev)}</strong></div>
+          <div className="ev-overview">
+            <div className="ev-ov-left">
+              <div className={"pr-verdict-banner v-" + ev.verdict}>
+                <div className="pr-vb-tag">定调 · {ev.verdict === "继续推进" ? "推向公司内部决策 · 深入探讨要不要做" : "暂缓 · 各种原因不再推进"}</div>
+                <textarea className="pr-vb-reason" value={ev.verdictReason} onChange={(e) => update({ verdictReason: e.target.value })} />
+              </div>
+              <label className="fld"><span>项目简介（一段话：业务模式 · 关键客户 · 盈利模式 · 核心壁垒或关键价值）</span>
+                <textarea className="nd-extra" rows={5} value={ev.brief} placeholder="一段话讲清这单是什么：怎么做的业务、卖给谁 / 从谁进货、靠什么赚钱、护城河或关键价值在哪…" onChange={(e) => update({ brief: e.target.value })} />
+              </label>
+              <div className="set-hint">五维分值由后面 5 个 tab 填写自动汇总；看报告的人综合评估，不设及格线。</div>
+            </div>
+            <div className="ev-ov-right">
+              <Radar axes={axes} title="项目五维评价（0–10）" />
+              <div className="ev-axis-list">
+                {axes.map((a) => (
+                  <div key={a.label} className="ev-axis-row"><span>{a.label}</span><strong>{a.value}</strong></div>
+                ))}
+                <div className="ev-axis-row total"><span>综合（等权）</span><strong>{compositeScore(ev)}</strong></div>
+              </div>
             </div>
           </div>
         </div>

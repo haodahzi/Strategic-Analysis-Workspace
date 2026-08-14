@@ -355,9 +355,11 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 .ev-pane{animation:fade .15s ease}
 @keyframes fade{from{opacity:.5}to{opacity:1}}
 
-.ev-overview{display:grid;grid-template-columns:1fr 340px;gap:26px;align-items:start}
-.ev-ov-right{position:sticky;top:8px;margin-top:42px}   /* 下移，让雷达标题与左侧「项目情况·定调」灰线齐平 */
-.ev-verdict-pick{display:flex;gap:8px;margin:6px 0 4px}
+.ev-overview{display:grid;grid-template-columns:1fr 340px;gap:26px 30px;align-items:start;margin-top:16px}
+.ev-ov-right{position:sticky;top:8px}
+.ev-overview .pr-verdict-banner{margin-top:0}          /* 定调框与右侧雷达同起一行、顶部对齐（横平竖直） */
+.ev-overview .ev-ov-right .radar-wrap{padding-top:0}
+.ev-verdict-pick{display:flex;gap:8px;margin:8px 0 4px}
 .radar-wrap{display:flex;justify-content:center;padding:6px 0}
 .radar-svg{max-width:100%;height:auto}
 .ev-axis-list{margin-top:8px;border:1px solid var(--border2);background:#fff}
