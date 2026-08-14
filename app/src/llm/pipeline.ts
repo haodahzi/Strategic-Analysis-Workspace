@@ -4,7 +4,7 @@
 // 每个 stage 是用户可见的「子任务」，各自可路由不同模型；审查宜换一家/一款互查。
 import { AgentRole, ChatRequest } from "./types";
 import {
-  Evaluation, CreditParseResult, EXPENSE_KEYS, EXPENSE_LABEL, CREDIT_DIMS,
+  Evaluation, CreditParseResult, CreditCheck, CREDIT_RUBRIC, EXPENSE_KEYS, EXPENSE_LABEL, CREDIT_DIMS,
   activeMerchants, merchantScore, creditRedLines, computeEconomics,
   radarAxes, strategyScore, commercialScore, economicsScore, compositeScore,
 } from "../domain/evaluation";
@@ -238,34 +238,57 @@ function evalFacts(ev: Evaluation): string {
   ].filter(Boolean).join("\n");
 }
 
-// 企查查/工商信用报告「智能解析」：把报告正文按客商资信 5 类抽成分值 + 评分依据 + 红线判定。
+// 企查查/工商信用报告「智能解析」：按客商资信 5 类、逐个校验项核对，给分 + 逐项已核/未核+依据 + 红线具体信息。
 export function buildCreditParseRequest(name: string, reportText: string, model: string): ChatRequest {
+  const rubric = CREDIT_DIMS.map((d, i) => {
+    const r = CREDIT_RUBRIC[d];
+    return `${i + 1}. ${d}（校验项：${r.checkItems.join(" / ")}）\n   分档：${r.bands}\n   红线：${r.redline}`;
+  }).join("\n");
+  const fmt = CREDIT_DIMS.map((d) => `【${d}|分值】\n${CREDIT_RUBRIC[d].checkItems.map((it) => `${it} | 已核或未核 | 依据`).join("\n")}`).join("\n");
   const user =
-    `下面是「${name || "该客商"}」的企查查 / 工商信用报告正文。请按客商资信 5 类维度逐项打分（0–10 整数）并给一句评分依据，最后判定是否触红线。` +
-    `\n5 类维度（顺序固定）：${CREDIT_DIMS.map((d, i) => `${i + 1}.${d}`).join("；")}` +
-    `\n评分锚点：主体资格看存续 / 成立年限 / 实缴 / 规模 / 变更；股东控制看股权清晰度 / 实控人 / 关联风险；偿债与履约信用看被执行 / 失信 / 终本 / 限高 / 欠税 / 冻结（有则大幅扣分）；法律风险看诉讼（被告合同纠纷权重高）/ 行政处罚；经营合规看资质许可 / 纳税信用 / 经营异常。` +
-    `\n红线（命中即判「是」）：失信被执行 / 终本无财产 / 破产 / 控制人股权冻结 / 经营异常吊销或注销。` +
-    `\n严格按以下格式输出，每行一项、共 6 行，别加多余文字：\n主体资格与存续稳定性 | 分值 | 依据\n股东与控制结构 | 分值 | 依据\n偿债能力与履约信用 | 分值 | 依据\n法律风险与商业诚信 | 分值 | 依据\n经营合规与资质 | 分值 | 依据\n红线 | 是/否 | 命中的具体项（否则留空）` +
-    `\n\n只据报告中的事实，报告未体现的项给中性分（5）并在依据里注明「报告未体现」。报告正文：\n${reportText.slice(0, 12000)}`;
-  return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 1500 };
+    `下面是「${name || "该客商"}」的企查查 / 工商信用报告正文。请按客商资信 5 类、逐个校验项核对，给每类 0–10 整数分与逐项结论，最后判红线。\n` +
+    `【评分标准】\n${rubric}\n\n` +
+    `【严格按此格式输出，勿加多余文字】\n${fmt}\n【红线】\n类名 | 触发项 | 具体信息（如：失信被执行，标的800万；无红线则写：无 | 无 | 无）\n\n` +
+    `要求：每个校验项——报告有据的写「已核」+一句具体依据（含关键数字）；报告未体现的写「未核」+「报告未体现」。分值严格对照上面的分档。命中 失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销 / 纳税D / 关键许可缺失致违法 等红线，必须在【红线】段写清是哪一项、具体信息。\n\n报告正文：\n${reportText.slice(0, 12000)}`;
+  return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 2600 };
 }
 
 export function parseCreditReport(text: string): CreditParseResult {
-  const scores = [0, 0, 0, 0, 0], evidence = ["", "", "", "", ""];
-  let redLine = false, redLineNote = "";
+  const scores = [0, 0, 0, 0, 0];
+  const checks: CreditCheck[][] = CREDIT_DIMS.map((d) => CREDIT_RUBRIC[d].checkItems.map(() => ({ done: false, basis: "" })));
+  const notes = ["", "", "", "", ""];
+  let redLine = false, redLineNote = "", cur = -1, inRed = false;
   for (const raw of text.split(/\r?\n/)) {
-    const c = raw.split("|").map((x) => x.trim());
-    if (c.length < 2) continue;
-    const label = c[0].replace(/^\d+[.、)]\s*/, "").replace(/[*#]/g, "").trim();
-    if (/红线/.test(label)) { redLine = /^(是|有|y|yes|true)/i.test(c[1]); redLineNote = (c[2] ?? "").trim(); continue; }
-    const idx = CREDIT_DIMS.findIndex((d) => label.includes(d.slice(0, 4)) || d.includes(label.slice(0, 3)));
-    if (idx >= 0) {
-      const v = parseFloat((c[1] ?? "").replace(/[^\d.]/g, ""));
-      if (!isNaN(v)) scores[idx] = Math.max(0, Math.min(10, Math.round(v)));
-      evidence[idx] = (c[2] ?? "").trim();
+    const line = raw.replace(/^[\s>*#-]+/, "").replace(/[【】\[\]]/g, "").trim();
+    if (!line) continue;
+    const c = line.split(/[|｜]/).map((x) => x.trim());
+    if (/^红线/.test(line)) {           // 红线段头，或单行「红线 | 是 | 具体」
+      inRed = true;
+      if (c.length >= 3 && /是|有/.test(c[1]) && c[2] && !/^无$/.test(c[2])) { redLine = true; redLineNote += (redLineNote ? "；" : "") + c.slice(2).filter((x) => x && !/^无$/.test(x)).join("·"); }
+      continue;
+    }
+    const dimIdx = CREDIT_DIMS.findIndex((d) => c[0] && (c[0].includes(d.slice(0, 5)) || d.includes(c[0].slice(0, 4))));
+    if (dimIdx >= 0 && c.length >= 2 && /\d/.test(c[1])) {   // 类头：类名 | 分值
+      cur = dimIdx; inRed = false;
+      const v = parseInt((c[1].match(/\d+/) || ["0"])[0], 10);
+      if (!isNaN(v)) scores[dimIdx] = Math.max(0, Math.min(10, v));
+      continue;
+    }
+    if (inRed) {                          // 红线明细：类名 | 触发项 | 具体
+      if (c.length >= 2 && c[0] && !/^无$/.test(c[0])) { redLine = true; redLineNote += (redLineNote ? "；" : "") + c.filter((x) => x && !/^无$/.test(x)).join("·"); }
+      continue;
+    }
+    if (cur >= 0 && c.length >= 2) {       // 校验项：项名 | 已核/未核 | 依据
+      const items = CREDIT_RUBRIC[CREDIT_DIMS[cur]].checkItems;
+      const ii = items.findIndex((it) => c[0].includes(it.slice(0, 3)) || it.includes(c[0].slice(0, 3)));
+      if (ii >= 0) {
+        const done = /已核|已|有|是/.test(c[1]) && !/未核|未|否|无/.test(c[1]);
+        checks[cur][ii] = { done, basis: (c[2] ?? "").trim() };
+        if (done && c[2]) notes[cur] += (notes[cur] ? "；" : "") + `${items[ii]}：${c[2].trim()}`;
+      }
     }
   }
-  return { scores, evidence, redLine, redLineNote };
+  return { scores, checks, notes, redLine, redLineNote };
 }
 
 // 组装「一键导出项目报告」的模型请求（纯函数、可单测）。走「定稿」主笔。

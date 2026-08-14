@@ -143,27 +143,38 @@ describe("洽谈后 · 项目立项报告一键导出", () => {
 });
 
 describe("企查查报告智能解析", () => {
-  it("buildCreditParseRequest：走资料 system，含 5 类维度与固定输出格式", () => {
+  it("buildCreditParseRequest：走资料 system，含分档标准、校验项与红线段格式", () => {
     const req = buildCreditParseRequest("某公司", "企查查报告正文……", "m1");
     expect(req.model).toBe("m1");
     expect(req.system).toContain("尽调");
     expect(req.messages[0].content).toContain("偿债能力与履约信用");
-    expect(req.messages[0].content).toContain("红线 | 是/否");
+    expect(req.messages[0].content).toContain("校验项");
+    expect(req.messages[0].content).toContain("分档");
+    expect(req.messages[0].content).toContain("【红线】");
   });
-  it("parseCreditReport：解析 5 类分值 + 依据 + 红线判定", () => {
+  it("parseCreditReport：逐类分值 + 逐项已核/未核+依据 + 红线具体信息", () => {
     const out = [
-      "主体资格与存续稳定性 | 8 | 存续经营，成立12年",
-      "股东与控制结构 | 7 | 实控人清晰",
-      "偿债能力与履约信用 | 2 | 2条被执行",
-      "法律风险与商业诚信 | 4 | 多起买卖合同纠纷（被告）",
-      "经营合规与资质 | 8 | 纳税A级",
-      "红线 | 是 | 列入失信被执行人",
+      "【主体资格与存续稳定性|8】",
+      "登记状态 | 已核 | 存续在营",
+      "成立日期 | 已核 | 2013年成立",
+      "注册资本 / 实缴 | 已核 | 实缴5000万",
+      "参保人数 | 未核 | 报告未体现",
+      "变更记录 | 已核 | 无重大变更",
+      "【偿债能力与履约信用|2】",
+      "被执行人 | 已核 | 2条被执行",
+      "失信被执行人 | 已核 | 列入失信名单",
+      "【红线】",
+      "偿债能力与履约信用 | 失信被执行 | 列入失信名单，标的800万",
     ].join("\n");
     const r = parseCreditReport(out);
-    expect(r.scores).toEqual([8, 7, 2, 4, 8]);
+    expect(r.scores[0]).toBe(8);
+    expect(r.scores[2]).toBe(2);
+    expect(r.checks[0][0].done).toBe(true);
+    expect(r.checks[0][0].basis).toContain("存续在营");
+    expect(r.checks[0][3].done).toBe(false);              // 参保人数 未核
     expect(r.redLine).toBe(true);
     expect(r.redLineNote).toContain("失信");
-    expect(r.evidence[2]).toContain("被执行");
+    expect(r.notes[0]).toContain("登记状态");
   });
 });
 

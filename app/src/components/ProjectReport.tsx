@@ -1,9 +1,9 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { Analysis, QItem } from "../types";
 import {
-  Evaluation, EvalVerdict, ExpenseKey, ExpenseRow, Merchant,
-  MERCHANT_TYPES, RISK_KINDS, FIT_TYPES, FIT_SCORE, CREDIT_DIMS, CREDIT_HINT, EXPENSE_KEYS, EXPENSE_LABEL,
-  emptyMerchant, emptyRiskItem, strategyScore, commercialScore, merchantScore, creditScore, creditRedLines,
+  Evaluation, EvalVerdict, ExpenseKey, ExpenseRow, Merchant, CreditCheck,
+  MERCHANT_TYPES, RISK_KINDS, FIT_TYPES, FIT_SCORE, CREDIT_DIMS, CREDIT_RUBRIC, EXPENSE_KEYS, EXPENSE_LABEL,
+  emptyMerchant, emptyRiskItem, merchantChecks, strategyScore, commercialScore, merchantScore, creditScore, creditRedLines,
   computeEconomics, economicsScore, riskScore, radarAxes, compositeScore, financeCost,
 } from "../domain/evaluation";
 import Radar from "./Radar";
@@ -61,6 +61,7 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
   const [gen, setGen] = useState<{ status: "idle" | "running" | "err"; msg?: string }>({ status: "idle" });
   const [houseView, setHouseView] = useState<{ title: string; doc: string } | null>(null);
   const [mi, setMi] = useState(0);                                       // 当前选中的客商（左右切换）
+  const [openDim, setOpenDim] = useState<number | null>(null);          // 展开的评分标准/校验面板（accordion）
   const [parse, setParse] = useState<{ status: "idle" | "running" | "err"; msg?: string }>({ status: "idle" });
 
   const cfg = loadConfig();
@@ -114,7 +115,13 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
   const si = Math.max(0, Math.min(mi, merchants.length - 1));
   const m = merchants[si];
   const setMerchant = (i: number, mm: Merchant) => update({ credit: { merchants: merchants.map((x, k) => (k === i ? mm : x)) } });
-  const addMerchant = () => { update({ credit: { merchants: [...merchants, emptyMerchant()] } }); setMi(merchants.length); };
+  // 逐项校验编辑（已校验 done / 依据 basis）
+  const setCheck = (di: number, ii: number, patch: Partial<CreditCheck>) => {
+    const cur = merchantChecks(m).map((cat, ci) => (ci === di ? cat.map((x, xi) => (xi === ii ? { ...x, ...patch } : x)) : cat));
+    setMerchant(si, { ...m, checks: cur });
+  };
+  const bandOf = (s: number) => (s >= 9 ? "9–10" : s >= 6 ? "6–8" : s >= 3 ? "3–5" : "0–2");
+  const addMerchant = () => { update({ credit: { merchants: [...merchants, emptyMerchant()] } }); setMi(merchants.length); setOpenDim(null); };
   const delMerchant = (i: number) => { if (merchants.length <= 1) return; update({ credit: { merchants: merchants.filter((_, k) => k !== i) } }); setMi(Math.max(0, i - 1)); };
   const redlines = creditRedLines(ev.credit);
 
@@ -129,9 +136,9 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
       const fetchImpl = await getLlmFetch();
       const res = await makeClient(parseProv, fetchImpl).send(buildCreditParseRequest(merchants[i].name, text, parseAgent.model));
       const p = parseCreditReport(res.text);
-      const note = CREDIT_DIMS.map((d, k) => (p.evidence[k] ? `${d.slice(0, 4)}：${p.evidence[k]}` : "")).filter(Boolean).join("；");
+      const note = CREDIT_DIMS.map((d, k) => (p.notes[k] ? `【${d.slice(0, 4)}】${p.notes[k]}` : "")).filter(Boolean).join("\n");
       const cur = getRun(analysis.id).evaluation.credit.merchants[i];
-      setMerchant(i, { ...cur, scores: p.scores, note: note || cur.note, redLine: p.redLine || cur.redLine, redLineNote: p.redLineNote || cur.redLineNote });
+      setMerchant(i, { ...cur, scores: p.scores, checks: p.checks, note: note || cur.note, redLine: p.redLine || cur.redLine, redLineNote: p.redLineNote || cur.redLineNote });
       setParse({ status: "idle", msg: "" });
     } catch (e) { setParse({ status: "err", msg: (e as Error).message.slice(0, 180) }); }
   };
@@ -243,11 +250,11 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
         <div className="ev-pane">
           <div className="sec-head">客商资信 · {creditScore(ev.credit)}/10</div>
           {redlines.length > 0 && (
-            <div className="ev-redline-banner">⚠ 触红线客商：{redlines.map((x) => x.name || "未命名客商").join("、")} —— 该家资信封顶 ≤2 并计入平均，请重点核。</div>
+            <div className="ev-redline-banner">⚠ 触红线客商：{redlines.map((x) => (x.name || "未命名客商") + (x.redLineNote ? `（${x.redLineNote}）` : "")).join("；")} —— 该家资信封顶 ≤2 并计入平均，请重点核。</div>
           )}
           <div className="ev-mcht-chips">
             {merchants.map((x, i) => (
-              <button key={i} type="button" className={"ev-mcht-chip" + (i === si ? " on" : "") + (x.redLine ? " redline" : "")} onClick={() => setMi(i)}>
+              <button key={i} type="button" className={"ev-mcht-chip" + (i === si ? " on" : "") + (x.redLine ? " redline" : "")} onClick={() => { setMi(i); setOpenDim(null); }}>
                 {x.name || `客商${i + 1}`}{x.type ? ` · ${x.type}` : ""}<span className="ev-mcht-chip-s">{merchantScore(x)}</span>
               </button>
             ))}
@@ -276,19 +283,49 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
               </div>
               {parse.status !== "idle" && <div className="set-hint" style={{ margin: "2px 0 6px" }}>{parse.status === "err" ? <span className="pr-export-err">解析失败：{parse.msg}</span> : parse.msg}</div>}
 
-              <div className="ev-merchant-body">
-                <div className="ev-merchant-dims">
-                  {CREDIT_DIMS.map((d, di) => (
-                    <div key={d} className="ev-line"><span className="ev-line-l" title={CREDIT_HINT[d]}>{d}</span>
-                      <Slider value={m.scores[di]} onChange={(v) => setMerchant(si, { ...m, scores: m.scores.map((x, k) => (k === di ? v : x)) })} />
+              <div className="ev-merchant-radar top"><Radar axes={CREDIT_DIMS.map((d, di) => ({ label: d.slice(0, 4), value: m.scores[di] }))} size={230} /></div>
+              <div className="ev-merchant-dims">
+                {CREDIT_DIMS.map((d, di) => {
+                  const r = CREDIT_RUBRIC[d];
+                  const chks = merchantChecks(m)[di];
+                  const doneN = chks.filter((x) => x.done).length;
+                  return (
+                    <div key={d} className="ev-dim">
+                      <div className="ev-line">
+                        <span className="ev-line-l">{d}</span>
+                        <Slider value={m.scores[di]} onChange={(v) => setMerchant(si, { ...m, scores: m.scores.map((x, k) => (k === di ? v : x)) })} />
+                        <button type="button" className={"ev-std-btn" + (openDim === di ? " on" : "")} onClick={() => setOpenDim(openDim === di ? null : di)}>标准·校验 {openDim === di ? "▲" : "▼"}</button>
+                      </div>
+                      <div className="ev-band-cur">当前 {m.scores[di]} → 「{bandOf(m.scores[di])}」档 · 本轮已校验 {doneN}/{r.checkItems.length}</div>
+                      {openDim === di && (
+                        <div className="ev-std-panel">
+                          <div className="ev-std-sec"><b>看什么：</b>{r.field}</div>
+                          <div className="ev-std-cues">{r.cues.map((cue) => (<div key={cue.concept} className="ev-cue"><b>{cue.concept}</b>：{cue.clue}</div>))}</div>
+                          <div className="ev-std-sec"><b>分档：</b>{r.bands}</div>
+                          <div className="ev-std-red"><b>红线：</b>{r.redline}</div>
+                          <div className="ev-std-sec"><b>本轮校验清单</b>（勾选＝已校验并填依据；不勾＝未校验）</div>
+                          <div className="ev-checks">
+                            {r.checkItems.map((it, ii) => {
+                              const ck = chks[ii];
+                              return (
+                                <div key={it} className="ev-check-row">
+                                  <label className="ev-check-lbl"><input type="checkbox" checked={ck.done} onChange={(e) => setCheck(di, ii, { done: e.target.checked })} /> {it}</label>
+                                  {ck.done
+                                    ? <input className="key-input ev-check-basis" value={ck.basis} placeholder="依据 / 具体信息…" onChange={(e) => setCheck(di, ii, { basis: e.target.value })} />
+                                    : <span className="ev-unchecked">未校验</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-                <div className="ev-merchant-radar"><Radar axes={CREDIT_DIMS.map((d, di) => ({ label: d.slice(0, 4), value: m.scores[di] }))} size={220} /></div>
+                  );
+                })}
               </div>
               <label className="ev-redline-toggle"><input type="checkbox" checked={m.redLine} onChange={(e) => setMerchant(si, { ...m, redLine: e.target.checked })} /> 触红线（失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销）</label>
-              {m.redLine && <input className="key-input wide" value={m.redLineNote} placeholder="红线具体：如「列入失信被执行人，金额 XXX 万」" onChange={(e) => setMerchant(si, { ...m, redLineNote: e.target.value })} />}
-              <textarea className="nd-extra" value={m.note} placeholder="评分依据 / 备注：工商 · 股权穿透 · 涉诉 · 资质等要点（智能解析会自动填这里）" onChange={(e) => setMerchant(si, { ...m, note: e.target.value })} />
+              {m.redLine && <input className="key-input wide" value={m.redLineNote} placeholder="红线具体信息：如「列入失信被执行人，标的 800 万」——务必写清是哪条触发" onChange={(e) => setMerchant(si, { ...m, redLineNote: e.target.value })} />}
+              <textarea className="nd-extra" value={m.note} placeholder="评分依据汇总 / 备注（智能解析会把各类已核项依据填这里）" onChange={(e) => setMerchant(si, { ...m, note: e.target.value })} />
             </div>
           )}
         </div>

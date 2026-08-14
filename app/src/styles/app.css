@@ -387,6 +387,24 @@ textarea.key-input{resize:vertical;font-family:var(--sans);line-height:1.6;min-h
 .ev-merchant-body{display:grid;grid-template-columns:1fr 230px;gap:14px;align-items:center}
 .ev-merchant-dims{min-width:0}
 .ev-merchant-radar{display:flex;justify-content:center}
+.ev-merchant-radar.top{margin:2px 0 10px;padding-bottom:10px;border-bottom:1px solid var(--border2)}
+/* 客商资信：每类 标准·校验 折叠面板 */
+.ev-dim{padding:6px 0;border-bottom:1px solid var(--border2)}
+.ev-std-btn{font-size:11px;padding:4px 9px;border:1px solid var(--border);background:#fff;color:var(--ink2);cursor:pointer;border-radius:2px;white-space:nowrap}
+.ev-std-btn.on{background:var(--gold);color:#fff;border-color:var(--gold)}
+.ev-band-cur{font-size:11px;color:var(--ink3);margin:2px 0 0 2px}
+.ev-std-panel{margin:8px 0 6px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--gold)}
+.ev-std-sec{font-size:12px;color:var(--ink2);margin:8px 0 5px}
+.ev-std-sec:first-child{margin-top:0}
+.ev-std-sec b,.ev-std-red b,.ev-cue b{color:var(--ink)}
+.ev-std-cues{display:flex;flex-direction:column;gap:3px;margin:4px 0}
+.ev-cue{font-size:11.5px;color:var(--ink2);line-height:1.5}
+.ev-std-red{font-size:12px;color:var(--red);margin:6px 0;padding:5px 9px;background:#fbeeec;border:1px solid #e2b7ad}
+.ev-checks{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.ev-check-row{display:flex;align-items:center;gap:10px}
+.ev-check-lbl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink);min-width:150px;flex-shrink:0}
+.ev-check-basis{flex:1;width:auto}
+.ev-unchecked{flex:1;font-size:11px;color:var(--ink3);font-style:italic}
 .ev-redline-toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2);margin:10px 0 8px}
 .ev-merchant .key-input.wide{margin-top:6px}
 
