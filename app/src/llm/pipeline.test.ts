@@ -143,29 +143,32 @@ describe("洽谈后 · 项目立项报告一键导出", () => {
 });
 
 describe("企查查报告智能解析", () => {
-  it("buildCreditParseRequest：走资料 system，含分档标准、校验项与红线段格式", () => {
+  it("buildCreditParseRequest：走资料 system，要求 JSON 输出、含 5 类与 schema", () => {
     const req = buildCreditParseRequest("某公司", "企查查报告正文……", "m1");
     expect(req.model).toBe("m1");
     expect(req.system).toContain("尽调");
+    expect(req.messages[0].content).toContain("JSON");
+    expect(req.messages[0].content).toContain("categories");
     expect(req.messages[0].content).toContain("偿债能力与履约信用");
-    expect(req.messages[0].content).toContain("校验项");
-    expect(req.messages[0].content).toContain("分档");
-    expect(req.messages[0].content).toContain("【红线】");
+    expect(req.jsonSchema).toBeTruthy();
   });
-  it("parseCreditReport：逐类分值 + 逐项已核/未核+依据 + 红线具体信息", () => {
-    const out = [
-      "【主体资格与存续稳定性|8】",
-      "登记状态 | 已核 | 存续在营",
-      "成立日期 | 已核 | 2013年成立",
-      "注册资本 / 实缴 | 已核 | 实缴5000万",
-      "参保人数 | 未核 | 报告未体现",
-      "变更记录 | 已核 | 无重大变更",
-      "【偿债能力与履约信用|2】",
-      "被执行人 | 已核 | 2条被执行",
-      "失信被执行人 | 已核 | 列入失信名单",
-      "【红线】",
-      "偿债能力与履约信用 | 失信被执行 | 列入失信名单，标的800万",
-    ].join("\n");
+  it("parseCreditReport：解析 JSON —— 逐类分值 + 逐项已核/未核+依据 + 红线具体", () => {
+    const out = JSON.stringify({
+      categories: [
+        { score: 8, items: [
+          { item: "登记状态", done: true, basis: "存续在营" },
+          { item: "成立日期", done: true, basis: "2013年成立" },
+          { item: "注册资本 / 实缴", done: true, basis: "实缴5000万" },
+          { item: "参保人数", done: false, basis: "报告未体现" },
+          { item: "变更记录", done: true, basis: "无重大变更" },
+        ] },
+        { score: 7, items: [] },
+        { score: 2, items: [{ item: "失信被执行人", done: true, basis: "列入失信名单" }] },
+        { score: 4, items: [] },
+        { score: 8, items: [] },
+      ],
+      redLine: true, redLineNote: "失信被执行·标的800万",
+    });
     const r = parseCreditReport(out);
     expect(r.scores[0]).toBe(8);
     expect(r.scores[2]).toBe(2);
@@ -175,6 +178,14 @@ describe("企查查报告智能解析", () => {
     expect(r.redLine).toBe(true);
     expect(r.redLineNote).toContain("失信");
     expect(r.notes[0]).toContain("登记状态");
+  });
+  it("parseCreditReport 文本兜底：无 JSON 时解析【类|分】格式", () => {
+    const out = ["【主体资格与存续稳定性|8】", "登记状态 | 已核 | 存续在营", "【红线】", "偿债能力与履约信用 | 失信被执行 | 标的800万"].join("\n");
+    const r = parseCreditReport(out);
+    expect(r.scores[0]).toBe(8);
+    expect(r.checks[0][0].done).toBe(true);
+    expect(r.redLine).toBe(true);
+    expect(r.redLineNote).toContain("失信");
   });
 });
 

@@ -238,26 +238,75 @@ function evalFacts(ev: Evaluation): string {
   ].filter(Boolean).join("\n");
 }
 
-// 企查查/工商信用报告「智能解析」：按客商资信 5 类、逐个校验项核对，给分 + 逐项已核/未核+依据 + 红线具体信息。
+// 客商资信 5 类 JSON 结构 schema（供支持结构化输出的模型约束返回）
+const CREDIT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    categories: { type: "array", items: { type: "object", properties: {
+      score: { type: "integer" },
+      items: { type: "array", items: { type: "object", properties: { item: { type: "string" }, done: { type: "boolean" }, basis: { type: "string" } } } },
+    } } },
+    redLine: { type: "boolean" }, redLineNote: { type: "string" },
+  },
+};
+
+// 企查查/工商信用报告「智能解析」：让模型直接返回 JSON（逐类分值 + 逐校验项已核/未核+依据 + 红线具体），可靠优先，文本兜底。
 export function buildCreditParseRequest(name: string, reportText: string, model: string): ChatRequest {
-  const rubric = CREDIT_DIMS.map((d, i) => {
+  const spec = CREDIT_DIMS.map((d, i) => {
     const r = CREDIT_RUBRIC[d];
-    return `${i + 1}. ${d}（校验项：${r.checkItems.join(" / ")}）\n   分档：${r.bands}\n   红线：${r.redline}`;
+    return `第${i + 1}类 ${d}｜校验项(${r.checkItems.length}个)：${r.checkItems.join("、")}｜分档：${r.bands}｜红线：${r.redline}`;
   }).join("\n");
-  const fmt = CREDIT_DIMS.map((d) => `【${d}|分值】\n${CREDIT_RUBRIC[d].checkItems.map((it) => `${it} | 已核或未核 | 依据`).join("\n")}`).join("\n");
   const user =
-    `下面是「${name || "该客商"}」的企查查 / 工商信用报告正文。请按客商资信 5 类、逐个校验项核对，给每类 0–10 整数分与逐项结论，最后判红线。\n` +
-    `【评分标准】\n${rubric}\n\n` +
-    `【严格按此格式输出，勿加多余文字】\n${fmt}\n【红线】\n类名 | 触发项 | 具体信息（如：失信被执行，标的800万；无红线则写：无 | 无 | 无）\n\n` +
-    `要求：每个校验项——报告有据的写「已核」+一句具体依据（含关键数字）；报告未体现的写「未核」+「报告未体现」。分值严格对照上面的分档。命中 失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销 / 纳税D / 关键许可缺失致违法 等红线，必须在【红线】段写清是哪一项、具体信息。\n\n报告正文：\n${reportText.slice(0, 12000)}`;
-  return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 2600 };
+    `依据「${name || "该客商"}」的企查查 / 工商信用报告正文，按客商资信 5 类、逐个校验项核对，只输出 JSON（不要解释、不要 markdown 代码块）。\n` +
+    `【5 类顺序与校验项、分档、红线】\n${spec}\n\n` +
+    `【只输出如下 JSON】\n{"categories":[{"score":0到10整数,"items":[{"item":"校验项名","done":true或false,"basis":"依据(未核写：报告未体现)"}]}],"redLine":true或false,"redLineNote":"命中的红线与具体信息(如 失信被执行·标的800万)，无则空串"}\n` +
+    `categories 必须 5 个、与上面 5 类同序；每类 items 与该类校验项同名同序、逐项给 done 与 basis。分值严格对照分档。命中 失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销 / 纳税D / 关键许可缺失致违法 等红线，redLine=true 且 redLineNote 写清是哪一项、具体信息。报告未体现的项 done=false、basis 写「报告未体现」。\n\n报告正文：\n${reportText.slice(0, 12000)}`;
+  return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 3000, jsonSchema: CREDIT_JSON_SCHEMA };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function tryJson(text: string): any {
+  try { return JSON.parse(text); } catch { /* 非纯 JSON，尝试截取 */ }
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch { /* ignore */ } }
+  return null;
 }
 
 export function parseCreditReport(text: string): CreditParseResult {
   const scores = [0, 0, 0, 0, 0];
   const checks: CreditCheck[][] = CREDIT_DIMS.map((d) => CREDIT_RUBRIC[d].checkItems.map(() => ({ done: false, basis: "" })));
   const notes = ["", "", "", "", ""];
-  let redLine = false, redLineNote = "", cur = -1, inRed = false;
+  let redLine = false, redLineNote = "";
+
+  // 主路径：JSON（可靠）
+  const j = tryJson(text);
+  if (j && Array.isArray(j.categories)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    j.categories.slice(0, 5).forEach((cat: any, ci: number) => {
+      const v = Math.round(Number(cat?.score));
+      if (!isNaN(v)) scores[ci] = Math.max(0, Math.min(10, v));
+      const items = CREDIT_RUBRIC[CREDIT_DIMS[ci]].checkItems;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const arr: any[] = Array.isArray(cat?.items) ? cat.items : [];
+      items.forEach((it, ii) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const f = arr.find((x: any) => x && typeof x.item === "string" && (x.item.includes(it.slice(0, 3)) || it.includes(String(x.item).slice(0, 3)))) ?? arr[ii];
+        if (f) {
+          const done = !!f.done;
+          const basis = String(f.basis ?? "").trim();
+          checks[ci][ii] = { done, basis };
+          if (done && basis) notes[ci] += (notes[ci] ? "；" : "") + `${it}：${basis}`;
+        }
+      });
+    });
+    redLine = !!j.redLine;
+    redLineNote = String(j.redLineNote ?? "").trim();
+    if (redLine && !redLineNote) redLineNote = "（命中红线，未注明具体项）";
+    return { scores, checks, notes, redLine, redLineNote };
+  }
+
+  // 兜底：文本解析（旧【类|分】格式容错）
+  let cur = -1, inRed = false;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.replace(/^[\s>*#-]+/, "").replace(/[【】\[\]]/g, "").trim();
     if (!line) continue;
