@@ -238,30 +238,19 @@ function evalFacts(ev: Evaluation): string {
   ].filter(Boolean).join("\n");
 }
 
-// 客商资信 5 类 JSON 结构 schema（供支持结构化输出的模型约束返回）
-const CREDIT_JSON_SCHEMA = {
-  type: "object",
-  properties: {
-    categories: { type: "array", items: { type: "object", properties: {
-      score: { type: "integer" },
-      items: { type: "array", items: { type: "object", properties: { item: { type: "string" }, done: { type: "boolean" }, basis: { type: "string" } } } },
-    } } },
-    redLine: { type: "boolean" }, redLineNote: { type: "string" },
-  },
-};
-
-// 企查查/工商信用报告「智能解析」：让模型直接返回 JSON（逐类分值 + 逐校验项已核/未核+依据 + 红线具体），可靠优先，文本兜底。
+// 企查查/工商信用报告「智能解析」：提示词里要求「只输出 JSON」，从返回文本里解析（不设 jsonSchema——
+// 各家的结构化/JSON 模式在部分模型上会返回空，反而不如让模型正常输出文本再抽 JSON 可靠）。
 export function buildCreditParseRequest(name: string, reportText: string, model: string): ChatRequest {
   const spec = CREDIT_DIMS.map((d, i) => {
     const r = CREDIT_RUBRIC[d];
     return `第${i + 1}类 ${d}｜校验项(${r.checkItems.length}个)：${r.checkItems.join("、")}｜分档：${r.bands}｜红线：${r.redline}`;
   }).join("\n");
   const user =
-    `依据「${name || "该客商"}」的企查查 / 工商信用报告正文，按客商资信 5 类、逐个校验项核对，只输出 JSON（不要解释、不要 markdown 代码块）。\n` +
+    `依据「${name || "该客商"}」的企查查 / 工商信用报告正文，按客商资信 5 类、逐个校验项核对，只输出一个 JSON 对象（不要任何解释文字）。\n` +
     `【5 类顺序与校验项、分档、红线】\n${spec}\n\n` +
     `【只输出如下 JSON】\n{"categories":[{"score":0到10整数,"items":[{"item":"校验项名","done":true或false,"basis":"依据(未核写：报告未体现)"}]}],"redLine":true或false,"redLineNote":"命中的红线与具体信息(如 失信被执行·标的800万)，无则空串"}\n` +
     `categories 必须 5 个、与上面 5 类同序；每类 items 与该类校验项同名同序、逐项给 done 与 basis。分值严格对照分档。命中 失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销 / 纳税D / 关键许可缺失致违法 等红线，redLine=true 且 redLineNote 写清是哪一项、具体信息。报告未体现的项 done=false、basis 写「报告未体现」。\n\n报告正文：\n${reportText.slice(0, 12000)}`;
-  return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 3000, jsonSchema: CREDIT_JSON_SCHEMA };
+  return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 3000 };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

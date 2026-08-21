@@ -143,14 +143,14 @@ describe("洽谈后 · 项目立项报告一键导出", () => {
 });
 
 describe("企查查报告智能解析", () => {
-  it("buildCreditParseRequest：走资料 system，要求 JSON 输出、含 5 类与 schema", () => {
+  it("buildCreditParseRequest：走资料 system，提示词要求 JSON、含 5 类；不设 jsonSchema（避免部分模型返回空）", () => {
     const req = buildCreditParseRequest("某公司", "企查查报告正文……", "m1");
     expect(req.model).toBe("m1");
     expect(req.system).toContain("尽调");
     expect(req.messages[0].content).toContain("JSON");
     expect(req.messages[0].content).toContain("categories");
     expect(req.messages[0].content).toContain("偿债能力与履约信用");
-    expect(req.jsonSchema).toBeTruthy();
+    expect(req.jsonSchema).toBeUndefined();
   });
   it("parseCreditReport：解析 JSON —— 逐类分值 + 逐项已核/未核+依据 + 红线具体", () => {
     const out = JSON.stringify({

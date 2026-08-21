@@ -135,9 +135,10 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
       setParse({ status: "running", msg: "模型解析中…（按 5 类维度抽分与依据）" });
       const fetchImpl = await getLlmFetch();
       const res = await makeClient(parseProv, fetchImpl).send(buildCreditParseRequest(merchants[i].name, text, parseAgent.model));
+      if (!res.text.trim()) throw new Error(`「资料」模型（${parseProv.label} · ${parseAgent.model}）没有返回任何内容——该模型可能不支持这步或未配置可用 Key。请到「设置」为「资料」换一款模型后重试，或手动填分。`);
       const p = parseCreditReport(res.text);
       const got = p.scores.some((s) => s > 0) || p.checks.some((cat) => cat.some((x) => x.done)) || p.redLine;
-      if (!got) throw new Error(`未解析出有效评分（模型输出格式不符或报告内容不足），已保留原分，可再试一次或手动填。模型原始输出前 140 字：${res.text.slice(0, 140).replace(/\s+/g, " ")}`);
+      if (!got) throw new Error(`未解析出有效评分（模型输出不含可解析的 JSON），已保留原分，可再试一次或手动填。模型原始输出前 160 字：${res.text.slice(0, 160).replace(/\s+/g, " ")}`);
       const note = CREDIT_DIMS.map((d, k) => (p.notes[k] ? `【${d.slice(0, 4)}】${p.notes[k]}` : "")).filter(Boolean).join("\n");
       const cur = getRun(analysis.id).evaluation.credit.merchants[i];
       setMerchant(i, { ...cur, scores: p.scores, checks: p.checks, note: note || cur.note, redLine: p.redLine || cur.redLine, redLineNote: p.redLineNote || cur.redLineNote });
