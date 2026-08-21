@@ -16,10 +16,10 @@ jobs:
   build-windows-test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
@@ -28,12 +28,13 @@ jobs:
         run: npm ci
 
       - name: Setup Rust 1.77.2
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.77.2
+          components: rustfmt
 
       - name: Rust cache
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: "app/src-tauri -> target"
 
@@ -67,7 +68,7 @@ jobs:
         run: '"short_sha=$($env:GITHUB_SHA.Substring(0, 7))" >> $env:GITHUB_OUTPUT'
 
       - name: Upload Windows test installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: competitive-intelligence-windows-test-${{ steps.artifact_meta.outputs.short_sha }}
           path: app/src-tauri/target/release/bundle/nsis/*-setup.exe
