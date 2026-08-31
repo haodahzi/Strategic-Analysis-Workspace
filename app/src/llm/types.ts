@@ -20,6 +20,7 @@ export interface ChatRequest {
   maxTokens?: number;
   jsonSchema?: object; // 传入则要求结构化输出（Claude: output_config.format；OpenAI: json_object）
   images?: string[];   // 传入则走多模态：把这些图片（base64 data URL）随最后一条 user 消息一起发（视觉解析）
+  disableThinking?: boolean; // 关闭「思考模式」（仅对 DeepSeek 生效）：避免思维链吃光输出预算导致最终正文为空
 }
 
 export interface HttpSpec { url: string; headers: Record<string, string>; body: unknown; }

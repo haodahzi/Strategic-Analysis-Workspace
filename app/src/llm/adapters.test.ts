@@ -56,6 +56,22 @@ describe("多模型适配 · 请求整形", () => {
     expect(parseResponse("openai", { choices: [{ message: { content: "乙" } }] })).toBe("乙");
   });
 
+  it("disableThinking：仅 DeepSeek 关思考——openai 加 chat_template_kwargs、anthropic 加 thinking:disabled；别家不加", () => {
+    const o = buildHttp(deepseek, { ...req, disableThinking: true }).body as Record<string, unknown>;
+    expect(o.chat_template_kwargs).toEqual({ thinking: false });
+    const dsAnthropic: ProviderConfig = { ...deepseek, style: "anthropic", baseUrl: "https://api.deepseek.com/anthropic" };
+    const a = buildHttp(dsAnthropic, { ...req, disableThinking: true }).body as Record<string, unknown>;
+    expect(a.thinking).toEqual({ type: "disabled" });
+    const other: ProviderConfig = { ...deepseek, id: "openai" };
+    const oo = buildHttp(other, { ...req, disableThinking: true }).body as Record<string, unknown>;
+    expect(oo.chat_template_kwargs).toBeUndefined();
+  });
+
+  it("响应解析：openai 正文空时回退 reasoning_content（思考模型）", () => {
+    expect(parseResponse("openai", { choices: [{ message: { content: "", reasoning_content: "{\"a\":1}" } }] })).toBe("{\"a\":1}");
+    expect(parseResponse("openai", { choices: [{ message: { content: "正文", reasoning_content: "思考" } }] })).toBe("正文");
+  });
+
   it("Mock 客户端连通", async () => {
     const c = makeClient({ id: "mock", label: "Mock", style: "openai", baseUrl: "", models: ["mock-1"] });
     const r = await c.send(req);

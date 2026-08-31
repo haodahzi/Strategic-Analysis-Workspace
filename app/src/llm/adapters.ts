@@ -30,6 +30,7 @@ export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
         ...(req.system ? { system: req.system } : {}),
         messages,
         ...(req.jsonSchema ? { output_config: { format: { type: "json_schema", schema: req.jsonSchema } } } : {}),
+        ...(req.disableThinking && cfg.id === "deepseek" ? { thinking: { type: "disabled" } } : {}),
       },
     };
   }
@@ -49,6 +50,8 @@ export function buildHttp(cfg: ProviderConfig, req: ChatRequest): HttpSpec {
       max_tokens: req.maxTokens ?? 8000,
       messages,
       ...(req.jsonSchema ? { response_format: { type: "json_object" } } : {}),
+      // DeepSeek V4 默认开启思考模式（思维链吃输出预算 → 正文空）；本步用非思考模式。仅对 deepseek 下发，别家不受影响。
+      ...(req.disableThinking && cfg.id === "deepseek" ? { chat_template_kwargs: { thinking: false } } : {}),
     },
   };
 }
@@ -60,8 +63,10 @@ export function parseResponse(style: ProviderStyle, json: unknown): string {
     const blocks = (j?.content as Array<{ type: string; text?: string }>) ?? [];
     return blocks.filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
   }
-  const choices = j?.choices as Array<{ message?: { content?: string } }> | undefined;
-  return choices?.[0]?.message?.content ?? "";
+  const choices = j?.choices as Array<{ message?: { content?: string; reasoning_content?: string } }> | undefined;
+  const msg = choices?.[0]?.message;
+  // 思考模型：正文空时回退取思维链内容（其中常已含 JSON 草稿，交给上层 tryJson 提取），避免整份丢空。
+  return (msg?.content && msg.content.trim()) ? msg.content : (msg?.reasoning_content ?? "");
 }
 
 // 是否命中输出上限被截断（需续写）。anthropic: stop_reason=max_tokens；openai: finish_reason=length。
