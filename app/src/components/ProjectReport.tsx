@@ -150,9 +150,9 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
       const p = parseCreditReport(res.text);
       const got = p.scores.some((s) => s > 0) || p.checks.some((cat) => cat.some((x) => x.done)) || p.redLine;
       if (!got) throw new Error(`未解析出有效评分（模型输出不含可解析的 JSON），已保留原分，可再试一次或手动填。模型原始输出前 160 字：${res.text.slice(0, 160).replace(/\s+/g, " ")}`);
-      const note = CREDIT_DIMS.map((d, k) => (p.notes[k] ? `【${d.slice(0, 4)}】${p.notes[k]}` : "")).filter(Boolean).join("\n");
+      const note = CREDIT_DIMS.map((d, k) => (p.summaries[k] ? `【${d.slice(0, 4)}】${p.summaries[k]}` : "")).filter(Boolean).join("\n");
       const cur = getRun(analysis.id).evaluation.credit.merchants[i];
-      setMerchant(i, { ...cur, scores: p.scores, checks: p.checks, note: note || cur.note, redLine: p.redLine || cur.redLine, redLineNote: p.redLineNote || cur.redLineNote });
+      setMerchant(i, { ...cur, scores: p.scores, checks: p.checks, summaries: p.summaries, note: note || cur.note, redLine: p.redLine || cur.redLine, redLineNote: p.redLineNote || cur.redLineNote });
       setParse({ status: "idle", msg: "" });
     } catch (e) { setParse({ status: "err", msg: (e as Error).message.slice(0, 180) }); }
   };
@@ -313,6 +313,7 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
                         <button type="button" className={"ev-std-btn" + (openDim === di ? " on" : "")} onClick={() => setOpenDim(openDim === di ? null : di)}>标准·校验 {openDim === di ? "▲" : "▼"}</button>
                       </div>
                       <div className="ev-band-cur">当前 {m.scores[di]} → 「{bandOf(m.scores[di])}」档 · 本轮已校验 {doneN}/{r.checkItems.length}</div>
+                      {m.summaries?.[di]?.trim() && <div className="ev-band-sum">评分说明：{m.summaries[di]}</div>}
                       {openDim === di && (
                         <div className="ev-std-panel">
                           <div className="ev-std-sec"><b>看什么：</b>{r.field}</div>

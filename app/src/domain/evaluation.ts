@@ -95,7 +95,7 @@ export const CREDIT_RUBRIC: Record<CreditDim, CreditRubricItem> = {
 };
 
 export interface CreditCheck { done: boolean; basis: string; }   // 本轮校验：已校验(done)+依据(basis)；未校验 done=false
-export interface Merchant { name: string; type: string; scores: number[]; redLine: boolean; redLineNote: string; note: string; checks?: CreditCheck[][]; }  // scores.length=5；checks[5][各类校验项]
+export interface Merchant { name: string; type: string; scores: number[]; redLine: boolean; redLineNote: string; note: string; checks?: CreditCheck[][]; summaries?: string[]; }  // scores[5]；checks[5][各类校验项]；summaries[5]=逐类评分说明
 export interface CreditEval { merchants: Merchant[]; }
 export function buildChecks(): CreditCheck[][] { return CREDIT_DIMS.map((d) => CREDIT_RUBRIC[d].checkItems.map(() => ({ done: false, basis: "" }))); }
 export function merchantChecks(m: Merchant): CreditCheck[][] {
@@ -103,8 +103,8 @@ export function merchantChecks(m: Merchant): CreditCheck[][] {
   if (!Array.isArray(m.checks) || m.checks.length !== 5) return def;
   return def.map((cat, ci) => cat.map((_, ii) => m.checks![ci]?.[ii] ?? { done: false, basis: "" }));
 }
-// 企查查报告智能解析结果：逐类分值 + 逐项校验(已核/未核+依据) + 逐类小结 + 红线判定与具体信息
-export interface CreditParseResult { scores: number[]; checks: CreditCheck[][]; notes: string[]; redLine: boolean; redLineNote: string; }
+// 企查查报告智能解析结果：逐类分值 + 逐项校验(已核/未核+依据) + 逐类评分说明 + 红线判定与具体信息
+export interface CreditParseResult { scores: number[]; checks: CreditCheck[][]; summaries: string[]; redLine: boolean; redLineNote: string; }
 
 // —— 四、经济效益：万元口径逐年测算表 ——
 export type ExpenseMode = "amount" | "pct";
@@ -244,6 +244,7 @@ export function normalizeEvaluation(raw: any): Evaluation {
             scores: Array.isArray(m?.scores) && m.scores.length === 5 ? m.scores.map((n: any) => +n || 0) : [0, 0, 0, 0, 0],
             redLine: !!m?.redLine, redLineNote: m?.redLineNote ?? "", note: m?.note ?? "",
             checks: Array.isArray(m?.checks) && m.checks.length === 5 ? m.checks : buildChecks(),
+            summaries: Array.isArray(m?.summaries) ? m.summaries : undefined,
           }))
         : [emptyMerchant()],
     },

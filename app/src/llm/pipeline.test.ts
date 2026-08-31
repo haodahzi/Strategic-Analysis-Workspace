@@ -163,7 +163,7 @@ describe("企查查报告智能解析", () => {
           { item: "变更记录", done: true, basis: "无重大变更" },
         ] },
         { score: 7, items: [] },
-        { score: 2, items: [{ item: "失信被执行人", done: true, basis: "列入失信名单" }] },
+        { score: 2, summary: "有失信被执行记录", items: [{ item: "失信被执行人", done: true, basis: "列入失信名单" }] },
         { score: 4, items: [] },
         { score: 8, items: [] },
       ],
@@ -177,7 +177,8 @@ describe("企查查报告智能解析", () => {
     expect(r.checks[0][3].done).toBe(false);              // 参保人数 未核
     expect(r.redLine).toBe(true);
     expect(r.redLineNote).toContain("失信");
-    expect(r.notes[0]).toContain("登记状态");
+    expect(r.summaries[0]).toContain("登记状态");            // 无 summary 时由已核项组合
+    expect(r.summaries[2]).toBe("有失信被执行记录");         // 有 summary 时用模型的
   });
   it("parseCreditReport 文本兜底：无 JSON 时解析【类|分】格式", () => {
     const out = ["【主体资格与存续稳定性|8】", "登记状态 | 已核 | 存续在营", "【红线】", "偿债能力与履约信用 | 失信被执行 | 标的800万"].join("\n");

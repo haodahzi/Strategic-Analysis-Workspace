@@ -246,10 +246,10 @@ export function buildCreditParseRequest(name: string, reportText: string, model:
     return `第${i + 1}类 ${d}｜校验项(${r.checkItems.length}个)：${r.checkItems.join("、")}｜分档：${r.bands}｜红线：${r.redline}`;
   }).join("\n");
   const user =
-    `依据「${name || "该客商"}」的企查查 / 工商信用报告正文，按客商资信 5 类、逐个校验项核对，只输出一个 JSON 对象（不要任何解释文字）。\n` +
+    `依据「${name || "该客商"}」的企查查 / 工商信用报告正文（报告含目录与各章明细，请依据「明细」内容判断，不要只看目录页；如报告有工商信息，登记状态 / 成立日期 / 注册资本实缴 / 参保人数一般在「基本信息 → 工商信息」章），按客商资信 5 类、逐个校验项核对，只输出一个 JSON 对象（不要任何解释文字）。\n` +
     `【5 类顺序与校验项、分档、红线】\n${spec}\n\n` +
-    `【只输出如下 JSON】\n{"categories":[{"score":0到10整数,"items":[{"item":"校验项名","done":true或false,"basis":"依据(未核写：报告未体现)"}]}],"redLine":true或false,"redLineNote":"命中的红线与具体信息(如 失信被执行·标的800万)，无则空串"}\n` +
-    `categories 必须 5 个、与上面 5 类同序；每类 items 与该类校验项同名同序、逐项给 done 与 basis。分值严格对照分档。命中 失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销 / 纳税D / 关键许可缺失致违法 等红线，redLine=true 且 redLineNote 写清是哪一项、具体信息。报告未体现的项 done=false、basis 写「报告未体现」。\n\n报告正文：\n${reportText.slice(0, 12000)}`;
+    `【只输出如下 JSON】\n{"categories":[{"score":0到10整数,"summary":"一句话评分说明(为什么给这个分，点出关键项)","items":[{"item":"校验项名","done":true或false,"basis":"依据(未核写：报告未体现)"}]}],"redLine":true或false,"redLineNote":"命中的红线与具体信息(如 失信被执行·标的800万)，无则空串"}\n` +
+    `categories 必须 5 个、与上面 5 类同序；每类 items 与该类校验项同名同序、逐项给 done 与 basis，并给一句 summary 概述评分依据。分值严格对照分档。命中 失信 / 终本 / 破产 / 控制人股权冻结 / 经营异常吊销 / 纳税D / 关键许可缺失致违法 等红线，redLine=true 且 redLineNote 写清是哪一项、具体信息。报告未体现的项 done=false、basis 写「报告未体现」。\n\n报告正文：\n${reportText.slice(0, 80000)}`;
   return { model, system: AGENT_SYS["资料"], messages: [{ role: "user", content: user }], maxTokens: 12000, disableThinking: true };
 }
 
@@ -264,7 +264,7 @@ function tryJson(text: string): any {
 export function parseCreditReport(text: string): CreditParseResult {
   const scores = [0, 0, 0, 0, 0];
   const checks: CreditCheck[][] = CREDIT_DIMS.map((d) => CREDIT_RUBRIC[d].checkItems.map(() => ({ done: false, basis: "" })));
-  const notes = ["", "", "", "", ""];
+  const summaries = ["", "", "", "", ""];
   let redLine = false, redLineNote = "";
 
   // 主路径：JSON（可靠）
@@ -277,6 +277,7 @@ export function parseCreditReport(text: string): CreditParseResult {
       const items = CREDIT_RUBRIC[CREDIT_DIMS[ci]].checkItems;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const arr: any[] = Array.isArray(cat?.items) ? cat.items : [];
+      const donePairs: string[] = [];
       items.forEach((it, ii) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const f = arr.find((x: any) => x && typeof x.item === "string" && (x.item.includes(it.slice(0, 3)) || it.includes(String(x.item).slice(0, 3)))) ?? arr[ii];
@@ -284,14 +285,15 @@ export function parseCreditReport(text: string): CreditParseResult {
           const done = !!f.done;
           const basis = String(f.basis ?? "").trim();
           checks[ci][ii] = { done, basis };
-          if (done && basis) notes[ci] += (notes[ci] ? "；" : "") + `${it}：${basis}`;
+          if (done && basis) donePairs.push(`${it}：${basis}`);
         }
       });
+      summaries[ci] = String(cat?.summary ?? "").trim() || donePairs.join("；");
     });
     redLine = !!j.redLine;
     redLineNote = String(j.redLineNote ?? "").trim();
     if (redLine && !redLineNote) redLineNote = "（命中红线，未注明具体项）";
-    return { scores, checks, notes, redLine, redLineNote };
+    return { scores, checks, summaries, redLine, redLineNote };
   }
 
   // 兜底：文本解析（旧【类|分】格式容错）
@@ -322,11 +324,11 @@ export function parseCreditReport(text: string): CreditParseResult {
       if (ii >= 0) {
         const done = /已核|已|有|是/.test(c[1]) && !/未核|未|否|无/.test(c[1]);
         checks[cur][ii] = { done, basis: (c[2] ?? "").trim() };
-        if (done && c[2]) notes[cur] += (notes[cur] ? "；" : "") + `${items[ii]}：${c[2].trim()}`;
+        if (done && c[2]) summaries[cur] += (summaries[cur] ? "；" : "") + `${items[ii]}：${c[2].trim()}`;
       }
     }
   }
-  return { scores, checks, notes, redLine, redLineNote };
+  return { scores, checks, summaries, redLine, redLineNote };
 }
 
 // 组装「一键导出项目报告」的模型请求（纯函数、可单测）。走「定稿」主笔。
