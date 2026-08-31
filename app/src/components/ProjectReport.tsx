@@ -68,8 +68,6 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
   const agent = cfg.agents["定稿"];
   const prov = providerById(cfg, agent.provider);
   const realMode = prov.id !== "mock";
-  const parseAgent = cfg.agents["资料"];
-  const parseProv = providerById(cfg, parseAgent.provider);
 
   const update = (patch: Partial<Evaluation>) => setEvaluation(analysis.id, { ...ev, ...patch });
   const ec = ev.economics;
@@ -131,11 +129,24 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
     try {
       const text = /\.pdf$/i.test(file.name) ? await extractPdfText(file) : await file.text();
       if (!text.trim()) throw new Error("没提取到文字（可能是扫描件 / 图片版 PDF，换文本版或手动填分）");
-      if (parseProv.id === "mock") throw new Error("无 Key，无法智能解析——到「设置」为「资料」配置模型后再试；也可手动填分");
       setParse({ status: "running", msg: "模型解析中…（按 5 类维度抽分与依据）" });
       const fetchImpl = await getLlmFetch();
-      const res = await makeClient(parseProv, fetchImpl).send(buildCreditParseRequest(merchants[i].name, text, parseAgent.model));
-      if (!res.text.trim()) throw new Error(`「资料」模型（${parseProv.label} · ${parseAgent.model}）没有返回任何内容——该模型可能不支持这步或未配置可用 Key。请到「设置」为「资料」换一款模型后重试，或手动填分。`);
+      // 在已配置的真实模型间回退：资料→定稿→起草（去重）。某些推理型模型（把预算耗在思维链上）对这步会返回空，逐个试到有内容为止。
+      const seen = new Set<string>();
+      const cands = (["资料", "定稿", "起草"] as const).map((role) => {
+        const ag = cfg.agents[role]; const pv = providerById(cfg, ag.provider);
+        return { pv, model: ag.model, key: pv.id + "|" + ag.model };
+      }).filter((c) => c.pv.id !== "mock" && !seen.has(c.key) && !!seen.add(c.key));
+      if (!cands.length) throw new Error("没有可用的真实模型——请到「设置」为「资料 / 定稿」配置模型 Key 后再试，或手动填分。");
+      let res: { text: string } | null = null; const tried: string[] = [];
+      for (const c of cands) {
+        try {
+          const r = await makeClient(c.pv, fetchImpl).send(buildCreditParseRequest(merchants[i].name, text, c.model));
+          if (r.text.trim()) { res = r; break; }
+          tried.push(`${c.pv.label}·${c.model}（返回空）`);
+        } catch (e) { tried.push(`${c.pv.label}·${c.model}（${(e as Error).message.slice(0, 36)}）`); }
+      }
+      if (!res) throw new Error(`已尝试的模型均未返回内容：${tried.join("；")}。多为推理型模型对本步返回空——请到「设置」把「资料」换成普通对话模型（如 deepseek-chat / gpt-4o 等），或手动填分。`);
       const p = parseCreditReport(res.text);
       const got = p.scores.some((s) => s > 0) || p.checks.some((cat) => cat.some((x) => x.done)) || p.redLine;
       if (!got) throw new Error(`未解析出有效评分（模型输出不含可解析的 JSON），已保留原分，可再试一次或手动填。模型原始输出前 160 字：${res.text.slice(0, 160).replace(/\s+/g, " ")}`);
