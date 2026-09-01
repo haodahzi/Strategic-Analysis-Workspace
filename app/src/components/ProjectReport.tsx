@@ -213,12 +213,6 @@ export default function ProjectReport({ analysis }: { analysis: Analysis }) {
             </div>
             <div className="ev-ov-right">
               <Radar axes={axes} title="项目五维评价（0–10）" />
-              <div className="ev-axis-list">
-                {axes.map((a) => (
-                  <div key={a.label} className="ev-axis-row"><span>{a.label}</span><strong>{a.value}</strong></div>
-                ))}
-                <div className="ev-axis-row total"><span>综合（等权）</span><strong>{compositeScore(ev)}</strong></div>
-              </div>
             </div>
           </div>
         </div>
