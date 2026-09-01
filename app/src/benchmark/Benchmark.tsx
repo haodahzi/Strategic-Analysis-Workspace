@@ -26,6 +26,8 @@ export default function Benchmark() {
 
   const unit = data.units.find((u) => u.id === unitId) ?? data.units[0];
   useEffect(() => { if (!data.units.some((u) => u.id === unitId) && data.units[0]) setUnitId(data.units[0].id); }, [data.units, unitId]);
+  // 单元隔离：切换业务单元时，月份与筛选各自独立、回到该单元的本月默认，不把上一个单元的时间/筛选带过来
+  useEffect(() => { setMonth(curMonth()); setFCompany(""); setFType(""); setFImp(""); setQ(""); }, [unitId]);
 
   const monthEvents = useMemo(() => (unit ? data.events.filter((e) => e.unitId === unit.id && e.month === month) : []), [data.events, unit, month]);
   const shown = useMemo(() => monthEvents
@@ -79,9 +81,9 @@ export default function Benchmark() {
               </div>
               <div className="bm-head-r">
                 <div className="bm-month">
-                  <button type="button" onClick={() => setMonth((m) => addMonth(m, -1))}>‹</button>
-                  <span>{month}</span>
-                  <button type="button" disabled={month >= curMonth()} onClick={() => setMonth((m) => addMonth(m, 1))}>›</button>
+                  <button type="button" title="上一月" onClick={() => setMonth((m) => addMonth(m, -1))}>‹</button>
+                  <span>{month}{month >= curMonth() ? " · 本月" : ""}</span>
+                  <button type="button" title={month >= curMonth() ? "已是本月，无更新的月份" : "下一月"} disabled={month >= curMonth()} onClick={() => setMonth((m) => addMonth(m, 1))}>›</button>
                 </div>
                 <button type="button" className="bm-refresh" disabled={ref.status === "running" && ref.unitId === unit.id} onClick={() => void doRefresh()}>
                   {ref.status === "running" && ref.unitId === unit.id ? "刷新中…"
