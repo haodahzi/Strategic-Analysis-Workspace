@@ -1,12 +1,11 @@
 // [对标情报] 主视图：左侧业务单元栏 + 右侧本月情报流。整块删除见 README.md。
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import "./benchmark.css";
-import { EVENT_TYPES, Feedback, IMPORTANCE, IMPORTANCE_RANK, Importance, IntelEvent, curMonth } from "./types";
+import { EVENT_TYPES, Feedback, IMPORTANCE, IMPORTANCE_RANK, Importance, IntelEvent, addMonth, curMonth } from "./types";
 import { addCompany, getData, hydrate, lastRefresh, patchEvent, removeCompany, setCompany, setUnitName, subscribe } from "./data";
 import { refreshUnit } from "./intel";
 import { openExternal } from "../sources/browser";
 
-const addMonth = (m: string, d: number): string => { const [y, mo] = m.split("-").map(Number); const dt = new Date(y, mo - 1 + d, 1); return dt.toISOString().slice(0, 7); };
 const impClass = (i: Importance) => (i === "重大" ? "imp-hi" : i === "重要" ? "imp-mid" : "imp-lo");
 
 export default function Benchmark() {

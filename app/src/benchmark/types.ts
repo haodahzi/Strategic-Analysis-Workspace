@@ -43,8 +43,17 @@ export interface RefreshLog { unitId: string; month: string; at: string; count: 
 
 export interface BenchmarkData { units: Unit[]; events: IntelEvent[]; refreshes: RefreshLog[]; }
 
-// 当前自然月 YYYY-MM
-export function curMonth(): string { return new Date().toISOString().slice(0, 7); }
+// 当前自然月 YYYY-MM（用本地日期部件，避免 toISOString 的 UTC 偏移在东八区把月初回退一天/一月）
+export function curMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+// 月份加减（纯整数月序运算，绝不经 UTC）——修「向后点无效 / 向前跳两月」的时区 bug
+export function addMonth(m: string, delta: number): string {
+  const [y, mo] = m.split("-").map(Number);
+  const idx = y * 12 + (mo - 1) + delta;   // 绝对月序
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
+}
 // 去重键：企业 + 类型 + 标题核（剥非字），供刷新时合并同一事件、保留用户状态
 export function dedupKey(companyId: string, type: string, title: string): string {
   return companyId + "|" + type + "|" + title.replace(/[\s，。、,.:：;；!！?？"“”'‘’()（）\-—_]/g, "").slice(0, 24);
