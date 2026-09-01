@@ -81,7 +81,7 @@ export function parseIntel(text: string, hits: SearchHit[], unitId: string, comp
   return out;
 }
 
-// 刷新一个业务单元（backfill=true 时按近 7 天首次回填，否则本月）。
+// 刷新一个业务单元（backfill=true 时按近一个月首次回填，否则本月）。
 // onlyCompanyId 传入时只刷这一家（配合上方「全部企业」下拉：选了某家就只跑那家，别再全跑）。
 // 返回带诊断的 summary，让「没结果」也能说清是哪一环：检索无命中 / 模型空返回 / 确无窗口内事件。
 export async function refreshUnit(
@@ -93,7 +93,7 @@ export async function refreshUnit(
   const agent = cfg.agents["资料"]; const prov = providerById(cfg, agent.provider);
   if (prov.id === "mock") throw new Error("「资料」未配置真实模型——到「设置」为「资料」配置一款模型后再刷新。");
   const fetchImpl = await getLlmFetch();
-  const windowDesc = backfill ? "近 7 天" : `本月（${month}）`;
+  const windowDesc = backfill ? "近一个月" : `本月（${month}）`;
   // 明确点选某家就刷那家（无论是否勾启用）；否则刷该单元全部启用中的企业。
   const active = unit.companies.filter((c) => (onlyCompanyId ? c.id === onlyCompanyId : c.active));
   if (!active.length) throw new Error(onlyCompanyId ? "所选企业不存在。" : "该单元没有启用中的对标企业——到「企业名单维护」勾选启用。");

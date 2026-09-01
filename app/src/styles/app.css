@@ -25,7 +25,8 @@ body{font-family:var(--sans);background:#e9e5dc;color:var(--ink)}
 
 /* 主体：左栏 + 内容 */
 .app-body{display:grid;grid-template-columns:238px 1fr;overflow:hidden;min-height:0}
-.app-sidebar{background:#211d18;color:#cfc8bd;overflow:auto;padding:14px 10px;display:flex;flex-direction:column;gap:3px}
+.app-sidebar{background:#211d18;color:#cfc8bd;overflow:auto;padding:14px 10px;display:flex;flex-direction:column;gap:3px;scrollbar-width:none;-ms-overflow-style:none}
+.app-sidebar::-webkit-scrollbar{width:0;height:0;display:none}
 .nav-group{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:#7d766b;margin:16px 8px 6px;text-transform:uppercase}
 .nav-group:first-child{margin-top:2px}
 .nav-item{display:block;width:100%;text-align:left;background:transparent;border:none;color:#d7d0c5;padding:8px 10px;font-size:13px;cursor:pointer;border-radius:3px}

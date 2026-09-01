@@ -19,7 +19,8 @@ export default function Benchmark() {
   const [fType, setFType] = useState("");
   const [fImp, setFImp] = useState("");
   const [q, setQ] = useState("");
-  const [ref, setRef] = useState<{ status: "idle" | "running" | "done" | "err"; msg?: string }>({ status: "idle" });
+  // ref 带 unitId：刷新的进度/结果/禁用态只属于发起它的那个单元，切到别的单元不串台
+  const [ref, setRef] = useState<{ unitId: string; status: "idle" | "running" | "done" | "err"; msg?: string }>({ unitId: "", status: "idle" });
   const [ev, setEv] = useState<IntelEvent | null>(null);   // 证据弹窗
   const [admin, setAdmin] = useState(false);
 
@@ -38,13 +39,14 @@ export default function Benchmark() {
 
   const doRefresh = async () => {
     if (!unit) return;
+    const uId = unit.id;   // 锁定发起刷新的单元，回调只作用于它，避免异步完成时已切到别的单元
     const only = fCompany || undefined;   // 「全部企业」下拉选了某家 → 只刷那家
-    const backfill = !lastRefresh(unit.id, month);   // 首次该单元该月 → 近7天回填
-    setRef({ status: "running", msg: "开始刷新…" });
+    const backfill = !lastRefresh(uId, month);   // 首次该单元该月 → 近一个月回填
+    setRef({ unitId: uId, status: "running", msg: "开始刷新…" });
     try {
-      const r = await refreshUnit(unit, month, backfill, (m) => setRef({ status: "running", msg: m }), only);
-      setRef({ status: "done", msg: `刷新完成：${r.summary}` });
-    } catch (e) { setRef({ status: "err", msg: (e as Error).message.slice(0, 200) }); }
+      const r = await refreshUnit(unit, month, backfill, (m) => setRef({ unitId: uId, status: "running", msg: m }), only);
+      setRef({ unitId: uId, status: "done", msg: `刷新完成：${r.summary}` });
+    } catch (e) { setRef({ unitId: uId, status: "err", msg: (e as Error).message.slice(0, 200) }); }
   };
 
   const markRead = (e: IntelEvent) => { if (!e.read) patchEvent(e.id, { read: true }); };
@@ -81,16 +83,16 @@ export default function Benchmark() {
                   <span>{month}</span>
                   <button type="button" disabled={month >= curMonth()} onClick={() => setMonth((m) => addMonth(m, 1))}>›</button>
                 </div>
-                <button type="button" className="bm-refresh" disabled={ref.status === "running"} onClick={() => void doRefresh()}>
-                  {ref.status === "running" ? "刷新中…"
+                <button type="button" className="bm-refresh" disabled={ref.status === "running" && ref.unitId === unit.id} onClick={() => void doRefresh()}>
+                  {ref.status === "running" && ref.unitId === unit.id ? "刷新中…"
                     : fCompany
-                      ? `刷新 ${(unit.companies.find((c) => c.id === fCompany)?.name ?? "").slice(0, 8)}${lastRefresh(unit.id, month) ? "" : "·近7天"}`
-                      : lastRefresh(unit.id, month) ? "刷新本月" : "首次刷新（近7天）"}
+                      ? `刷新 ${(unit.companies.find((c) => c.id === fCompany)?.name ?? "").slice(0, 8)}${lastRefresh(unit.id, month) ? "" : "·近一月"}`
+                      : lastRefresh(unit.id, month) ? "刷新本月" : "首次刷新（近一个月）"}
                 </button>
               </div>
             </div>
             <div className="bm-stats">全部 {monthEvents.length} · 重大 {majors} · 未读 {unread}{lastRefresh(unit.id, month) ? ` · 上次刷新 ${lastRefresh(unit.id, month)!.at.slice(5, 16).replace("T", " ")}` : " · 尚未刷新"}</div>
-            {ref.status !== "idle" && <div className="bm-refmsg">{ref.status === "err" ? <span className="bm-err">刷新失败：{ref.msg}</span> : ref.msg}</div>}
+            {ref.unitId === unit.id && ref.status !== "idle" && <div className="bm-refmsg">{ref.status === "err" ? <span className="bm-err">刷新失败：{ref.msg}</span> : ref.msg}</div>}
 
             <div className="bm-filters">
               <select value={fCompany} onChange={(e) => setFCompany(e.target.value)}><option value="">全部企业</option>{unit.companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
