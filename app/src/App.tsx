@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { Analysis, Stage } from "./types";
 import { loadAnalysesAsync, saveAnalysesAsync } from "./data/analysesStore";
 import Dashboard from "./components/Dashboard";
@@ -9,8 +9,9 @@ import ProjectWorkspace from "./components/ProjectWorkspace";
 import ReportLibrary from "./components/ReportLibrary";
 import { deleteRun, hydrateRuns, setMaterials, startRun } from "./llm/pipelineStore";
 import { clearUnread, getUnread, subscribeUnread } from "./llm/unread";
+import { BENCHMARK_LABEL, BenchmarkView } from "./benchmark";   // [对标情报]
 
-type View = "dashboard" | "project" | "settings" | "new" | "reports";
+type View = "dashboard" | "project" | "settings" | "new" | "reports" | "benchmark";   // [对标情报] +benchmark
 
 const STAGE_CLASS: Record<Stage, string> = {
   调研前: "st-pre", 洽谈中: "st-neg", 洽谈后: "st-post",
@@ -105,6 +106,7 @@ export default function App() {
           {navItem("dashboard", "▤ 研究分析总览")}
           {navItem("new", "✚ 新建分析")}
           {navItem("reports", "▦ 报告库")}
+          {navItem("benchmark", BENCHMARK_LABEL)}{/* [对标情报] */}
           {navItem("settings", "⚙ 设置")}
 
           <div className="nav-group">在办分析 · {list.length}</div>
@@ -137,6 +139,8 @@ export default function App() {
                 : <ProjectWorkspace key={project.id} analysis={project} onUpdate={updateAnalysis} onDelete={() => deleteAnalysis(project.id)} />
           )}
           {items !== null && view === "reports" && <ReportLibrary />}
+          {/* [对标情报] */}
+          {items !== null && view === "benchmark" && <Suspense fallback={<div className="dash"><div className="set-hint">加载对标企业情报…</div></div>}><BenchmarkView /></Suspense>}
           {items !== null && view === "settings" && <Settings />}
         </main>
       </div>
