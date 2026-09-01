@@ -34,10 +34,16 @@ const SYS = "你是严谨的竞争情报分析师。只依据给定的公开检�
 
 export function buildIntelRequest(company: string, unitName: string, hits: SearchHit[], windowDesc: string): ChatRequest {
   const src = hits.map((h, i) => `[${i + 1}] ${h.title}\n${h.url}\n${(h.content || "").slice(0, 700)}`).join("\n\n");
+  // 业务单元名多为内部代称（「业务单元1」这类占位），不应写进分析正文——一律以「我方」自称。
+  // 若是有意义的真实名称（如「集采事业部」），仅作背景帮助模型把握影响角度，同样不逐字出现在 impact/action。
+  const isPlaceholder = /^业务单元\s*\d*$/.test(unitName.trim());
+  const selfNote = isPlaceholder
+    ? "分析中一律以「我方」指代自身。"
+    : `我方相关业务背景为「${unitName}」（仅供你把握相关性与影响角度）；impact/action 中一律用「我方」指代，不要逐字写出该名称。`;
   const user =
-    `下面是关于对标企业「${company}」（对应我方业务单元：${unitName}）的公开检索资料（编号 [n]）。请提炼该企业在【${windowDesc}】内、值得关注的独立事件，只输出一个 JSON（不要解释、不要 markdown 代码块）。\n` +
-    `要求：① 同一事件的多篇转载合并为一条、聚合来源编号；② 事件类型限定 8 类之一：${EVENT_TYPES.join(" / ")}；③ 重要性三级 重大/重要/一般（综合影响范围、变化强度、来源可信度、与我方业务相关性、新颖性）；④ facts 只写来源支持的事实、不含推测；⑤ impact/action 是你对我方业务单元的分析；⑥ confidence 高/中/低（官方 / 监管披露最高、多源交叉更高、日期不确定降低）；⑦ 不在窗口内 / 证据不足 / 无法确认是该企业的，不要输出。\n` +
-    `JSON 结构：{"events":[{"title":"一句话事件","type":"8类之一","importance":"重大/重要/一般","occurTime":"YYYY-MM或YYYY-MM-DD(发生时间,不确定留空)","publishTime":"YYYY-MM-DD","facts":"公开事实","impact":"对本单元潜在影响","action":"建议行动","confidence":"高/中/低","confidenceBasis":"依据一句","sourceIdx":[来源编号]}]}\n无值得关注的事件则输出 {"events":[]}。\n\n检索资料：\n${src.slice(0, 60000)}`;
+    `下面是关于对标企业「${company}」的公开检索资料（编号 [n]）。${selfNote}请提炼该企业在【${windowDesc}】内、值得关注的独立事件，只输出一个 JSON（不要解释、不要 markdown 代码块）。\n` +
+    `要求：① 同一事件的多篇转载合并为一条、聚合来源编号；② 事件类型限定 8 类之一：${EVENT_TYPES.join(" / ")}；③ 重要性三级 重大/重要/一般（综合影响范围、变化强度、来源可信度、与我方业务相关性、新颖性）；④ facts 只写来源支持的事实、不含推测；⑤ impact/action 是你对我方的分析，一律用「我方」自称，绝不出现内部业务单元的代称或编号；⑥ confidence 高/中/低（官方 / 监管披露最高、多源交叉更高、日期不确定降低）；⑦ 不在窗口内 / 证据不足 / 无法确认是该企业的，不要输出。\n` +
+    `JSON 结构：{"events":[{"title":"一句话事件","type":"8类之一","importance":"重大/重要/一般","occurTime":"YYYY-MM或YYYY-MM-DD(发生时间,不确定留空)","publishTime":"YYYY-MM-DD","facts":"公开事实","impact":"对我方潜在影响","action":"建议行动","confidence":"高/中/低","confidenceBasis":"依据一句","sourceIdx":[来源编号]}]}\n无值得关注的事件则输出 {"events":[]}。\n\n检索资料：\n${src.slice(0, 60000)}`;
   return { model: "", system: SYS, messages: [{ role: "user", content: user }], maxTokens: 8000, disableThinking: true };
 }
 
@@ -49,6 +55,8 @@ function tryJson(text: string): any {
   return null;
 }
 function hostName(url: string): string { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url.slice(0, 30); } }
+// 兜底清洗：即便模型没听话，把正文里漏出的「（我方）业务单元N」占位代称收敛成「我方」
+const cleanSelf = (s: string): string => s.replace(/我方业务单元\s*\d+/g, "我方").replace(/业务单元\s*\d+/g, "我方");
 const asType = (s: string): EventType => (EVENT_TYPES.includes(s as EventType) ? (s as EventType) : "战略与经营");
 const asImp = (s: string): Importance => (s === "重大" || s === "重要" ? s : "一般");
 const asConf = (s: string): Confidence => (s === "高" || s === "低" ? s : "中");
@@ -70,7 +78,7 @@ export function parseIntel(text: string, hits: SearchHit[], unitId: string, comp
       id: newEventId(), unitId, companyId, company, title,
       type: asType(String(e?.type ?? "")), importance: asImp(String(e?.importance ?? "")),
       occurTime: occur, publishTime: publish,
-      facts: String(e?.facts ?? "").trim(), impact: String(e?.impact ?? "").trim(), action: String(e?.action ?? "").trim(),
+      facts: String(e?.facts ?? "").trim(), impact: cleanSelf(String(e?.impact ?? "").trim()), action: cleanSelf(String(e?.action ?? "").trim()),
       confidence: asConf(String(e?.confidence ?? "")), confidenceBasis: String(e?.confidenceBasis ?? "").trim(),
       // 一律归入「本次刷新的月份」而非事件发生月：月初「近7天回填」会带回上月末的事件，
       // 若按发生月归档会落到上月、当前月视图里看不到（正是「刷新有进度却没结果」的根因）。

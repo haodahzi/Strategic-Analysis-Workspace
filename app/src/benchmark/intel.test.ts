@@ -40,6 +40,22 @@ describe("对标情报 · 解析", () => {
     expect(evs[0].occurTime).toBe("2026-08-28");   // 发生时间照常保留供显示
   });
 
+  it("parseIntel：impact/action 里漏出的「业务单元N」占位被收敛为「我方」", () => {
+    const out = JSON.stringify({ events: [
+      { title: "某竞品降价", type: "渠道与市场", importance: "重要", facts: "降价", impact: "对我方业务单元1的客户与渠道形成挤压", action: "业务单元3应加强客户维护", sourceIdx: [1] },
+    ] });
+    const evs = parseIntel(out, hits, "u1", "c1", "X", "2026-09");
+    expect(evs[0].impact).toBe("对我方的客户与渠道形成挤压");
+    expect(evs[0].action).toBe("我方应加强客户维护");
+  });
+
+  it("buildIntelRequest：占位单元名不写进提示、真实单元名仅作背景且要求用「我方」自称", () => {
+    expect(buildIntelRequest("蓝色光标", "业务单元1", hits, "本月").messages[0].content).not.toContain("业务单元1");
+    const real = buildIntelRequest("蓝色光标", "集采事业部", hits, "本月").messages[0].content;
+    expect(real).toContain("集采事业部");
+    expect(real).toContain("用「我方」");
+  });
+
   it("parseIntel：非法类型/重要性回退，无 JSON 返回空", () => {
     const out = JSON.stringify({ events: [{ title: "某事件", type: "乱写", importance: "乱写", sourceIdx: [1] }] });
     const evs = parseIntel(out, hits, "u1", "c1", "X", "2026-08");
