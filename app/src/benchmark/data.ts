@@ -47,15 +47,17 @@ export function hydrate(): Promise<void> {
 
 function commit(next: BenchmarkData) { data = next; persistSoon(); notify(); }
 
-// 刷新：合并某单元某月的事件，按去重键保留用户的已读/收藏/反馈
-export function mergeEvents(unitId: string, month: string, incoming: IntelEvent[]): number {
-  const prev = data.events.filter((e) => e.unitId === unitId && e.month === month);
-  const prevByKey = new Map(prev.map((e) => [dedupKey(e.companyId, e.type, e.title), e]));
+// 刷新：合并某单元某月的事件，按去重键保留用户的已读/收藏/反馈。
+// companyIds 传入时只替换这些企业的切片——单家刷新不会误删同单元其它企业本月已有的情报。
+export function mergeEvents(unitId: string, month: string, incoming: IntelEvent[], companyIds?: string[]): number {
+  const scope = companyIds && companyIds.length ? new Set(companyIds) : null;
+  const inScope = (e: IntelEvent) => e.unitId === unitId && e.month === month && (!scope || scope.has(e.companyId));
+  const prevByKey = new Map(data.events.filter(inScope).map((e) => [dedupKey(e.companyId, e.type, e.title), e]));
   const merged: IntelEvent[] = incoming.map((e) => {
     const old = prevByKey.get(dedupKey(e.companyId, e.type, e.title));
     return old ? { ...e, id: old.id, read: old.read, starred: old.starred, feedback: old.feedback } : e;
   });
-  const others = data.events.filter((e) => !(e.unitId === unitId && e.month === month));
+  const others = data.events.filter((e) => !inScope(e));
   commit({ ...data, events: [...others, ...merged] });
   return merged.length;
 }

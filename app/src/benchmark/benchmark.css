@@ -1,5 +1,8 @@
 /* [对标情报] 模块样式（复用 app.css 的 CSS 变量）。删除本文件即移除全部样式。 */
 .bm{display:grid;grid-template-columns:240px 1fr;height:100%;min-height:calc(100vh - 52px)}
+/* 隐藏滚动条但保留滚动：右侧情报流 / 左侧单元栏 / 证据弹窗都靠习惯下滑，去掉丑陋的原生滚动条 */
+.bm-units,.bm-main,.bm-modal-in{scrollbar-width:none;-ms-overflow-style:none}
+.bm-units::-webkit-scrollbar,.bm-main::-webkit-scrollbar,.bm-modal-in::-webkit-scrollbar{width:0;height:0;display:none}
 .bm-units{border-right:1px solid var(--border2);background:var(--surface2);padding:14px 10px;overflow-y:auto}
 .bm-units-h{font-family:var(--serif);font-size:14px;font-weight:700;color:var(--ink);padding:4px 8px 12px}
 .bm-unit{display:block;width:100%;text-align:left;background:none;border:none;border-left:2px solid transparent;padding:9px 10px;cursor:pointer;border-radius:2px}

@@ -30,6 +30,16 @@ describe("对标情报 · 解析", () => {
     expect(evs[0].impact).toContain("竞争");
   });
 
+  it("parseIntel：一律归入本次刷新月份（月初近7天回填的上月事件也进本月，不被视图筛掉）", () => {
+    // 今天 9-01 刷新、回填近7天，事件发生在 8-28；应归入刷新月 2026-09，而非发生月 2026-08
+    const out = JSON.stringify({ events: [
+      { title: "省广集团中标某大单", type: "客户与市场", importance: "重要", occurTime: "2026-08-28", publishTime: "2026-08-29", sourceIdx: [1] },
+    ] });
+    const evs = parseIntel(out, hits, "u1", "c1", "省广集团", "2026-09");
+    expect(evs[0].month).toBe("2026-09");
+    expect(evs[0].occurTime).toBe("2026-08-28");   // 发生时间照常保留供显示
+  });
+
   it("parseIntel：非法类型/重要性回退，无 JSON 返回空", () => {
     const out = JSON.stringify({ events: [{ title: "某事件", type: "乱写", importance: "乱写", sourceIdx: [1] }] });
     const evs = parseIntel(out, hits, "u1", "c1", "X", "2026-08");

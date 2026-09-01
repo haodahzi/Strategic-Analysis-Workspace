@@ -7,18 +7,27 @@ import { getLlmFetch } from "../llm/runtime";
 import { EVENT_TYPES, EventType, Importance, IntelEvent, Unit, Company, Confidence } from "./types";
 import { logRefresh, mergeEvents, newEventId } from "./data";
 
-// 每家企业的检索式：覆盖 8 类事件角度（gatherSources 会按检索预算收口）
+// 每家企业的检索式：5 条覆盖 8 类事件角度（gatherSources 会按检索预算收口）。
+// 收敛到 5 条是刻意的：条数×企业数=总检索次数，太多会让单次刷新明显变慢。
 function queriesFor(c: Company): string[] {
   const n = c.name;
   return [
-    `${n} 最新 动态 公告`,
-    `${n} 中标 项目 合作 大客户`,
-    `${n} 融资 并购 投资 增资 战略`,
-    `${n} 高管 任命 人事 组织架构 招聘`,
+    `${n} 最新 动态 公告 战略`,
+    `${n} 中标 合作 大客户 融资 并购`,
+    `${n} 高管 人事 招聘 组织架构`,
     `${n} 新产品 新业务 技术 专利`,
-    `${n} 处罚 诉讼 风险 舆情`,
-    `${n} 渠道 市场 门店 区域 扩张`,
+    `${n} 处罚 诉讼 风险 舆情 扩张`,
   ];
+}
+
+// 单步超时护栏：任一步卡住（检索/模型无响应）不至于让整次刷新永远停在「进行中」。
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: () => T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let settled = false;
+    const done = (v: T) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const timer = setTimeout(() => done(fallback()), ms);
+    p.then(done, () => done(fallback()));
+  });
 }
 
 const SYS = "你是严谨的竞争情报分析师。只依据给定的公开检索资料提炼事实，事实与分析（潜在影响/建议行动）严格分开、绝不混写；证据不足或无法确认主体的事件一律不输出，不杜撰。";
@@ -63,35 +72,58 @@ export function parseIntel(text: string, hits: SearchHit[], unitId: string, comp
       occurTime: occur, publishTime: publish,
       facts: String(e?.facts ?? "").trim(), impact: String(e?.impact ?? "").trim(), action: String(e?.action ?? "").trim(),
       confidence: asConf(String(e?.confidence ?? "")), confidenceBasis: String(e?.confidenceBasis ?? "").trim(),
-      sources, month: (occur || publish || month).slice(0, 7) || month, createdAt: new Date().toISOString(),
+      // 一律归入「本次刷新的月份」而非事件发生月：月初「近7天回填」会带回上月末的事件，
+      // 若按发生月归档会落到上月、当前月视图里看不到（正是「刷新有进度却没结果」的根因）。
+      // 发生时间仍完整保留在 occurTime/publishTime，卡片照常显示与排序。
+      sources, month, createdAt: new Date().toISOString(),
     });
   }
   return out;
 }
 
-// 刷新一个业务单元（backfill=true 时按近 7 天首次回填，否则本月）
-export async function refreshUnit(unit: Unit, month: string, backfill: boolean, onProgress?: (msg: string) => void): Promise<{ count: number }> {
+// 刷新一个业务单元（backfill=true 时按近 7 天首次回填，否则本月）。
+// onlyCompanyId 传入时只刷这一家（配合上方「全部企业」下拉：选了某家就只跑那家，别再全跑）。
+// 返回带诊断的 summary，让「没结果」也能说清是哪一环：检索无命中 / 模型空返回 / 确无窗口内事件。
+export async function refreshUnit(
+  unit: Unit, month: string, backfill: boolean,
+  onProgress?: (msg: string) => void, onlyCompanyId?: string,
+): Promise<{ count: number; summary: string }> {
   const cfg = loadConfig();
   if (!searchEnabled(cfg)) throw new Error("未配置联网检索（博查）——到「设置 → 数据源」填检索 API 后再刷新。");
   const agent = cfg.agents["资料"]; const prov = providerById(cfg, agent.provider);
   if (prov.id === "mock") throw new Error("「资料」未配置真实模型——到「设置」为「资料」配置一款模型后再刷新。");
   const fetchImpl = await getLlmFetch();
   const windowDesc = backfill ? "近 7 天" : `本月（${month}）`;
-  const active = unit.companies.filter((c) => c.active);
+  // 明确点选某家就刷那家（无论是否勾启用）；否则刷该单元全部启用中的企业。
+  const active = unit.companies.filter((c) => (onlyCompanyId ? c.id === onlyCompanyId : c.active));
+  if (!active.length) throw new Error(onlyCompanyId ? "所选企业不存在。" : "该单元没有启用中的对标企业——到「企业名单维护」勾选启用。");
+
   const all: IntelEvent[] = [];
+  let hitTotal = 0, noHits = 0, emptyModel = 0, ok = 0;
   for (let i = 0; i < active.length; i++) {
     const c = active[i];
     onProgress?.(`检索 ${c.name}（${i + 1}/${active.length}）…`);
-    let hits: SearchHit[] = [];
-    try { hits = await gatherSources(cfg, { industry: "", ourRole: "", focus: "对标情报", company: c.name }, queriesFor(c), [c.name, ...c.aliases]); } catch { hits = []; }
-    if (!hits.length) continue;
-    onProgress?.(`解析 ${c.name}（${i + 1}/${active.length}）…`);
-    try {
-      const res = await makeClient(prov, fetchImpl).send({ ...buildIntelRequest(c.name, unit.name, hits, windowDesc), model: agent.model });
-      if (res.text.trim()) all.push(...parseIntel(res.text, hits, unit.id, c.id, c.name, month));
-    } catch { /* 单家失败不阻断整体 */ }
+    const hits: SearchHit[] = await withTimeout(
+      gatherSources(cfg, { industry: "", ourRole: "", focus: "对标情报", company: c.name }, queriesFor(c), [c.name, ...c.aliases]).catch(() => [] as SearchHit[]),
+      75000, () => [] as SearchHit[],
+    );
+    hitTotal += hits.length;
+    if (!hits.length) { noHits++; continue; }
+    onProgress?.(`解析 ${c.name}（命中 ${hits.length} 源 · ${i + 1}/${active.length}）…`);
+    const text = await withTimeout(
+      makeClient(prov, fetchImpl).send({ ...buildIntelRequest(c.name, unit.name, hits, windowDesc), model: agent.model }).then((r) => r.text || "").catch(() => ""),
+      150000, () => "",
+    );
+    if (!text.trim()) { emptyModel++; continue; }
+    all.push(...parseIntel(text, hits, unit.id, c.id, c.name, month));
+    ok++;
   }
-  const count = mergeEvents(unit.id, month, all);
+  const count = mergeEvents(unit.id, month, all, active.map((c) => c.id));
   logRefresh({ unitId: unit.id, month, at: new Date().toISOString(), count });
-  return { count };
+
+  const parts = [`检索 ${active.length} 家`, `命中 ${hitTotal} 源`, `本轮 ${count} 条`];
+  if (noHits) parts.push(`${noHits} 家无检索命中`);
+  if (emptyModel) parts.push(`${emptyModel} 家模型空返回`);
+  if (ok && count === 0) parts.push("已抓到资料但未提炼出窗口内值得关注的事件");
+  return { count, summary: parts.join(" · ") };
 }
